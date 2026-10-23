@@ -171,6 +171,7 @@ export interface QueueCounts {
   succeeded?: number;
   failed?: number;
   deferred?: number;
+  lane_counts?: Record<string, number>;
 }
 
 export interface ScaleStatus {

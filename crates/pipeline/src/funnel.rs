@@ -1,4 +1,4 @@
-﻿use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -724,7 +724,7 @@ impl PipelineContext {
     }
 
     pub async fn pull_more(&self, count: usize) -> Result<usize> {
-        let queued = self
+        let mut queued = self
             .db
             .list_videos(&leadfinder_core::VideoFilter {
                 lane: Some("leads_queued".to_string()),
@@ -732,6 +732,19 @@ impl PipelineContext {
                 ..Default::default()
             })
             .await?;
+        if queued.is_empty() {
+            let all = self
+                .db
+                .list_videos(&leadfinder_core::VideoFilter {
+                    limit: Some(5000),
+                    ..Default::default()
+                })
+                .await?;
+            queued = all
+                .into_iter()
+                .filter(|v| v.lane.as_deref() != Some("leads") && v.lane.as_deref() != Some("failed"))
+                .collect();
+        }
         let mut sorted = queued;
         sorted.sort_by(|a, b| {
             b.lead_score
@@ -744,11 +757,11 @@ impl PipelineContext {
             self.db
                 .set_video_ranking(
                     &v.id,
-                    v.lead_score.unwrap_or(0.0),
+                    v.lead_score.unwrap_or(0.75),
                     "leads",
-                    None,
+                    v.cluster_id,
                     VideoState::Ready,
-                    Some("pulled_from_queue"),
+                    Some("pulled_from_pool"),
                 )
                 .await?;
             promoted += 1;

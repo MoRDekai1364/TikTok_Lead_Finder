@@ -20,12 +20,14 @@
     onResearchMore,
     onBatchKeep,
     onBatchDiscard,
+    laneCounts,
   }: {
     cards: LeadCard[];
     activeLane: Lane;
     selectedId: string | null;
     checkedIds: Set<string>;
     currentLang: Language;
+    laneCounts?: Record<string, number>;
     onSelectCard: (id: string) => void;
     onToggleCheck: (id: string) => void;
     onChangeLane: (lane: Lane) => void;
@@ -60,7 +62,7 @@
   const filteredCards = $derived.by(() => {
     let list = cards.filter((c: LeadCard) => {
       if (activeLane === 'leads') {
-        return c.lane === 'leads' || c.lane === 'leads_queued';
+        return c.lane === 'leads' || c.lane === 'leads_queued' || !c.lane;
       }
       return c.lane === activeLane;
     });
@@ -130,6 +132,9 @@
         aria-selected={activeLane === 'leads'}
       >
         {t.laneLeads}
+        {#if laneCounts?.leads}
+          <span class="tab-badge">{laneCounts.leads}</span>
+        {/if}
       </button>
       <button
         class="lane-tab"
@@ -139,6 +144,9 @@
         aria-selected={activeLane === 'already_checked'}
       >
         {t.laneAlreadyChecked}
+        {#if laneCounts?.already_checked}
+          <span class="tab-badge">{laneCounts.already_checked}</span>
+        {/if}
       </button>
       <button
         class="lane-tab"
@@ -148,6 +156,21 @@
         aria-selected={activeLane === 'low_quality'}
       >
         {t.laneLowQuality}
+        {#if laneCounts?.low_quality}
+          <span class="tab-badge">{laneCounts.low_quality}</span>
+        {/if}
+      </button>
+      <button
+        class="lane-tab"
+        class:active={activeLane === 'screened_out'}
+        onclick={() => onChangeLane('screened_out')}
+        role="tab"
+        aria-selected={activeLane === 'screened_out'}
+      >
+        {currentLang === 'bg' ? 'Отхвърлени' : 'Screened Out'}
+        {#if laneCounts?.screened_out}
+          <span class="tab-badge">{laneCounts.screened_out}</span>
+        {/if}
       </button>
       <button
         class="lane-tab"
@@ -157,6 +180,9 @@
         aria-selected={activeLane === 'failed'}
       >
         {t.laneFailed}
+        {#if laneCounts?.failed}
+          <span class="tab-badge">{laneCounts.failed}</span>
+        {/if}
       </button>
     </div>
 
@@ -173,6 +199,7 @@
 
       <select bind:value={verdictFilter} class="select-filter" aria-label={t.filterVerdict}>
         <option value="all">{t.filterVerdict}</option>
+        <option value="PROCESSING">{currentLang === 'bg' ? 'В обработка' : 'Processing'}</option>
         <option value="CONTRADICTED">CONTRADICTED</option>
         <option value="SUPPORTED">SUPPORTED</option>
         <option value="UNVERIFIABLE">UNVERIFIABLE</option>
@@ -188,7 +215,7 @@
 
       {#if activeLane === 'leads'}
         <button class="btn btn-secondary btn-sm" onclick={onPullMore} title={t.pullMoreButton}>
-          {t.pullMoreButton}
+          +15 {t.pullMoreButton}
         </button>
       {/if}
     </div>
@@ -291,6 +318,28 @@
     background: var(--primary-accent);
     color: #fff;
     border-color: var(--primary-accent);
+  }
+
+  .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    border: 1px solid var(--border-color);
+    margin-left: 0.35rem;
+    color: var(--text-muted);
+  }
+
+  .lane-tab.active .tab-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-color: transparent;
   }
 
   .filter-controls {

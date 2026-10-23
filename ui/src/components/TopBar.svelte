@@ -29,15 +29,25 @@
 
   let pasteText = $state('');
   let isPasting = $state(false);
+  let toastMessage = $state<string | null>(null);
+  let toastIsError = $state(false);
 
   const t = $derived(translations[currentLang]);
 
   async function handlePaste() {
     if (!pasteText.trim() || isPasting) return;
     isPasting = true;
+    toastMessage = currentLang === 'bg' ? 'Добавяне на линк...' : 'Adding link...';
+    toastIsError = false;
     try {
       await onPasteUrls(pasteText);
       pasteText = '';
+      toastMessage = currentLang === 'bg' ? '✓ Линкът е добавен в опашката!' : '✓ Added to processing queue!';
+      setTimeout(() => { toastMessage = null; }, 3500);
+    } catch (e: any) {
+      toastIsError = true;
+      toastMessage = currentLang === 'bg' ? '✕ Невалиден линк или грешка' : '✕ Invalid link or error';
+      setTimeout(() => { toastMessage = null; }, 4000);
     } finally {
       isPasting = false;
     }
@@ -74,6 +84,9 @@
       <button class="btn btn-primary" onclick={handlePaste} disabled={isPasting || !pasteText.trim()}>
         {isPasting ? '...' : t.pasteButton}
       </button>
+      {#if toastMessage}
+        <span class="paste-toast" class:toast-error={toastIsError}>{toastMessage}</span>
+      {/if}
     </div>
 
     <div class="indicators">
@@ -198,6 +211,25 @@
 
   .paste-bar input:focus {
     border-color: var(--primary-accent);
+  }
+
+  .paste-toast {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--verdict-supported);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    white-space: nowrap;
+  }
+
+  .paste-toast.toast-error {
+    background: rgba(225, 29, 72, 0.2);
+    color: var(--verdict-contradicted);
+    border-color: rgba(225, 29, 72, 0.4);
   }
 
   .indicators {

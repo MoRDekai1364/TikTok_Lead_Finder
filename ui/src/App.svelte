@@ -113,13 +113,16 @@
   }
 
   async function handlePasteUrls(text: string) {
-    await pasteLinks(text);
+    const res = await pasteLinks(text);
+    if (res && typeof res.ingested === 'number' && res.ingested === 0) {
+      throw new Error('No valid TikTok links found');
+    }
     await loadInitialData();
   }
 
   async function handlePullMore() {
-    await pullMore(10);
-    cards = await fetchVideos(activeLane);
+    await pullMore(15);
+    await loadInitialData();
   }
 
   async function handleKeep(id: string) {
@@ -281,6 +284,7 @@
           {selectedId}
           {checkedIds}
           {currentLang}
+          laneCounts={queueCounts.lane_counts}
           onSelectCard={handleSelectCard}
           onToggleCheck={handleToggleCheck}
           onChangeLane={handleChangeLane}

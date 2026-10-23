@@ -52,6 +52,8 @@
         return 'chip-not-checkable';
       case 'ALREADY_CHECKED':
         return 'chip-already-checked';
+      case 'PROCESSING':
+        return 'chip-processing';
       default:
         return 'chip-default';
     }
@@ -342,6 +344,11 @@
   .chip-already-checked {
     background: rgba(168, 85, 247, 0.15);
     color: #a855f7;
+  }
+
+  .chip-processing {
+    background: rgba(59, 130, 246, 0.18);
+    color: #3b82f6;
   }
 
   .chip-default {

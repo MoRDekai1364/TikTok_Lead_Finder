@@ -123,6 +123,11 @@ impl Database {
         let hashtags_json = serde_json::to_string(&vref.hashtags)?;
 
         if let Some(prev) = existing {
+            let promoted_lane = if vref.discovered_via.starts_with("paste") && prev.lane.is_none() {
+                Some("leads")
+            } else {
+                prev.lane.as_deref()
+            };
             sqlx::query(
                 "UPDATE videos SET
                    creator_id = COALESCE(?2, creator_id),
@@ -133,7 +138,8 @@ impl Database {
                    likes = COALESCE(?7, likes),
                    shares = COALESCE(?8, shares),
                    comments = COALESCE(?9, comments),
-                   duration_s = COALESCE(?10, duration_s)
+                   duration_s = COALESCE(?10, duration_s),
+                   lane = COALESCE(lane, ?11)
                  WHERE id = ?1",
             )
             .bind(&vref.id)
@@ -146,6 +152,7 @@ impl Database {
             .bind(vref.shares)
             .bind(vref.comments)
             .bind(vref.duration_s)
+            .bind(promoted_lane)
             .execute(&self.pool)
             .await?;
 
@@ -153,11 +160,16 @@ impl Database {
             return Ok((updated, false));
         }
 
+        let initial_lane = if vref.discovered_via.starts_with("paste") {
+            Some("leads")
+        } else {
+            None
+        };
         sqlx::query(
             "INSERT INTO videos (
                 id, creator_id, url, caption, hashtags, posted_at, views, likes, shares, comments,
-                duration_s, discovered_via, discovered_at, state
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                duration_s, discovered_via, discovered_at, state, lane
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         )
         .bind(&vref.id)
         .bind(&creator_id)
@@ -173,6 +185,7 @@ impl Database {
         .bind(&vref.discovered_via)
         .bind(&now)
         .bind(VideoState::Discovered.as_str())
+        .bind(initial_lane)
         .execute(&self.pool)
         .await?;
 
@@ -309,7 +322,7 @@ impl Database {
             "SELECT v.*, c.handle AS creator_handle, c.display_name AS creator_display_name
              FROM videos v
              LEFT JOIN creators c ON c.id = v.creator_id
-             WHERE (?1 IS NULL OR v.lane = ?1)
+             WHERE (?1 IS NULL OR v.lane = ?1 OR (v.lane IS NULL AND ?1 = 'leads'))
                AND (?2 IS NULL OR v.state = ?2)
                AND (?3 IS NULL OR v.creator_id = ?3)
                AND (?4 IS NULL OR COALESCE(v.lead_score, 0.0) >= ?4)
@@ -319,7 +332,7 @@ impl Database {
                     OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND LOWER(cl.text_bg) LIKE '%' || LOWER(?6) || '%'))
                AND (?7 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.verdict = ?7))
                AND (?8 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.label = ?8))
-             ORDER BY COALESCE(v.lead_score, -1.0) DESC, v.discovered_at DESC
+             ORDER BY CASE WHEN v.lane IS NULL OR v.state != 'VERIFIED' THEN 999.0 ELSE COALESCE(v.lead_score, -1.0) END DESC, v.discovered_at DESC
              LIMIT ?9 OFFSET ?10",
         )
         .bind(&filter.lane)
@@ -336,6 +349,23 @@ impl Database {
         .await?;
 
         Ok(rows.iter().map(Self::map_video_row).collect())
+    }
+
+    pub async fn get_lane_counts(&self) -> Result<std::collections::HashMap<String, i64>> {
+        let rows = sqlx::query(
+            "SELECT COALESCE(lane, 'leads') AS lane_key, COUNT(*) AS cnt
+             FROM videos
+             GROUP BY COALESCE(lane, 'leads')",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        let mut map = std::collections::HashMap::new();
+        for r in rows {
+            let k: String = r.get("lane_key");
+            let c: i64 = r.get("cnt");
+            map.insert(k, c);
+        }
+        Ok(map)
     }
 
     pub async fn list_lead_cards(&self, filter: &VideoFilter) -> Result<Vec<LeadCardSummary>> {
@@ -396,24 +426,48 @@ impl Database {
 
             let research_running_row = sqlx::query(
                 "SELECT COUNT(*) AS cnt FROM jobs
-                 WHERE video_id = ?1 AND stage = 'RESEARCH_MORE' AND status IN ('queued', 'running')",
+                 WHERE video_id = ?1 AND status IN ('queued', 'running')",
             )
             .bind(&video.id)
             .fetch_one(&self.pool)
             .await?;
-            let research_running = research_running_row.get::<i64, _>("cnt") > 0;
+            let research_running = research_running_row.get::<i64, _>("cnt") > 0 || video.state != "VERIFIED";
+
+            let top_claim_bg_final = if top_claim_bg.is_some() {
+                top_claim_bg
+            } else if video.state != "VERIFIED" {
+                Some("Видеото се обработва в момента (транскрибиране, OCR и проверка)...".to_string())
+            } else {
+                None
+            };
+
+            let top_verdict_final = if top_verdict.is_some() {
+                top_verdict
+            } else if video.state != "VERIFIED" {
+                Some("PROCESSING".to_string())
+            } else {
+                None
+            };
+
+            let top_label_final = if top_label.is_some() {
+                top_label
+            } else if video.state != "VERIFIED" {
+                Some("В обработка...".to_string())
+            } else {
+                None
+            };
 
             let reason_flagged = video
                 .state_reason
                 .clone()
-                .or_else(|| top_claim_bg.clone())
+                .or_else(|| top_claim_bg_final.clone())
                 .unwrap_or_else(|| video.discovered_via.clone());
 
             cards.push(LeadCardSummary {
                 video,
-                top_claim_bg,
-                top_verdict,
-                top_label,
+                top_claim_bg: top_claim_bg_final,
+                top_verdict: top_verdict_final,
+                top_label: top_label_final,
                 transcript_quality,
                 transcript_source,
                 max_checkworthiness,

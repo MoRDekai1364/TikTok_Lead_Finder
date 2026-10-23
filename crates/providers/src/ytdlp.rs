@@ -425,15 +425,19 @@ pub fn extract_video_id_from_url(url_or_id: &str) -> Option<String> {
 
 pub fn extract_tiktok_urls_from_text(input: &str) -> Vec<String> {
     let url_re = Regex::new(
-        r"https?://(?:www\.|m\.|vm\.|vt\.)?tiktok\.com/[^\s,\x22'<>]+",
+        r"(?:https?://)?(?:www\.|m\.|vm\.|vt\.)?tiktok\.com/[^\s,\x22'<>]+",
     )
     .unwrap();
     let mut urls = Vec::new();
     for m in url_re.find_iter(input) {
-        let cleaned = m
+        let raw = m
             .as_str()
-            .trim_end_matches(|c: char| matches!(c, '.' | ',' | ';' | ')' | ']'))
-            .to_string();
+            .trim_end_matches(|c: char| matches!(c, '.' | ',' | ';' | ')' | ']' | '?' | '&'));
+        let cleaned = if raw.starts_with("http://") || raw.starts_with("https://") {
+            raw.to_string()
+        } else {
+            format!("https://{raw}")
+        };
         if !urls.contains(&cleaned) {
             urls.push(cleaned);
         }

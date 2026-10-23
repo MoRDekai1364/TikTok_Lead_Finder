@@ -1,4 +1,4 @@
-﻿[server]
+[server]
 host = '127.0.0.1'
 port = 17420
 data_dir = 'data'
@@ -30,13 +30,13 @@ ocr_languages = ['bul', 'eng']
 ocr_dedup_similarity = 0.85
 
 [funnel]
-min_views = 2000
-min_views_per_hour = 100
-daily_lead_cap = 25
+min_views = 500
+min_views_per_hour = 50
+daily_lead_cap = 100
 low_quality_threshold = 0.4
 retention_days = 7
-daily_llm_budget = 250
-daily_search_budget = 500
+daily_llm_budget = 500
+daily_search_budget = 1000
 cluster_similarity_threshold = 0.55
 virality_saturation_views = 1000000
 phash_max_hamming = 6

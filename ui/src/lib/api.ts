@@ -107,7 +107,8 @@ function normalizeProfile(res: any): HardwareProfile | null {
 
 export async function fetchQueueStatus(): Promise<QueueCounts> {
   const res = await fetchJson<any>('/api/health');
-  return (res?.queue || res || {}) as QueueCounts;
+  const q = res?.queue || res || {};
+  return { ...q, lane_counts: res?.lane_counts } as QueueCounts;
 }
 
 export async function fetchScaleStatus(): Promise<ScaleStatus> {
@@ -129,10 +130,17 @@ export async function fetchVideoDetail(id: string): Promise<VideoDetail> {
   return fetchJson<VideoDetail>(`/api/videos/${encodeURIComponent(id)}`);
 }
 
-export async function pasteLinks(text: string): Promise<{ count: number }> {
-  return fetchJson<{ count: number }>('/api/inbox/paste', {
+export async function pasteLinks(text: string): Promise<{ count?: number; ingested?: number; videos?: any[] }> {
+  return fetchJson<{ count?: number; ingested?: number; videos?: any[] }>('/api/inbox/paste', {
     method: 'POST',
     body: JSON.stringify({ text }),
+  });
+}
+
+export async function triggerDiscovery(maxPerSeed: number = 10): Promise<{ count: number }> {
+  return fetchJson<{ count: number }>('/api/discover/run', {
+    method: 'POST',
+    body: JSON.stringify({ max_per_seed: maxPerSeed }),
   });
 }
 

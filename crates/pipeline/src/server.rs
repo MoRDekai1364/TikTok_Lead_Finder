@@ -116,6 +116,7 @@ pub struct HealthResponse {
     pub queue: serde_json::Value,
     pub capacity_per_day: Option<f64>,
     pub cloud_enabled: bool,
+    pub lane_counts: std::collections::HashMap<String, i64>,
 }
 
 pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
@@ -189,6 +190,7 @@ async fn handle_health(State(ctx): State<Arc<PipelineContext>>) -> impl IntoResp
         .ok()
         .flatten()
         .and_then(|p| p.capacity_per_day);
+    let lane_counts = ctx.db.get_lane_counts().await.unwrap_or_default();
 
     Json(HealthResponse {
         status: "ok",
@@ -200,6 +202,7 @@ async fn handle_health(State(ctx): State<Arc<PipelineContext>>) -> impl IntoResp
         queue,
         capacity_per_day,
         cloud_enabled: cfg.providers.cloud_enabled,
+        lane_counts,
     })
 }
 
@@ -338,9 +341,11 @@ async fn handle_list_videos(
     match ctx.db.list_lead_cards(&filter).await {
         Ok(cards) => {
             let cap = ctx.config.read().await.funnel.daily_lead_cap;
+            let lane_counts = ctx.db.get_lane_counts().await.unwrap_or_default();
             Json(serde_json::json!({
                 "daily_cap": cap,
                 "total": cards.len(),
+                "lane_counts": lane_counts,
                 "cards": cards
             }))
             .into_response()
