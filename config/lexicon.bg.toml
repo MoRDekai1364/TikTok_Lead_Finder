@@ -176,6 +176,10 @@ right = 'тротоара'
 wrong = 'ильяна'
 right = 'Илияна'
 
+[[asr_repairs]]
+wrong = 'напрао'
+right = 'направо'
+
 [[orth_phonetic_clusters]]
 from = 'щн'
 to = 'SHN'
@@ -853,6 +857,30 @@ term = 'калинка'
 standard = 'назначен без квалификация партиен кадър'
 register = 'български политически жаргон'
 ipa = 'kɐˈliŋkɐ'
+
+[[dialect_glossary]]
+term = 'напрао'
+standard = 'направо'
+register = 'разговорно'
+ipa = 'nɐˈpraɔ'
+
+[[dialect_glossary]]
+term = 'чоек'
+standard = 'човек'
+register = 'разговорно/диалектно'
+ipa = 'ˈtʃɔɛk'
+
+[[dialect_glossary]]
+term = 'еми'
+standard = 'ами'
+register = 'разговорно'
+ipa = 'ˈɛmi'
+
+[[dialect_glossary]]
+term = 'баси'
+standard = 'баси / възклицание'
+register = 'разговорно/жаргон'
+ipa = 'ˈbasi'
 
 [[acronyms]]
 abbr = 'ДДС'

@@ -298,7 +298,7 @@ impl Database {
         sqlx::query(
             "UPDATE videos SET
                lead_score = ?2,
-               lane = CASE WHEN discovered_via LIKE 'paste%' THEN 'pasted' ELSE ?3 END,
+               lane = ?3,
                cluster_id = COALESCE(?4, cluster_id),
                state = ?5,
                state_reason = ?6
