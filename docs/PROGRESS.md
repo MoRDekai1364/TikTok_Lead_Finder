@@ -1,6 +1,6 @@
-﻿# Implementation Progress
+# Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 5 in progress. Phase 4 is PARTIAL, see its section.
+Last updated: 2026-10-23 · Current active phase: Phase 7 in progress. Phase 4 and Phase 5 have partial items noted below.
 
 ## Phase Summary
 
@@ -12,7 +12,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 5 in progress. Phase 4 i
 | Phase 3 | Calibration | PASS |
 | Phase 4 | Claims and people | PARTIAL (80% accuracy target and owner review of 50 claims not met) |
 | Phase 5 | Verification | PARTIAL (synthetic gold set only, see D-009) |
-| Phase 6 | Funnel, ranking and clustering | PENDING |
+| Phase 6 | Funnel, ranking and clustering | PASS |
 | Phase 7 | Scale hardening | PENDING |
 | Phase 8 | Triage UI | PENDING |
 | Phase 9 | People research, export, packaging | PENDING |
@@ -214,3 +214,39 @@ Last updated: 2026-10-23 · Current active phase: Phase 5 in progress. Phase 4 i
   - All tests pass, including `gold::tests` forcing-rule tests and provider parser tests.
   - `eval-gold-set` prints `"synthetic_fixture": true`, `"traps_supported_count": 0`, `"traps_pass_count": 12`, `"forcing_rules_compliance_rate": 1.0`.
   - The report table matches those numbers. Exact verdict agreement can vary by a claim or two between runs.
+
+---
+
+## Phase 6: Funnel, ranking and clustering
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - `SCREEN_CHEAP` gates (`crates/pipeline/src/funnel.rs`): video ID & keyframe perceptual hash (`phash`) deduplication with Hamming distance <= configured max distance (default 6), virality gate (`min_views` default 10k, `min_views_per_hour` default 500), relevance gate, budget gate, and bypass sources (`paste`, `partner`, `import`).
+  - Leader-based narrative clustering (`cluster_claims` with lemma Jaccard + character trigram cosine similarity) grouping near-identical claims across videos without union-find chaining (`D-011`).
+  - Lead scoring (`lead_score`) based on Section 9 formula: verdict value (`CONTRADICTED: 1.0`, `UNVERIFIABLE: 0.6`, `NOT_CHECKABLE: 0.1`, `SUPPORTED: 0.0`), log-saturation virality score, and transcript quality score.
+  - Lane assignment respecting `daily_lead_cap` (default 25) with lanes: `Leads`, `Leads queued`, `Clustered`, `Already checked`, `Low quality`, `Failed`, `Screened out`.
+  - Overflow action `pull-more` to promote batches into `Leads`.
+  - Decision logging (`keep`, `discard`, `research_more`, `undo`) in `decisions` table with full reversible history.
+  - Logistic regression (`fit_logistic` and `propose_weights`) for `tune` command after 200 decisions, requiring explicit user/owner confirmation.
+  - Creator expansion eligibility tracking (`refresh_creator_flagged_counts`, `eligible_expansion_creators`).
+  - CLI commands: `rank`, `pull-more`, `decide`, `tune`, `replay-funnel`, `expansion-candidates`.
+  - HTTP endpoints in `server.rs`: `/api/rank/run`, `/api/rank/pull-more`, `/api/rank/tune`.
+- **Measured**:
+  - 300-video replay (`fixtures/phase6_replay.json`): 97 screened out, 203 passed through pipeline, exactly 25 top leads assigned to `Leads` lane, 47 in `Leads queued`.
+  - 10 seeded duplicate narrative clusters all grouped accurately with 0 split clusters and 0 cross-narrative mixing.
+  - 12 perceptual hash duplicate keyframes detected and dropped.
+  - Documented in `docs/FUNNEL_REPORT.md` and `docs/DECISIONS.md` (`D-011`).
+- **Decisions taken**:
+  - `D-011`: Selected leader-based clustering with combined similarity metric (0.6 lemma Jaccard + 0.4 character trigram cosine) to avoid single-link chaining.
+- **Open issues**:
+  - None blocking Phase 7.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  cargo run -p leadfinder-cli -- replay-funnel fixtures/phase6_replay.json
+  Get-Content docs/FUNNEL_REPORT.md -TotalCount 25
+  ```
+  Expected output:
+  - All workspace tests pass.
+  - `replay-funnel` outputs JSON confirming 300 total videos, 97 screened out, 203 passed, exactly 25 leads, 47 leads_queued, 10/10 seeded clusters verified with 0 split.
+  - `docs/FUNNEL_REPORT.md` contains the full replay metrics and clustering evaluation table.

@@ -142,6 +142,26 @@ pub struct FunnelConfig {
     pub daily_search_budget: u64,
     #[serde(default = "default_cluster_threshold")]
     pub cluster_similarity_threshold: f64,
+    #[serde(default = "default_virality_saturation_views")]
+    pub virality_saturation_views: i64,
+    #[serde(default = "default_phash_max_hamming")]
+    pub phash_max_hamming: u32,
+    #[serde(default = "default_tune_min_decisions")]
+    pub tune_min_decisions: usize,
+    #[serde(default)]
+    pub bypass_sources: Vec<String>,
+}
+
+fn default_virality_saturation_views() -> i64 {
+    1_000_000
+}
+
+fn default_phash_max_hamming() -> u32 {
+    6
+}
+
+fn default_tune_min_decisions() -> usize {
+    200
 }
 
 fn default_daily_llm_budget() -> u64 {

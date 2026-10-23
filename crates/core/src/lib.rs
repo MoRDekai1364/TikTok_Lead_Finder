@@ -1,5 +1,6 @@
-pub mod config;
+﻿pub mod config;
 pub mod db;
+pub mod db_funnel;
 pub mod models;
 pub mod politeness;
 pub mod traits;

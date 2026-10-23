@@ -100,3 +100,12 @@ Every deviation from `docs/PLAN.md` and every resolution of a deferred decision 
 - **Context**: Phase 4 acceptance asks for 80% correct extractions on an owner review of 50 claims. The corpus yields 39 claims after filtering and the agent's review scored 66.7%. The owner review cannot be done by the agent.
 - **Decision**: Record Phase 4 as PARTIAL in `docs/PROGRESS.md` and continue to Phase 5, whose verification stage depends only on claim text and the forcing rules. Do not report Phase 4 as passed.
 - **Reason**: Section 0 rule 9 lets the agent continue when blocked on an owner-only item. The deviation from strict phase sequencing is logged here.
+
+## D-011: Claim Clustering Method and Replay Fixture
+- **Date**: 2026-10-23
+- **Phase**: 6
+- **Context**: Section 9 asks for near-duplicate claim clustering by embedding or n-gram similarity, and Section 18 defers the embedding choice.
+- **Decision**: No embedding model. Similarity is `0.6 * lemma Jaccard + 0.4 * character trigram cosine` using the Bulgarian lexicon lemmatiser, threshold `funnel.cluster_similarity_threshold = 0.55`. Clustering is leader-based: a claim joins the most similar existing leader at or above the threshold, otherwise it starts a cluster. A first attempt used single-link union-find. On the replay fixture it chained unrelated claims into a cluster of 46 videos, so it was replaced.
+- **Replay fixture**: `fixtures/phase6_replay.json` is generated and flagged `"synthetic": true`. No recorded TikTok corpus with owner labels exists yet.
+- **Lanes**: besides the four plan lanes the ranker writes `leads_queued` (behind the daily cap), `clustered` (non-representative members of a cluster) and `screened_out` (no check-worthy claim). The UI shows only the four plan lanes.
+- **Reason**: Cheap, offline and explainable. An embedding re-rank can replace it later without changing the lane logic.

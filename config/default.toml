@@ -38,6 +38,10 @@ retention_days = 7
 daily_llm_budget = 250
 daily_search_budget = 500
 cluster_similarity_threshold = 0.55
+virality_saturation_views = 1000000
+phash_max_hamming = 6
+tune_min_decisions = 200
+bypass_sources = ['paste', 'partner', 'import']
 
 [ranking]
 w_check = 0.35

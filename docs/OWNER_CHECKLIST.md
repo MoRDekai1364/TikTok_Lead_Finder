@@ -17,3 +17,4 @@ This checklist tracks items requiring confirmation, sign-off, or ongoing curatio
 - [ ] Review 50 extracted claims from your own clips (`leadfinder extract-claims-batch`, then `docs/CLAIMS_AUDIT.md` as the template). The plan requires at least 80% correct. The current agent review is 66.7% on 39 claims.
 - [ ] Supply real fact-checks (claim text, published verdict, link) for the gold set so `leadfinder eval-gold-set` can report agreement with published verdicts. The bundled `fixtures/gold_set/claims.json` is synthetic and flagged as such.
 - [ ] Tell us whether Factcheck.bg access is permitted for automated lookups. Its feed and API returned `403 Forbidden` on re-test while `robots.txt` allows crawling.
+- [ ] Label 100 or more processed videos keep or discard so `leadfinder tune` and a real precision at 25 become possible. The bundled replay fixture is synthetic.

@@ -1,5 +1,6 @@
 ﻿pub mod claims;
 pub mod engine;
+pub mod funnel;
 pub mod gold;
 pub mod janitor;
 pub mod server;
@@ -8,6 +9,7 @@ pub mod verify;
 
 pub use claims::*;
 pub use engine::*;
+pub use funnel::*;
 pub use gold::*;
 pub use janitor::*;
 pub use server::*;

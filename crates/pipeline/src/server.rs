@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+﻿use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
 use axum::extract::{Path, Query, Request, State};
@@ -119,6 +119,9 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/inbox/paste", post(handle_paste))
         .route("/api/inbox/import", post(handle_import))
         .route("/api/discover/run", post(handle_discover_run))
+        .route("/api/rank/run", post(handle_rank_run))
+        .route("/api/rank/pull-more", post(handle_pull_more))
+        .route("/api/rank/tune", post(handle_tune))
         .route("/api/videos", get(handle_list_videos))
         .route("/api/videos/:id", get(handle_video_detail))
         .route("/api/videos/:id/decision", post(handle_decision))
@@ -237,6 +240,56 @@ async fn handle_import(
         .into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PullMoreRequest {
+    pub count: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TuneRequest {
+    pub confirm: Option<bool>,
+}
+
+async fn handle_rank_run(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    match ctx.rank_all().await {
+        Ok(summary) => Json(summary).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_pull_more(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<PullMoreRequest>,
+) -> Response {
+    let count = body.count.unwrap_or(10).clamp(1, 200);
+    match ctx.pull_more(count).await {
+        Ok(promoted) => Json(serde_json::json!({ "promoted": promoted })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_tune(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<TuneRequest>,
+) -> Response {
+    match ctx.tune_ranking(body.confirm.unwrap_or(false)).await {
+        Ok(v) => Json(v).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
         )
             .into_response(),

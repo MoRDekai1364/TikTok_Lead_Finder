@@ -128,6 +128,28 @@ enum Commands {
         #[arg(required = true)]
         video_id: String,
     },
+    Rank,
+    ExpansionCandidates,
+    PullMore {
+        #[arg(long, default_value_t = 10)]
+        count: usize,
+    },
+    Decide {
+        #[arg(required = true)]
+        video_id: String,
+        #[arg(required = true)]
+        action: String,
+        #[arg(long)]
+        note: Option<String>,
+    },
+    Tune {
+        #[arg(long, default_value_t = false)]
+        confirm: bool,
+    },
+    ReplayFunnel {
+        #[arg(required = true)]
+        fixture_json: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -416,6 +438,68 @@ async fn main() -> Result<()> {
         Commands::EvalGoldSet { fixtures_json } => {
             let result = leadfinder_pipeline::run_gold_set_eval(&ctx, &fixtures_json).await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Commands::Rank => {
+            let summary = ctx.rank_all().await?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Commands::ExpansionCandidates => {
+            let cfg = ctx.config.read().await.clone();
+            let rows = ctx
+                .db
+                .eligible_expansion_creators(cfg.expansion.min_flagged_videos, cfg.expansion.max_depth)
+                .await?;
+            let items: Vec<serde_json::Value> = rows
+                .into_iter()
+                .map(|(handle, depth, flagged)| {
+                    serde_json::json!({
+                        "handle": handle,
+                        "expansion_depth": depth,
+                        "flagged_count": flagged,
+                        "max_videos_per_run": cfg.expansion.max_videos_per_creator,
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&items)?);
+        }
+        Commands::PullMore { count } => {
+            let promoted = ctx.pull_more(count).await?;
+            println!("{}", serde_json::json!({ "promoted": promoted }));
+        }
+        Commands::Decide { video_id, action, note } => {
+            if !matches!(action.as_str(), "keep" | "discard" | "research_more" | "undo") {
+                anyhow::bail!("action must be keep, discard, research_more or undo");
+            }
+            let decision = ctx.db.log_decision(&video_id, &action, note.as_deref()).await?;
+            println!("{}", serde_json::to_string_pretty(&decision)?);
+        }
+        Commands::Tune { confirm } => {
+            let report = ctx.tune_ranking(confirm).await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::ReplayFunnel { fixture_json } => {
+            #[derive(serde::Deserialize)]
+            struct ReplayFixture {
+                videos: Vec<leadfinder_pipeline::FunnelVideo>,
+                seed_terms: Vec<String>,
+                now: String,
+            }
+            let raw = std::fs::read_to_string(&fixture_json)?;
+            let fx: ReplayFixture = serde_json::from_str(raw.trim_start_matches('\u{feff}'))?;
+            let cfg = ctx.config.read().await.clone();
+            let lex = global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
+            let now = chrono::DateTime::parse_from_rfc3339(&fx.now)?.with_timezone(&chrono::Utc);
+            let (result, ranked) = leadfinder_pipeline::replay_funnel(
+                &fx.videos,
+                &cfg,
+                &fx.seed_terms,
+                &|w: &str| lex.lemmatize_word(w),
+                now,
+            );
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({ "result": result, "ranked": ranked }))?
+            );
         }
         Commands::VerifyVideo { video_id } => {
             ctx.run_verify_job(&video_id).await?;
