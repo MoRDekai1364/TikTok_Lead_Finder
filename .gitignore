@@ -1,0 +1,17 @@
+/target
+/ui/node_modules
+/ui/dist
+/ui/src-tauri/target
+/.env
+/*.db
+/*.db-shm
+/*.db-wal
+/data
+/logs
+/cache
+/tools
+/models
+/release_stage
+/Setup_Output
+/.DS_Store
+Thumbs.db

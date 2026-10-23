@@ -1,0 +1,131 @@
+[server]
+host = '127.0.0.1'
+port = 17420
+data_dir = 'data'
+db_path = 'data/leadfinder.db'
+log_dir = 'logs'
+cache_dir = 'cache'
+prompts_dir = 'prompts'
+assets_dir = 'assets'
+tools_dir = 'tools'
+models_dir = 'models'
+
+[discovery]
+region = 'BG'
+languages = ['bg', 'en', 'ru', 'tr']
+requests_per_minute = 12
+breaker_failures = 5
+breaker_cooldown_minutes = 30
+cache_ttl_hours = 6
+automated_discovery_enabled = false
+yt_dlp_timeout_seconds = 45
+
+[extraction]
+ffmpeg_timeout_seconds = 120
+whisper_timeout_seconds = 300
+ocr_timeout_seconds = 60
+keyframe_interval_seconds = 3
+max_keyframes = 20
+ocr_languages = ['bul', 'eng']
+ocr_dedup_similarity = 0.85
+
+[funnel]
+min_views = 2000
+min_views_per_hour = 100
+daily_lead_cap = 25
+low_quality_threshold = 0.4
+retention_days = 7
+daily_llm_budget = 250
+daily_search_budget = 500
+cluster_similarity_threshold = 0.55
+
+[ranking]
+w_check = 0.35
+w_viral = 0.20
+w_verdict = 0.35
+w_q = 0.15
+checkworthy_threshold = 0.45
+weight_llm_score = 0.60
+weight_contains_numbers = 0.12
+weight_public_figure = 0.10
+weight_sensitive_topic = 0.10
+weight_urges_sharing = 0.08
+sensitive_topic_terms = ['здраве', 'ваксин', 'лекарств', 'рак', 'избори', 'гласува', 'бюлетин', 'евро', 'война', 'пенси', 'данък', 'ток', 'вода']
+share_urge_terms = ['споделете', 'разпространете', 'предайте', 'преди да го изтрият', 'скриват от нас', 'share']
+
+[normalisation]
+wikidata_languages = ['bg', 'en']
+definite_suffixes = ['ът', 'ят', 'та', 'то', 'те']
+role_prefixes = ['проф.', 'проф', 'доц.', 'доц', 'д-р', 'ген.', 'ген', 'акад.', 'инж.', 'г-н', 'г-жа', 'президентът', 'премиерът', 'министърът', 'депутатът']
+
+[expansion]
+min_flagged_videos = 3
+window_days = 30
+max_videos_per_creator = 20
+max_depth = 2
+
+[capacity]
+target_videos_per_day = 300
+processing_window_hours = 12
+avg_video_seconds = 45
+overhead_seconds = 10
+max_wer_ceiling = 0.40
+min_llm_tokens_per_second = 8.0
+min_llm_json_validity = 0.95
+
+[providers]
+llm_chain = ['local', 'gemini', 'heuristics']
+cloud_enabled = false
+local_llm_url = 'http://127.0.0.1:18080'
+local_llm_model = 'bggpt'
+gemini_model = 'gemini-2.5-flash'
+transcriber_engine = 'whisper_cpp'
+whisper_model = 'small'
+ocr_engine = 'tesseract'
+searxng_url = ''
+
+[verification]
+min_independent_news_outlets = 2
+passages_per_claim = 8
+retrieval_window_days = 30
+already_checked_similarity = 0.60
+
+[[factcheck_archives]]
+name = 'Factcheck.bg'
+base_url = 'https://factcheck.bg'
+feed_url = 'https://factcheck.bg/feed/'
+sitemap_url = 'https://factcheck.bg/post-sitemap.xml'
+search_url_template = 'https://factcheck.bg/?s={query}'
+enabled = true
+
+[[factcheck_archives]]
+name = 'AFP Провери'
+base_url = 'https://proveri.afp.com'
+feed_url = 'https://proveri.afp.com/rss.xml'
+sitemap_url = 'https://proveri.afp.com/sitemap.xml'
+search_url_template = 'https://proveri.afp.com/search?search_api_fulltext={query}'
+enabled = true
+
+[[factcheck_archives]]
+name = 'BNR Проверено'
+base_url = 'https://bnr.bg'
+feed_url = 'https://bnr.bg/factcheck/rss'
+sitemap_url = ''
+search_url_template = 'https://bnr.bg/search?q={query}'
+enabled = true
+
+[[factcheck_archives]]
+name = 'BNT Проверено'
+base_url = 'https://bntnews.bg'
+feed_url = ''
+sitemap_url = ''
+search_url_template = 'https://bntnews.bg/search?q={query}'
+enabled = true
+
+[[factcheck_archives]]
+name = 'BROD'
+base_url = 'https://brodhub.eu'
+feed_url = 'https://brodhub.eu/feed/'
+sitemap_url = 'https://brodhub.eu/sitemap_index.xml'
+search_url_template = 'https://brodhub.eu/?s={query}'
+enabled = true

@@ -1,0 +1,79 @@
+[[sources]]
+name = 'Народно събрание на Република България'
+domain = 'parliament.bg'
+category = 'parliament'
+
+[[sources]]
+name = 'Министерски съвет'
+domain = 'gov.bg'
+category = 'government'
+
+[[sources]]
+name = 'Президент на Република България'
+domain = 'president.bg'
+category = 'presidency'
+
+[[sources]]
+name = 'Министерство на здравеопазването'
+domain = 'mh.government.bg'
+category = 'ministry'
+
+[[sources]]
+name = 'Министерство на финансите'
+domain = 'minfin.bg'
+category = 'ministry'
+
+[[sources]]
+name = 'Министерство на вътрешните работи'
+domain = 'mvr.bg'
+category = 'ministry'
+
+[[sources]]
+name = 'Министерство на отбраната'
+domain = 'mod.bg'
+category = 'ministry'
+
+[[sources]]
+name = 'Министерство на образованието и науката'
+domain = 'mon.bg'
+category = 'ministry'
+
+[[sources]]
+name = 'Министерство на външните работи'
+domain = 'mfa.bg'
+category = 'ministry'
+
+[[sources]]
+name = 'Централна избирателна комисия'
+domain = 'cik.bg'
+category = 'institution'
+
+[[sources]]
+name = 'Национален статистически институт'
+domain = 'nsi.bg'
+category = 'institution'
+
+[[sources]]
+name = 'Българска народна банка'
+domain = 'bnb.bg'
+category = 'institution'
+
+[[sources]]
+name = 'Държавен вестник'
+domain = 'dv.parliament.bg'
+category = 'official_gazette'
+
+[[sources]]
+name = 'Българска телеграфна агенция'
+domain = 'bta.bg'
+category = 'national_news_agency'
+
+[[sources]]
+name = 'Изпълнителна агенция по лекарствата'
+domain = 'bda.bg'
+category = 'institution'
+
+[[sources]]
+name = 'Национален осигурителен институт'
+domain = 'noi.bg'
+category = 'institution'

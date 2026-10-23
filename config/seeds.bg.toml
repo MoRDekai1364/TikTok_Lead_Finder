@@ -1,0 +1,199 @@
+[[seeds]]
+kind = 'keyword'
+value = 'избори измама бюлетини'
+topic = 'elections'
+
+[[seeds]]
+kind = 'keyword'
+value = 'машинно гласуване манипулация'
+topic = 'elections'
+
+[[seeds]]
+kind = 'keyword'
+value = 'централна избирателна комисия решение'
+topic = 'elections'
+
+[[seeds]]
+kind = 'keyword'
+value = 'еврозона лев спестявания'
+topic = 'economy'
+
+[[seeds]]
+kind = 'keyword'
+value = 'приемане на еврото цени'
+topic = 'economy'
+
+[[seeds]]
+kind = 'keyword'
+value = 'дигитално евро контрол'
+topic = 'economy'
+
+[[seeds]]
+kind = 'keyword'
+value = 'инфлация статистика лъжа'
+topic = 'economy'
+
+[[seeds]]
+kind = 'keyword'
+value = 'пенсии увеличение нои'
+topic = 'social'
+
+[[seeds]]
+kind = 'keyword'
+value = 'данъци нов закон парламент'
+topic = 'politics'
+
+[[seeds]]
+kind = 'keyword'
+value = 'народно събрание гласува тайно'
+topic = 'politics'
+
+[[seeds]]
+kind = 'keyword'
+value = 'министър председател каза'
+topic = 'politics'
+
+[[seeds]]
+kind = 'keyword'
+value = 'изпращане на български войници'
+topic = 'security'
+
+[[seeds]]
+kind = 'keyword'
+value = 'мобилизация българия повиквателни'
+topic = 'security'
+
+[[seeds]]
+kind = 'keyword'
+value = 'ваксини странични ефекти'
+topic = 'health'
+
+[[seeds]]
+kind = 'keyword'
+value = 'сзо пандемия договор'
+topic = 'health'
+
+[[seeds]]
+kind = 'keyword'
+value = 'тайно лекарство рак лекарите крият'
+topic = 'health'
+
+[[seeds]]
+kind = 'keyword'
+value = 'антибиотици забрана аптеки'
+topic = 'health'
+
+[[seeds]]
+kind = 'keyword'
+value = 'кемтрейлс пръскане самолети'
+topic = 'environment'
+
+[[seeds]]
+kind = 'keyword'
+value = 'земетресение прогноза българия'
+topic = 'emergencies'
+
+[[seeds]]
+kind = 'keyword'
+value = 'наводнение язовир изпускане'
+topic = 'emergencies'
+
+[[seeds]]
+kind = 'keyword'
+value = 'цена на тока режим'
+topic = 'energy'
+
+[[seeds]]
+kind = 'keyword'
+value = 'затваряне на тец марица'
+topic = 'energy'
+
+[[seeds]]
+kind = 'keyword'
+value = 'храни насекоми брашно етикети'
+topic = 'food'
+
+[[seeds]]
+kind = 'keyword'
+value = 'гмо храни магазини българия'
+topic = 'food'
+
+[[seeds]]
+kind = 'keyword'
+value = 'мигранти лагер българия'
+topic = 'migration'
+
+[[seeds]]
+kind = 'keyword'
+value = 'шенген сухопътни граници условие'
+topic = 'eu'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'българия'
+topic = 'general'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'новини'
+topic = 'general'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'политика'
+topic = 'politics'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'парламент'
+topic = 'politics'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'избори'
+topic = 'elections'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'еврозона'
+topic = 'economy'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'българскиятлев'
+topic = 'economy'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'инфлация'
+topic = 'economy'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'здраве'
+topic = 'health'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'истината'
+topic = 'viral_claims'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'събудетесе'
+topic = 'viral_claims'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'тайна'
+topic = 'viral_claims'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'скандал'
+topic = 'viral_claims'
+
+[[seeds]]
+kind = 'hashtag'
+value = 'енергетика'
+topic = 'energy'
