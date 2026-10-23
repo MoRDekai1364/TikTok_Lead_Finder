@@ -495,6 +495,13 @@ impl PipelineContext {
                                     Ok(())
                                 }
                             }
+                            Some(Stage::Claims) | Some(Stage::Checkworthy) => {
+                                if let Some(vid) = &job.video_id {
+                                    self.extract_claims_for_video(vid).await.map(|_| ())
+                                } else {
+                                    Ok(())
+                                }
+                            }
                             _ => Ok(()),
                         };
 

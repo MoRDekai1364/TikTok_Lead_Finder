@@ -1,8 +1,10 @@
+pub mod claims;
 pub mod engine;
 pub mod janitor;
 pub mod server;
 pub mod spike;
 
+pub use claims::*;
 pub use engine::*;
 pub use janitor::*;
 pub use server::*;
@@ -74,5 +76,63 @@ mod tests {
         assert_eq!(auth.status(), StatusCode::OK);
         let body: serde_json::Value = auth.json().await.unwrap();
         assert_eq!(body.get("status").and_then(|v| v.as_str()), Some("ok"));
+    }
+
+    #[test]
+    fn splits_every_attribution_trap_and_excludes_opinions_from_checkworthy() {
+        use leadfinder_core::{load_app_config, ClaimInput, ClaimType, RuntimePaths};
+        use leadfinder_providers::global_lexicon;
+
+        let paths = RuntimePaths::discover().unwrap();
+        let cfg = load_app_config(&paths.config_dir).unwrap();
+        let lex = global_lexicon(&paths, &cfg.normalisation.lexicon_config_file);
+        let verbs = lex.attribution_verbs();
+
+        let traps = [
+            ("Бойко Борисов се съгласи България да приеме 50 000 мигранти.", "agreed"),
+            ("Румен Радев заяви вчера, че България напуска НАТО.", "said"),
+            ("Министърът на финансите предложи нов 30-процентов данък върху спестяванията.", "proposed"),
+            ("Народното събрание гласува за забрана на домашните градини.", "voted"),
+            ("Димитър Радев отрече левовете да се обменят по фиксирания курс.", "denied"),
+            ("Костадин Костадинов се бил договорил с посолството да оттегли искането.", "agreed"),
+        ];
+
+        for (sentence, expected_act) in traps {
+            let mut claim = ClaimInput {
+                text_bg: sentence.to_string(),
+                claim_type: ClaimType::Factual,
+                speaker: None,
+                attribution: Vec::new(),
+                start_ms: 1000,
+                end_ms: 6000,
+                checkworthiness: 0.85,
+            };
+            split_and_normalize_attribution(&mut claim, Some("creator_x"), &verbs);
+            assert_eq!(claim.claim_type, ClaimType::Attribution);
+            assert_eq!(claim.attribution.len(), 1);
+            assert_eq!(claim.attribution[0].act, expected_act);
+            assert!(claim.attribution[0].asserted_part.as_deref().unwrap_or("").contains("creator_x"));
+            assert!(claim.attribution[0].attributed_part.as_deref().unwrap_or("").contains(expected_act));
+        }
+
+        let op_score = compute_combined_checkworthiness(
+            0.90,
+            "Според мен това е пълна глупост!",
+            "opinion",
+            "Споделете преди да го изтрият!",
+            true,
+            &cfg.ranking,
+        );
+        assert!(op_score < cfg.ranking.checkworthy_threshold);
+
+        let stat_score = compute_combined_checkworthiness(
+            0.80,
+            "Инфлацията при лекарствата скочи с 25 процента през март.",
+            "statistical",
+            "Споделете това видео!",
+            true,
+            &cfg.ranking,
+        );
+        assert!(stat_score >= cfg.ranking.checkworthy_threshold);
     }
 }

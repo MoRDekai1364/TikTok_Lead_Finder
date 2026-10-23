@@ -326,6 +326,10 @@ pub struct AttributionAct {
     pub act: String,
     pub target: Option<String>,
     pub about: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asserted_part: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attributed_part: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "attr_trap_01",
+    "speaker": "tiktok_komentator1",
+    "transcript": "Бойко Борисов тайно се съгласи с Урсула фон дер Лайен България да приеме 50 000 мигранти до края на годината!",
+    "expected_actor": "Бойко Борисов",
+    "expected_act": "agreed"
+  },
+  {
+    "id": "attr_trap_02",
+    "speaker": "naroden_glas_bg",
+    "transcript": "Президентът Румен Радев заяви вчера, че България напуска НАТО веднага след изборите.",
+    "expected_actor": "Румен Радев",
+    "expected_act": "said"
+  },
+  {
+    "id": "attr_trap_03",
+    "speaker": "istinata_dnes",
+    "transcript": "Министърът на финансите предложи нов 30-процентов данък върху всички банкови спестявания в левове.",
+    "expected_actor": "Министърът на финансите",
+    "expected_act": "proposed"
+  },
+  {
+    "id": "attr_trap_04",
+    "speaker": "svoboden_kanal",
+    "transcript": "Депутатите в Народното събрание гласуваха за пълна забрана на домашните градини и кладенците в селата.",
+    "expected_actor": "Народното събрание",
+    "expected_act": "voted"
+  },
+  {
+    "id": "attr_trap_05",
+    "speaker": "bg_patriot_news",
+    "transcript": "Управителят на БНБ Димитър Радев отрече левовете да се обменят по фиксирания курс от 1.95583.",
+    "expected_actor": "Димитър Радев",
+    "expected_act": "denied"
+  },
+  {
+    "id": "attr_trap_06",
+    "speaker": "zdrave_bez_cenzura",
+    "transcript": "Световната здравна организация призна официално, че питейната вода в Европа съдържа наночастици за контрол.",
+    "expected_actor": "Световната здравна организация",
+    "expected_act": "said"
+  },
+  {
+    "id": "attr_trap_07",
+    "speaker": "fokus_bg_clip",
+    "transcript": "Костадин Костадинов се бил договорил с посолството да оттегли искането за референдум за лева.",
+    "expected_actor": "Костадин Костадинов",
+    "expected_act": "agreed"
+  },
+  {
+    "id": "attr_trap_08",
+    "speaker": "alarm_bg",
+    "transcript": "Кристин Лагард обяви от Франкфурт, че дигиталното евро ще има срок на годност от 60 дни за харчене.",
+    "expected_actor": "Кристин Лагард",
+    "expected_act": "said"
+  }
+]

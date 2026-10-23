@@ -4,16 +4,17 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tokio::net::TcpListener;
-use leadfinder_core::VideoFilter;
+use leadfinder_core::{ClaimsOutput, LlmJsonRequest, VideoFilter};
 use leadfinder_pipeline::{
-    build_router, render_spike_markdown, run_discovery_spike, run_media_retention_janitor,
-    PipelineContext,
+    build_router, claims_output_json_schema, render_spike_markdown, run_discovery_spike,
+    run_media_retention_janitor, split_and_normalize_attribution, PipelineContext,
 };
 use leadfinder_probe::{
     apply_calibration_overrides, run_calibration, CalibrationOverrides,
 };
 use leadfinder_providers::{
-    global_lexicon, inspect_dependencies, install_missing_dependencies,
+    global_lexicon, inspect_dependencies, install_missing_dependencies, stop_managed_llama_server,
+    LlmChainRunner,
 };
 
 #[derive(Parser)]
@@ -106,6 +107,18 @@ enum Commands {
         override_ocr: Option<String>,
         #[arg(long)]
         clear_overrides: bool,
+    },
+    ExtractClaims {
+        #[arg(required = true)]
+        video_id: String,
+    },
+    ExtractClaimsBatch {
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    EvalAttributionTraps {
+        #[arg(required = true)]
+        fixtures_json: PathBuf,
     },
 }
 
@@ -323,6 +336,156 @@ async fn main() -> Result<()> {
 
             let profile = run_calibration(&ctx.paths, &cfg, &ctx.db, force_cpu).await?;
             println!("{}", serde_json::to_string_pretty(&profile)?);
+        }
+        Commands::ExtractClaims { video_id } => {
+            let report = ctx.extract_claims_for_video(&video_id).await;
+            stop_managed_llama_server().await;
+            let report = report?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::ExtractClaimsBatch { limit } => {
+            let videos = ctx
+                .db
+                .list_videos(&VideoFilter {
+                    limit: Some(limit as i64),
+                    ..Default::default()
+                })
+                .await?;
+            let mut reports = Vec::new();
+            let mut errors = Vec::new();
+            let mut first_try_ok = 0usize;
+            let mut repaired_ok = 0usize;
+            let mut total_claims = 0usize;
+            let mut total_checkworthy = 0usize;
+            let mut total_people = 0usize;
+            let mut total_public_figures = 0usize;
+
+            for v in &videos {
+                match ctx.extract_claims_for_video(&v.id).await {
+                    Ok(rep) => {
+                        if rep.first_try_valid {
+                            first_try_ok += 1;
+                        }
+                        if rep.repair_used {
+                            repaired_ok += 1;
+                        }
+                        total_claims += rep.extracted_claims_count;
+                        total_checkworthy += rep.checkworthy_claims_count;
+                        total_people += rep.resolved_people_count;
+                        total_public_figures += rep.public_figures_count;
+                        reports.push(rep);
+                    }
+                    Err(e) => {
+                        errors.push(serde_json::json!({
+                            "video_id": v.id,
+                            "error": e.to_string(),
+                        }));
+                    }
+                }
+            }
+            stop_managed_llama_server().await;
+
+            let total_attempted = videos.len().max(1);
+            let first_try_rate = (first_try_ok as f64 / total_attempted as f64 * 1000.0).round() / 1000.0;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "videos_attempted": videos.len(),
+                    "videos_succeeded": reports.len(),
+                    "error_count": errors.len(),
+                    "first_try_valid_count": first_try_ok,
+                    "first_try_validity_rate": first_try_rate,
+                    "repaired_count": repaired_ok,
+                    "total_claims_extracted": total_claims,
+                    "total_checkworthy_claims": total_checkworthy,
+                    "total_people_resolved": total_people,
+                    "total_public_figures": total_public_figures,
+                    "reports": reports,
+                    "errors": errors,
+                }))?
+            );
+        }
+        Commands::EvalAttributionTraps { fixtures_json } => {
+            #[derive(serde::Deserialize)]
+            struct TrapCase {
+                id: String,
+                speaker: String,
+                transcript: String,
+                expected_actor: String,
+                expected_act: String,
+            }
+
+            let raw = std::fs::read_to_string(&fixtures_json)?;
+            let cases: Vec<TrapCase> = serde_json::from_str(&raw)?;
+            let cfg = ctx.config.read().await.clone();
+            let lex = global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
+            let verbs = lex.attribution_verbs();
+            let runner = LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+            let prompt_path = ctx.paths.prompts_dir.join("claims_v1.txt");
+            let system_prompt = std::fs::read_to_string(&prompt_path)?;
+
+            let mut results = Vec::new();
+            let mut split_pass_count = 0usize;
+            let mut first_try_count = 0usize;
+
+            for case in &cases {
+                let ling = lex.analyze_for_llm(&case.transcript);
+                let user_prompt = format!(
+                    "VIDEO_METADATA:\n- id: {}\n- creator: @{}\n\nTRANSCRIPT_SEGMENTS:\n[0-8000 ms] {}\n\nLEXICON_NOTES:\n{}",
+                    case.id, case.speaker, case.transcript, ling.prompt_notes
+                );
+                let validated = runner
+                    .complete_validated(
+                        &LlmJsonRequest {
+                            system_prompt: system_prompt.clone(),
+                            user_prompt,
+                            json_schema: Some(claims_output_json_schema()),
+                            temperature: 0.0,
+                            max_tokens: 768,
+                        },
+                        &ctx.db,
+                    )
+                    .await?;
+                if validated.first_try_valid {
+                    first_try_count += 1;
+                }
+                let mut parsed: ClaimsOutput = serde_json::from_value(validated.response.parsed_json)?;
+                for cl in &mut parsed.claims {
+                    split_and_normalize_attribution(cl, Some(&case.speaker), &verbs);
+                }
+
+                let split_ok = !parsed.claims.is_empty()
+                    && parsed.claims.iter().any(|cl| {
+                        !cl.attribution.is_empty()
+                            && cl.attribution.iter().all(|a| {
+                                a.asserted_part.as_deref().map(|s| !s.is_empty()).unwrap_or(false)
+                                    && a.attributed_part.as_deref().map(|s| !s.is_empty()).unwrap_or(false)
+                            })
+                    });
+                if split_ok {
+                    split_pass_count += 1;
+                }
+                results.push(serde_json::json!({
+                    "id": case.id,
+                    "expected_actor": case.expected_actor,
+                    "expected_act": case.expected_act,
+                    "first_try_valid": validated.first_try_valid,
+                    "split_ok": split_ok,
+                    "claims": parsed.claims,
+                }));
+            }
+            stop_managed_llama_server().await;
+
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "total_traps": cases.len(),
+                    "split_pass_count": split_pass_count,
+                    "split_pass_rate": if cases.is_empty() { 1.0 } else { split_pass_count as f64 / cases.len() as f64 },
+                    "first_try_valid_count": first_try_count,
+                    "cases": results,
+                }))?
+            );
         }
     }
 

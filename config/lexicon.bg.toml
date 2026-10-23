@@ -925,3 +925,119 @@ expansion = 'Агенция Пътна инфраструктура'
 [[acronyms]]
 abbr = 'ТЕЛК'
 expansion = 'Трудово-експертна лекарска комисия'
+
+[[attribution_verbs]]
+phrase = 'се е съгласил'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'се съгласи'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'се съгласиха'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'се бил договорил'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'се договори'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'се договориха'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'подписа споразумение'
+act = 'agreed'
+
+[[attribution_verbs]]
+phrase = 'предложи'
+act = 'proposed'
+
+[[attribution_verbs]]
+phrase = 'предложиха'
+act = 'proposed'
+
+[[attribution_verbs]]
+phrase = 'е предложил'
+act = 'proposed'
+
+[[attribution_verbs]]
+phrase = 'внесе законопроект'
+act = 'proposed'
+
+[[attribution_verbs]]
+phrase = 'гласува за'
+act = 'voted'
+
+[[attribution_verbs]]
+phrase = 'гласуваха за'
+act = 'voted'
+
+[[attribution_verbs]]
+phrase = 'гласува против'
+act = 'voted'
+
+[[attribution_verbs]]
+phrase = 'гласуваха против'
+act = 'voted'
+
+[[attribution_verbs]]
+phrase = 'били гласували'
+act = 'voted'
+
+[[attribution_verbs]]
+phrase = 'отрече'
+act = 'denied'
+
+[[attribution_verbs]]
+phrase = 'отрекоха'
+act = 'denied'
+
+[[attribution_verbs]]
+phrase = 'отхвърли'
+act = 'denied'
+
+[[attribution_verbs]]
+phrase = 'е отрекъл'
+act = 'denied'
+
+[[attribution_verbs]]
+phrase = 'заяви'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'е заявил'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'обяви'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'е обявил'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'призна официално'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'призна'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'каза'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'бил казал'
+act = 'said'
+
+[[attribution_verbs]]
+phrase = 'съобщи'
+act = 'said'

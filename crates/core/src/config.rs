@@ -117,6 +117,8 @@ pub struct NormalisationConfig {
     pub definite_suffixes: Vec<String>,
     #[serde(default)]
     pub role_prefixes: Vec<String>,
+    #[serde(default)]
+    pub surname_suffixes: Vec<String>,
 }
 
 fn default_lexicon_config_file() -> String {

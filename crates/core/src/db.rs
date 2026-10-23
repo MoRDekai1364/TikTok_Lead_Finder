@@ -855,6 +855,14 @@ impl Database {
         Ok(person_id)
     }
 
+    pub async fn clear_people_for_video(&self, video_id: &str) -> Result<()> {
+        sqlx::query("DELETE FROM video_people WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn get_people_for_video(&self, video_id: &str) -> Result<Vec<Person>> {
         let rows = sqlx::query(
             "SELECT p.*, vp.mentions, vp.found_in

@@ -58,6 +58,7 @@ lexicon_config_file = 'lexicon.bg.toml'
 wikidata_languages = ['bg', 'en']
 definite_suffixes = ['ът', 'ят', 'та', 'то', 'те']
 role_prefixes = ['проф.', 'проф', 'доц.', 'доц', 'д-р', 'ген.', 'ген', 'акад.', 'инж.', 'г-н', 'г-жа', 'президентът', 'премиерът', 'министърът', 'депутатът']
+surname_suffixes = ['ов', 'ова', 'ев', 'ева', 'ски', 'ска', 'ин', 'ина']
 
 [expansion]
 min_flagged_videos = 3

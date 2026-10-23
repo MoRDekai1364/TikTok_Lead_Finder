@@ -35,6 +35,12 @@ pub struct AcronymEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AttributionVerbEntry {
+    pub phrase: String,
+    pub act: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LexiconConfig {
     pub language_code: String,
     #[serde(default)]
@@ -85,6 +91,8 @@ pub struct LexiconConfig {
     pub dialect_glossary: Vec<DialectGlossaryEntry>,
     #[serde(default)]
     pub acronyms: Vec<AcronymEntry>,
+    #[serde(default)]
+    pub attribution_verbs: Vec<AttributionVerbEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -312,6 +320,14 @@ impl LexiconNormalizer {
     pub fn is_known_word(&self, word: &str) -> bool {
         let low = word.trim().to_lowercase();
         self.valid_words.contains(&low)
+    }
+
+    pub fn attribution_verbs(&self) -> Vec<(String, String)> {
+        self.cfg
+            .attribution_verbs
+            .iter()
+            .map(|e| (e.phrase.clone(), e.act.clone()))
+            .collect()
     }
 
     pub fn normalize_transcript(&self, record: &mut TranscriptRecord) {

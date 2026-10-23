@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 3 complete, ready for Phase 4.
+Last updated: 2026-10-23 · Current active phase: Phase 4 complete, ready for Phase 5.
 
 ## Phase Summary
 
@@ -10,7 +10,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 3 complete, ready for Ph
 | Phase 1 | Core skeleton, paste-a-link, discovery spike (go/no-go) | PASS |
 | Phase 2 | Bulgarian single-video pipeline | PASS |
 | Phase 3 | Calibration | PASS |
-| Phase 4 | Claims and people | PENDING |
+| Phase 4 | Claims and people | PASS |
 | Phase 5 | Verification | PENDING |
 | Phase 6 | Funnel, ranking and clustering | PENDING |
 | Phase 7 | Scale hardening | PENDING |
@@ -154,3 +154,50 @@ Last updated: 2026-10-23 · Current active phase: Phase 3 complete, ready for Ph
   - `calibrate --force-cpu` outputs JSON with `"compute_backends": ["cpu"]`, `"asr_model": "small"`, `"llm_model": "BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf"`, and `"capacity_per_day"` around `1000–1200`.
   - `calibrate` (GPU) outputs JSON with `"compute_backend": "vulkan"`, `"asr_model": "small"`, `"llm_model": "BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf"`, `"json_validity_rate": 1.0`, and `"capacity_per_day"` within 25% of the measured 20-video throughput; running `calibrate` a second time produces the exact same `recommended` configuration and updates the single `profile` (`id = 1`) row idempotently.
   - `calibrate --override-asr base` sets `chosen_json.effective.asr_model = "base"` and `--clear-overrides` restores `chosen_json.effective.asr_model = "small"`.
+
+---
+
+## Phase 4: Claims and people
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - `Llm` provider trait and implementations (`crates/providers/src/llm.rs`):
+    - `OpenAiCompatLlm`: HTTP client supporting any OpenAI-compatible server, with `MANAGED_LLAMA` singleton that auto-launches, health-checks, reuses, and cleans up local `llama-server.exe` on `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` with strict JSON schema constrained decoding (`json_schema` mode) and 8,192 context window.
+    - `GeminiLlm`: Native REST `generateContent` adapter gated strictly behind `cloud_enabled = true` and `GEMINI_API_KEY`, sending text-only prompts (never audio or video).
+    - `HeuristicLlm`: Rule-based Bulgarian fallback extracting statistical and checkworthy statements with zero compute overhead.
+    - `LlmChainRunner`: Executes the configured provider chain (`['local', 'gemini', 'heuristics']`), tracks token usage and request counts in SQLite `provider_usage`, enforces daily LLM budget, validates output against JSON schema with array `maxItems: 5` bounds, and performs 1 automatic repair retry (`validate_json_against_schema`).
+  - People extraction and Wikidata resolution engine (`crates/providers/src/people.rs`):
+    - Text-only input sourcing: extracts candidate mentions strictly from transcript, OCR text, caption, hashtags, and creator handle/display name (zero facial recognition, zero biometric identification).
+    - Config-driven name and role normalizer: strips professional/honorific prefixes (`проф.`, `доц.`, `г-н`, `министър`), normalizes Bulgarian definite-article suffixes (`-ът`/`-ят` masculine definite forms, `-та`, `-то`), cleans inflected endings and patronymic/surname suffixes (`-ов`, `-ев`, `-ски`, `-ова`, `-ева`, `-ска`).
+    - Unified phonetic skeleton key: converts Cyrillic and Latin transliterated variations of names into canonical phonetic representation so Latin/Cyrillic duplicate mentions merge into a single canonical entry.
+    - Polite Wikidata lookup: queries official MediaWiki API (`wbsearchentities` + `wbgetentities`), caches responses in PolitenessGuard, identifies `Q5` (human), checks public-figure status (`P39` public office, `P102` political party, or `>=2` Wikipedia sitelinks), and formats authoritative summary descriptions while leaving private individuals unresearched.
+  - Claims stage worker and prompts (`crates/pipeline/src/claims.rs`, `prompts/claims_v1.txt`):
+    - Formats video context including timestamps, OCR lines, and Bulgarian lexicon/IPA/grammar notes (`LexiconNormalizer::analyze_for_llm`).
+    - Config-driven attribution splitter: parses attribution acts (`said`, `agreed`, `proposed`, `voted`, `denied`, `other`) using `attribution_verbs` from `config/lexicon.bg.toml`, splitting every attribution into an `asserted_part` (`[transcript creator:start..end ms] ...`) and an `attributed_part` (`actor (act): about`).
+    - Check-worthiness calculator: combines model score with weighted rule features (numbers/statistics, public figure presence, sensitive election/health topics, share-urging phrasing) into a unified `0.0..1.0` score, while demoting subjective `opinion` claims.
+    - Database storage: persists claims into SQLite `claims` table, updates `people` and `video_people`, sets video state to `CLAIMS_DONE`, and emits live `VideoUpdated` SSE events.
+  - Evaluation CLI commands (`crates/cli/src/main.rs`):
+    - `extract-claims --video-id <ID>`: Processes a single video through claims and people extraction.
+    - `extract-claims-batch --limit <N>`: Processes batch of videos, reports validity rates and aggregated metrics.
+    - `eval-attribution-traps <FIXTURES_JSON>`: Automated offline verification of attribution trap cases.
+- **Acceptance Criteria Verification**:
+  - `First-try JSON validity rate`: **100.0% (20/20 videos)** on the 20 Bulgarian clips (exceeds the >= 90% threshold).
+  - `Attribution traps split`: **100.0% (8/8 trap cases)** in `fixtures/phase4_attribution_traps.json` successfully split into asserted and attributed parts (`data/phase4_attribution_traps_eval.json`).
+  - `50-claim manual extraction accuracy`: **96.0% (48/50 claims)** valid, well-formed extractions documented in `docs/CLAIMS_AUDIT.md` (exceeds the >= 80% threshold).
+  - `People resolved`: **52 people resolved across 20 clips**, with 7 confirmed Wikidata public figures (`Румен Радев`, `Гълъб Донев`, `Бойко Борисов`, etc.).
+- **Decisions taken**:
+  - None required deviation from PLAN; added `maxItems: 5` schema constraint and fallback handling in `LlmChainRunner` to prevent unbounded generation loops on long parliamentary speeches.
+- **Open issues**:
+  - None blocking Phase 5.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  .\target\release\leadfinder.exe eval-attribution-traps fixtures/phase4_attribution_traps.json
+  .\target\release\leadfinder.exe extract-claims-batch --limit 20
+  Get-Content docs/CLAIMS_AUDIT.md | Select-Object -First 30
+  ```
+  Expected output:
+  - `cargo test --workspace` runs 17 unit and integration tests and exits `0` with zero warnings.
+  - `eval-attribution-traps` prints `"split_pass_rate": 1.0` and `"first_try_valid_count": 8`.
+  - `extract-claims-batch` prints `"videos_succeeded": 20`, `"first_try_validity_rate": 1.0`, `"total_claims": 64`, `"people_resolved": 52`.
+  - `docs/CLAIMS_AUDIT.md` displays the 50-claim audit table with 96.0% accuracy.
