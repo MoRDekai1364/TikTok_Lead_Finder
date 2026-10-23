@@ -33,3 +33,23 @@ Every deviation from `docs/PLAN.md` and every resolution of a deferred decision 
   - `headless_browser_public` (Edge `--headless=new --dump-dom`, logged-out, no spoofing): 50.0% overall success rate, 50.0% gate rate, p95 = 13,998 ms, 60 unique Bulgarian videos extracted. Specifically, public `/tag/{hashtag}` pages succeeded 15/15 (100% success, 0% block, 60 unique BG videos), whereas `/search?q={keyword}` pages were gated 15/15 (100% gated for logged-out sessions).
 - **Decision**: Record **NO-GO** for automated seeded search by default (`automated_discovery_enabled = false` in `config/default.toml`) because the 10-seed block/gate rate (50.0%) exceeds the 20% ceiling. Proceed with Paste-a-Link inbox (single/multi-URL + `yt-dlp` metadata + TikTok public oEmbed fallback) and Partner-Export CSV/TSV/text import as primary discovery sources, while retaining `HeadlessBrowserDiscoverySource` behind the opt-in config toggle and 5-failure circuit breaker for public hashtag pages if the owner chooses to enable it.
 - **Reason**: Strictly adheres to the Phase 1 empirical acceptance rule and Section 5 hard boundaries.
+
+## D-005: OCR Engine Selection (`tesseract (bul+eng)`)
+- **Date**: 2026-10-23
+- **Phase**: 2
+- **Context**: Section 6, Section 13 (Phase 2), and Section 18 require benchmarking Tesseract (`bul+eng`) against PaddleOCR ONNX (`RapidOCR`) on real Bulgarian TikTok keyframes and recording the engine choice.
+- **Measured Findings** (`docs/OCR_BENCHMARK.md`, 20 clips / 311 frames):
+  - `tesseract (bul+eng)`: `197.6 ms/frame`, `248` deduped lines, `234` Cyrillic lines (`94.4%` Cyrillic share), mean confidence `0.695`. Notice passing `-c tessedit_create_tsv=1` instead of positional `tsv` works cleanly with standalone `--tessdata-dir`.
+  - `paddle_onnx (RapidOCR)`: `1,572.9 ms/frame`, `233` deduped lines, `33` Cyrillic lines (`14.2%` Cyrillic share, default Latin/CJK recognition weights).
+- **Decision**: Select `tesseract` (`bul+eng`) as default OCR engine (`ocr_engine = 'tesseract'` in `config/default.toml`), keeping `PaddleOnnxOcr` available behind config.
+- **Reason**: 8.0x faster per frame, 7.1x higher Bulgarian Cyrillic recall, and zero Python runtime dependency.
+
+## D-006: Whisper ASR Variant & Local Bulgarian Morphological + Phonetic/IPA + Dialect/Grammar Lexicon
+- **Date**: 2026-10-23
+- **Phase**: 2
+- **Context**: Section 18 defers Whisper variant selection, and the owner requested downloading an extensive local Bulgarian dictionary covering dialects, informal speech, phonetic transcriptions, and grammar structures integrated with both the ASR transcription model and the LLM model.
+- **Decision**:
+  - Default ASR engine to `whisper.cpp` (`b5454`) with `ggml-small.bin` (`whisper_model = 'small'`, calibrated dynamically in Phase 3 against `tiny`, `base`, `small`, `small-q5_1`), always preferring native original TikTok captions (`found` via `CaptionFirstTranscriber` supporting both ISO-639-1 `bg` and ISO-639-2 `bul-BG`) before running Whisper (`generated`).
+  - Implement a 100% config-driven lexicon & phonetic/grammar engine (`config/lexicon.bg.toml` + `crates/providers/src/lexicon.rs`, zero hardcoded Bulgarian constants in Rust) backed by `models/lexicon/{bg_50k.txt,bg_BG.dic,bg_BG.aff,bg_mfa_ipa.dict,bg_wiktionary_lexicon.tsv}` (`922,137` inflected wordforms, `75,930` IPA phonetic transcriptions, `149,148` phonetic skeleton keys, `1,241` dialect/informal entries), auto-provisioned by `leadfinder setup-deps`.
+  - Feed Whisper `--prompt` conditioning + post-ASR orthographic, enclitic/proclitic, comparative `по-`/`най-`, and IPA/phonetic OOV repair, reducing 12-clip real TikTok WER from `0.224` (`22.4%`) to `0.195` (`19.5%`, `-12.9%` relative error reduction, `docs/WER_REPORT.md`), while exposing `analyze_for_llm` linguistic context notes (dialect/informal glosses with IPA, institutional acronyms, and renarrated-mood `преизказно наклонение` hearsay markers) for Phase 4–5 LLM models.
+- **Reason**: Improves real Bulgarian TikTok transcription accuracy measurably while enabling downstream LLM claim/entity/attribution models to handle regional dialects, informal speech, and Bulgarian grammatical evidentiality offline.

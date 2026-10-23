@@ -258,7 +258,6 @@ impl Database {
     pub async fn clear_video_media_path(&self, video_id: &str) -> Result<()> {
         sqlx::query("UPDATE videos SET media_path = NULL WHERE id = ?1")
             .bind(video_id)
-            .bind(Option::<String>::None)
             .execute(&self.pool)
             .await?;
         Ok(())

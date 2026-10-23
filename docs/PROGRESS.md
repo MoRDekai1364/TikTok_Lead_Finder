@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 1 complete, ready for Phase 2.
+Last updated: 2026-10-23 · Current active phase: Phase 2 complete, ready for Phase 3.
 
 ## Phase Summary
 
@@ -8,7 +8,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 1 complete, ready for Ph
 | --- | --- | --- |
 | Phase 0 | Owner decisions and scaffold | PASS |
 | Phase 1 | Core skeleton, paste-a-link, discovery spike (go/no-go) | PASS |
-| Phase 2 | Bulgarian single-video pipeline | IN PROGRESS |
+| Phase 2 | Bulgarian single-video pipeline | PASS |
 | Phase 3 | Calibration | PENDING |
 | Phase 4 | Claims and people | PENDING |
 | Phase 5 | Verification | PENDING |
@@ -87,3 +87,37 @@ Last updated: 2026-10-23 · Current active phase: Phase 1 complete, ready for Ph
   - `import-file fixtures/phase1_20_urls.txt` prints `"imported_count": 20` with populated creator handles, views, durations, captions, and `DISCOVERED` states.
   - `list-videos --limit 20` outputs JSON array of 20 stored Bulgarian TikTok videos.
   - `docs/SPIKE_DISCOVERY.md` displays the measured table across `ytdlp_public`, `headless_browser_public`, and `direct_http_public` and the `NO-GO` recommendation.
+
+---
+
+## Phase 2: Bulgarian single-video pipeline
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - `ACQUIRE` stage (`crates/providers/src/media.rs`): downloads video + native captions (`bg.*`, `bul.*`, `en.*`, `eng.*`, `ru.*`, `rus.*`, `tr.*`, `tur.*`, `orig.*`), extracts `16 kHz` mono PCM WAV (`audio_16k.wav`), samples 3-second keyframes (`<= 20` per clip at `720p` width), generates cached `thumb.jpg`, and computes 64-bit `dHash` perceptual hashes (`phash`).
+  - `Transcriber` trait implementations (`crates/providers/src/transcriber.rs`): `CaptionFirstTranscriber` (`found` native VTT/SRT captions first, rejecting machine-translated non-Cyrillic tracks, falling back to `WhisperCppTranscriber` `generated`), deterministic `transcript_quality` scoring (token confidence + speech coverage + language match + CPS/diversity sanity), and word-level Levenshtein `compute_wer`.
+  - Extensive config-driven Bulgarian dictionary, phonetic/IPA transcription, dialect/informal speech, and grammar module (`config/lexicon.bg.toml` + `crates/providers/src/lexicon.rs`): loads `922,137` inflected wordforms, `75,930` IPA phonetic transcriptions (`bg_mfa_ipa.dict` + Wiktionary), `149,148` phonetic skeleton keys, `78,238` Hunspell lemmas + affixes, and `1,241` dialectal/informal entries; conditions Whisper via `--prompt`, repairs phonetic/orthographic ASR errors, splits glued enclitics/proclitics, hyphenates `по-`/`най-` comparatives, and produces structured LLM linguistic context notes (`analyze_for_llm`).
+  - `Ocr` trait implementations (`crates/providers/src/ocr.rs`): `TesseractOcr` (`bul+eng` with `-c tessedit_create_tsv=1`) and `PaddleOnnxOcr` (`RapidOCR`) with cross-frame near-duplicate collapsing (`0.85` similarity) and empirical 20-clip / 311-frame benchmark (`docs/OCR_BENCHMARK.md`).
+  - Media retention janitor (`crates/pipeline/src/janitor.rs`): deletes raw MP4/WAV/keyframes older than `retention_days` (default 7) while preserving `thumb.jpg`, transcripts, and OCR rows.
+  - Dependency bootstrapper (`crates/providers/src/bootstrap.rs` / `leadfinder setup-deps`): verifies and auto-installs `yt-dlp`, `ffmpeg`, `ffprobe`, `whisper-cli`, `llama-server`, `tesseract` (`bul`+`eng`), WebView2, Whisper models, and all 5 Bulgarian lexicon/IPA files (including pure-Rust streaming compilation of `bg_wiktionary_lexicon.tsv`).
+  - CLI commands (`process`, `process-batch`, `benchmark-ocr`, `wer-report`, `run-janitor`, `lexicon-inspect`).
+- **Decisions taken**:
+  - `D-005`: Selected `tesseract (bul+eng)` as default OCR engine (`197.6 ms/frame`, `234` Cyrillic lines vs `1,572.9 ms/frame` and `33` Cyrillic lines for `paddle_onnx`).
+  - `D-006`: Selected `whisper.cpp` `small` as baseline ASR model with `CaptionFirstTranscriber` and integrated the `922k`-wordform + `75.9k`-IPA Bulgarian lexicon/grammar pipeline, improving 12-clip WER from `0.224` (`22.4%`) to `0.195` (`19.5%`, `docs/WER_REPORT.md`).
+- **Open issues**:
+  - None blocking Phase 3.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  .\target\release\leadfinder.exe setup-deps --check-only
+  .\target\release\leadfinder.exe lexicon-inspect --text "Кво прайш ве баце, знаешь ли че господин Радеф влезна февро зоната и плащаме дересе за най ниските цени?"
+  .\target\release\leadfinder.exe wer-report fixtures/phase2_wer_references.json
+  Get-Content docs/OCR_BENCHMARK.md
+  Get-Content docs/WER_REPORT.md
+  ```
+  Expected output:
+  - `cargo test --workspace` runs 12 unit and integration tests across `core`, `providers`, and `pipeline` and exits `0` with zero warnings.
+  - `setup-deps --check-only` outputs JSON confirming `yt_dlp`, `ffmpeg`, `ffprobe`, `whisper_cli`, `tesseract`, `tessdata_bul: true`, `tessdata_eng: true`, `llama_server`, `whisper_models`, and all 5 `lexicon_files`.
+  - `lexicon-inspect` outputs `"valid_wordforms": 922137`, `"ipa_transcriptions": 75930`, normalized Bulgarian sentence, and populated `llm_context` glossary/acronym notes.
+  - `wer-report fixtures/phase2_wer_references.json` prints `"clips_evaluated": 12` and `"mean_wer": 0.195`.
+  - `docs/OCR_BENCHMARK.md` and `docs/WER_REPORT.md` display the committed benchmark and WER tables.

@@ -109,12 +109,18 @@ pub struct RankingConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalisationConfig {
+    #[serde(default = "default_lexicon_config_file")]
+    pub lexicon_config_file: String,
     #[serde(default)]
     pub wikidata_languages: Vec<String>,
     #[serde(default)]
     pub definite_suffixes: Vec<String>,
     #[serde(default)]
     pub role_prefixes: Vec<String>,
+}
+
+fn default_lexicon_config_file() -> String {
+    "lexicon.bg.toml".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,19 +252,22 @@ impl RuntimePaths {
             .and_then(|p| p.parent().map(|d| d.to_path_buf()))
             .unwrap_or_else(|| cwd.clone());
 
-        let is_workspace = cwd.join("Cargo.toml").exists()
-            || cwd.join("config").join("default.toml").exists()
+        let find_root = |start: &Path| -> Option<PathBuf> {
+            start
+                .ancestors()
+                .take(5)
+                .find(|p| p.join("config").join("default.toml").exists())
+                .map(|p| p.to_path_buf())
+        };
+
+        let found_root = find_root(&cwd).or_else(|| find_root(&exe_dir));
+        let is_workspace = found_root
+            .as_ref()
+            .map(|r| r.join("Cargo.toml").exists())
+            .unwrap_or(false)
             || std::env::var("LEADFINDER_PORTABLE").ok().as_deref() == Some("1");
 
-        let static_root = if cwd.join("config").join("default.toml").exists() {
-            cwd.clone()
-        } else if exe_dir.join("config").join("default.toml").exists() {
-            exe_dir.clone()
-        } else if let Some(parent) = cwd.parent().filter(|p| p.join("config").join("default.toml").exists()) {
-            parent.to_path_buf()
-        } else {
-            cwd.clone()
-        };
+        let static_root = found_root.unwrap_or_else(|| cwd.clone());
 
         let mutable_root = if let Ok(custom) = std::env::var("LEADFINDER_APP_DATA_DIR") {
             PathBuf::from(custom)
@@ -360,6 +369,15 @@ impl RuntimePaths {
         }
 
         None
+    }
+
+    pub fn resolve_model_path(&self, rel: &str) -> Option<PathBuf> {
+        let candidates = [
+            self.models_dir.join(rel),
+            self.static_root.join("models").join(rel),
+            self.assets_dir.join(rel),
+        ];
+        candidates.into_iter().find(|p| p.is_file())
     }
 }
 

@@ -33,8 +33,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "bootstrapdeps"; Description: "Install and verify required local media, OCR, and speech tools (yt-dlp, ffmpeg, whisper.cpp, Tesseract BG+EN)"; GroupDescription: "Dependencies:"
-Name: "downloadmodels"; Description: "Download recommended Whisper ASR model and calibrate hardware during setup"; GroupDescription: "Dependencies:"; Flags: unchecked
+Name: "bootstrapdeps"; Description: "Install and verify required local media, OCR, speech, and Bulgarian lexicon tools (yt-dlp, ffmpeg, whisper.cpp, llama.cpp, Tesseract BG+EN, BG morphology & IPA dictionary)"; GroupDescription: "Dependencies:"
+Name: "downloadmodels"; Description: "Download recommended Whisper ASR + BgGPT LLM models, compile full Bulgarian Wiktionary lexicon, and calibrate hardware during setup"; GroupDescription: "Dependencies:"; Flags: unchecked
 
 [Files]
 Source: "release_stage\*"; DestDir: "{app}"; Excludes: "*.pdb,logs\*,data\*,cache\*"; Flags: ignoreversion recursesubdirs createallsubdirs

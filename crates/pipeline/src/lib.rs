@@ -1,8 +1,10 @@
 pub mod engine;
+pub mod janitor;
 pub mod server;
 pub mod spike;
 
 pub use engine::*;
+pub use janitor::*;
 pub use server::*;
 pub use spike::*;
 

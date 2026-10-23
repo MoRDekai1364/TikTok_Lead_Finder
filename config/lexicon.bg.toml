@@ -1,0 +1,927 @@
+language_code = 'bg'
+frequency_file = 'lexicon/bg_50k.txt'
+hunspell_dic_file = 'lexicon/bg_BG.dic'
+hunspell_aff_file = 'lexicon/bg_BG.aff'
+mfa_ipa_file = 'lexicon/bg_mfa_ipa.dict'
+wiktionary_tsv_file = 'lexicon/bg_wiktionary_lexicon.tsv'
+
+whisper_initial_prompt = 'Новини от България: Народното събрание, правителството, еврозоната, българският лев, евро, ДДС, НСИ, БНБ, НОИ, НЗОК, КЕВР, БНТ, ЕСГРАОН, референдум, инфлация, бюджет.'
+
+word_end_strip_chars = ['ь']
+enclitics = ['ли', 'ни', 'ви', 'сте', 'си', 'ми', 'му', 'им']
+proclitic_devoiced_prefix = 'ф'
+proclitic_restored_word = 'в'
+comparative_particles = ['по', 'най']
+renarrated_auxiliaries = ['бил', 'била', 'било', 'били', 'щял', 'щяла', 'щяло', 'щели', 'нямало']
+compound_join_left = ['евро', 'пред', 'под', 'над', 'извън', 'между', 'свръх', 'контра', 'анти', 'вице', 'екс', 'само', 'полу', 'телевизион', 'радио', 'електро', 'авто', 'агро', 'био', 'гео', 'еко', 'инфо', 'кибер', 'макро', 'микро', 'мини', 'мулти', 'нео', 'псевдо', 'социал', 'спец', 'супер', 'ултра', 'финанс', 'хидро']
+
+domain_vocabulary = [
+    'еврозоната', 'еврозона', 'еврото', 'евро', 'левът', 'лева', 'българският', 'българския',
+    'референдум', 'инфлация', 'инфлацията', 'правителството', 'парламентът', 'парламента',
+    'конституцията', 'суверенитета', 'суверенитет', 'бюджетът', 'бюджета', 'дефицит',
+    'пенсиите', 'заплатите', 'минималната', 'осигуровки', 'акциз', 'предизборно', 'предизборната',
+    'кандидатът', 'водещата', 'интервюто', 'интервю', 'изслушването', 'помилването',
+    'вицепрезидентката', 'президентът', 'министърът', 'олигархията', 'декара', 'земеделци',
+    'субсидии', 'енергетика', 'евростат', 'брюксел', 'шенген', 'радев', 'борисов', 'йотова',
+    'донев', 'пеканов', 'гюров', 'костадинов', 'пеевски', 'петков', 'василев', 'денков', 'ганев',
+    'колтуклиева', 'доцова', 'ангелов', 'чикагото', 'лагард', 'сорос', 'ддс', 'нси', 'нои',
+    'нзок', 'нап', 'мвр', 'мон', 'кевр', 'бнб', 'бнт', 'бнр', 'цик', 'данс', 'кзп', 'есграон'
+]
+
+[[char_replacements]]
+from = 'ы'
+to = 'и'
+
+[[char_replacements]]
+from = 'э'
+to = 'е'
+
+[[char_replacements]]
+from = 'ё'
+to = 'е'
+
+[[char_replacements]]
+from = 'і'
+to = 'и'
+
+[[char_replacements]]
+from = 'ї'
+to = 'йи'
+
+[[cluster_replacements]]
+from = 'вью'
+to = 'вю'
+
+[[cluster_replacements]]
+from = 'бью'
+to = 'бю'
+
+[[cluster_replacements]]
+from = 'пью'
+to = 'пю'
+
+[[cluster_replacements]]
+from = 'мью'
+to = 'мю'
+
+[[cluster_replacements]]
+from = 'фью'
+to = 'фю'
+
+[[cluster_replacements]]
+from = 'щт'
+to = 'щ'
+
+[[cluster_replacements]]
+from = 'шч'
+to = 'щ'
+
+[[asr_repairs]]
+wrong = 'афеврозоната'
+right = 'в еврозоната'
+
+[[asr_repairs]]
+wrong = 'февро'
+right = 'в евро'
+
+[[asr_repairs]]
+wrong = 'фефир'
+right = 'в ефир'
+
+[[asr_repairs]]
+wrong = 'дересе'
+right = 'ДДС'
+
+[[asr_repairs]]
+wrong = 'евро зоната'
+right = 'еврозоната'
+
+[[asr_repairs]]
+wrong = 'на татък'
+right = 'нататък'
+
+[[asr_repairs]]
+wrong = 'какъв то'
+right = 'какъвто'
+
+[[asr_repairs]]
+wrong = 'до година'
+right = 'догодина'
+
+[[asr_repairs]]
+wrong = 'телевизион на'
+right = 'телевизионна'
+
+[[asr_repairs]]
+wrong = 'пред избурно'
+right = 'предизборно'
+
+[[asr_repairs]]
+wrong = 'союза'
+right = 'съюза'
+
+[[asr_repairs]]
+wrong = 'сообщава'
+right = 'съобщава'
+
+[[asr_repairs]]
+wrong = 'сообщтава'
+right = 'съобщава'
+
+[[asr_repairs]]
+wrong = 'мозочно'
+right = 'мозъчно'
+
+[[asr_repairs]]
+wrong = 'сотрясение'
+right = 'сътресение'
+
+[[asr_repairs]]
+wrong = 'молодо'
+right = 'младо'
+
+[[asr_repairs]]
+wrong = 'низките'
+right = 'ниските'
+
+[[asr_repairs]]
+wrong = 'низки'
+right = 'ниски'
+
+[[asr_repairs]]
+wrong = 'исключителна'
+right = 'изключителна'
+
+[[asr_repairs]]
+wrong = 'исключително'
+right = 'изключително'
+
+[[asr_repairs]]
+wrong = 'штатите'
+right = 'щатите'
+
+[[asr_repairs]]
+wrong = 'подтвърди'
+right = 'потвърди'
+
+[[asr_repairs]]
+wrong = 'отцелявали'
+right = 'оцелявали'
+
+[[asr_repairs]]
+wrong = 'тротуара'
+right = 'тротоара'
+
+[[asr_repairs]]
+wrong = 'ильяна'
+right = 'Илияна'
+
+[[orth_phonetic_clusters]]
+from = 'щн'
+to = 'SHN'
+
+[[orth_phonetic_clusters]]
+from = 'щ'
+to = 'SHT'
+
+[[orth_phonetic_clusters]]
+from = 'шт'
+to = 'SHT'
+
+[[orth_phonetic_clusters]]
+from = 'дж'
+to = 'DZ'
+
+[[orth_phonetic_clusters]]
+from = 'дз'
+to = 'Z'
+
+[[orth_phonetic_clusters]]
+from = 'тц'
+to = 'TS'
+
+[[orth_phonetic_clusters]]
+from = 'дт'
+to = 'T'
+
+[[orth_phonetic_clusters]]
+from = 'зк'
+to = 'SK'
+
+[[orth_phonetic_clusters]]
+from = 'зп'
+to = 'SP'
+
+[[orth_phonetic_clusters]]
+from = 'зт'
+to = 'ST'
+
+[[orth_phonetic_clusters]]
+from = 'сб'
+to = 'ZB'
+
+[[orth_phonetic_clusters]]
+from = 'сг'
+to = 'ZG'
+
+[[orth_phonetic_clusters]]
+from = 'сд'
+to = 'ZD'
+
+[[orth_phonetic_clusters]]
+from = 'ис'
+to = 'IZ'
+
+[[orth_phonetic_clusters]]
+from = 'из'
+to = 'IZ'
+
+[[orth_phonetic_clusters]]
+from = 'рас'
+to = 'RAZ'
+
+[[orth_phonetic_clusters]]
+from = 'раз'
+to = 'RAZ'
+
+[[orth_phonetic_clusters]]
+from = 'я'
+to = 'JA'
+
+[[orth_phonetic_clusters]]
+from = 'ю'
+to = 'JU'
+
+[[orth_phonetic_clusters]]
+from = 'ьо'
+to = 'JO'
+
+[[orth_phonetic_chars]]
+from = 'а'
+to = 'A'
+
+[[orth_phonetic_chars]]
+from = 'ъ'
+to = 'A'
+
+[[orth_phonetic_chars]]
+from = 'о'
+to = 'O'
+
+[[orth_phonetic_chars]]
+from = 'у'
+to = 'O'
+
+[[orth_phonetic_chars]]
+from = 'е'
+to = 'E'
+
+[[orth_phonetic_chars]]
+from = 'и'
+to = 'E'
+
+[[orth_phonetic_chars]]
+from = 'й'
+to = 'J'
+
+[[orth_phonetic_chars]]
+from = 'б'
+to = 'B'
+
+[[orth_phonetic_chars]]
+from = 'п'
+to = 'P'
+
+[[orth_phonetic_chars]]
+from = 'в'
+to = 'V'
+
+[[orth_phonetic_chars]]
+from = 'ф'
+to = 'F'
+
+[[orth_phonetic_chars]]
+from = 'г'
+to = 'G'
+
+[[orth_phonetic_chars]]
+from = 'к'
+to = 'K'
+
+[[orth_phonetic_chars]]
+from = 'д'
+to = 'D'
+
+[[orth_phonetic_chars]]
+from = 'т'
+to = 'T'
+
+[[orth_phonetic_chars]]
+from = 'ж'
+to = 'ZH'
+
+[[orth_phonetic_chars]]
+from = 'ш'
+to = 'SH'
+
+[[orth_phonetic_chars]]
+from = 'з'
+to = 'Z'
+
+[[orth_phonetic_chars]]
+from = 'с'
+to = 'S'
+
+[[orth_phonetic_chars]]
+from = 'л'
+to = 'L'
+
+[[orth_phonetic_chars]]
+from = 'м'
+to = 'M'
+
+[[orth_phonetic_chars]]
+from = 'н'
+to = 'N'
+
+[[orth_phonetic_chars]]
+from = 'р'
+to = 'R'
+
+[[orth_phonetic_chars]]
+from = 'х'
+to = 'H'
+
+[[orth_phonetic_chars]]
+from = 'ц'
+to = 'TS'
+
+[[orth_phonetic_chars]]
+from = 'ч'
+to = 'C'
+
+[[orth_phonetic_chars]]
+from = 'ь'
+to = ''
+
+[[orth_final_devoice]]
+from = 'V'
+to = 'F'
+
+[[orth_final_devoice]]
+from = 'B'
+to = 'P'
+
+[[orth_final_devoice]]
+from = 'D'
+to = 'T'
+
+[[orth_final_devoice]]
+from = 'G'
+to = 'K'
+
+[[orth_final_devoice]]
+from = 'Z'
+to = 'S'
+
+[[orth_final_devoice]]
+from = 'ZH'
+to = 'SH'
+
+[[ipa_phonetic_clusters]]
+from = 't͡ʃ'
+to = 'C'
+
+[[ipa_phonetic_clusters]]
+from = 'tʃ'
+to = 'C'
+
+[[ipa_phonetic_clusters]]
+from = 'd͡ʒ'
+to = 'DZ'
+
+[[ipa_phonetic_clusters]]
+from = 'dʒ'
+to = 'DZ'
+
+[[ipa_phonetic_clusters]]
+from = 't͡s'
+to = 'TS'
+
+[[ipa_phonetic_clusters]]
+from = 'ts'
+to = 'TS'
+
+[[ipa_phonetic_clusters]]
+from = 'd͡z'
+to = 'Z'
+
+[[ipa_phonetic_clusters]]
+from = 'dz'
+to = 'Z'
+
+[[ipa_phonetic_clusters]]
+from = 'ʃt'
+to = 'SHT'
+
+[[ipa_phonetic_chars]]
+from = 'a'
+to = 'A'
+
+[[ipa_phonetic_chars]]
+from = 'ɐ'
+to = 'A'
+
+[[ipa_phonetic_chars]]
+from = 'ɤ'
+to = 'A'
+
+[[ipa_phonetic_chars]]
+from = 'ə'
+to = 'A'
+
+[[ipa_phonetic_chars]]
+from = 'o'
+to = 'O'
+
+[[ipa_phonetic_chars]]
+from = 'ɔ'
+to = 'O'
+
+[[ipa_phonetic_chars]]
+from = 'u'
+to = 'O'
+
+[[ipa_phonetic_chars]]
+from = 'ʊ'
+to = 'O'
+
+[[ipa_phonetic_chars]]
+from = 'e'
+to = 'E'
+
+[[ipa_phonetic_chars]]
+from = 'ɛ'
+to = 'E'
+
+[[ipa_phonetic_chars]]
+from = 'i'
+to = 'E'
+
+[[ipa_phonetic_chars]]
+from = 'ɪ'
+to = 'E'
+
+[[ipa_phonetic_chars]]
+from = 'j'
+to = 'J'
+
+[[ipa_phonetic_chars]]
+from = 'b'
+to = 'B'
+
+[[ipa_phonetic_chars]]
+from = 'p'
+to = 'P'
+
+[[ipa_phonetic_chars]]
+from = 'v'
+to = 'V'
+
+[[ipa_phonetic_chars]]
+from = 'f'
+to = 'F'
+
+[[ipa_phonetic_chars]]
+from = 'ɡ'
+to = 'G'
+
+[[ipa_phonetic_chars]]
+from = 'g'
+to = 'G'
+
+[[ipa_phonetic_chars]]
+from = 'c'
+to = 'K'
+
+[[ipa_phonetic_chars]]
+from = 'ɟ'
+to = 'G'
+
+[[ipa_phonetic_chars]]
+from = 'k'
+to = 'K'
+
+[[ipa_phonetic_chars]]
+from = 'd'
+to = 'D'
+
+[[ipa_phonetic_chars]]
+from = 't'
+to = 'T'
+
+[[ipa_phonetic_chars]]
+from = 'ʒ'
+to = 'ZH'
+
+[[ipa_phonetic_chars]]
+from = 'ʃ'
+to = 'SH'
+
+[[ipa_phonetic_chars]]
+from = 'z'
+to = 'Z'
+
+[[ipa_phonetic_chars]]
+from = 's'
+to = 'S'
+
+[[ipa_phonetic_chars]]
+from = 'l'
+to = 'L'
+
+[[ipa_phonetic_chars]]
+from = 'ɫ'
+to = 'L'
+
+[[ipa_phonetic_chars]]
+from = 'ʎ'
+to = 'L'
+
+[[ipa_phonetic_chars]]
+from = 'm'
+to = 'M'
+
+[[ipa_phonetic_chars]]
+from = 'n'
+to = 'N'
+
+[[ipa_phonetic_chars]]
+from = 'ɲ'
+to = 'N'
+
+[[ipa_phonetic_chars]]
+from = 'ŋ'
+to = 'N'
+
+[[ipa_phonetic_chars]]
+from = 'r'
+to = 'R'
+
+[[ipa_phonetic_chars]]
+from = 'x'
+to = 'H'
+
+[[dialect_glossary]]
+term = 'кво'
+standard = 'какво'
+register = 'разговорно/съкратено'
+ipa = 'kfɔ'
+
+[[dialect_glossary]]
+term = 'ко'
+standard = 'какво'
+register = 'източнобългарски диалект/разговорно'
+ipa = 'kɔ'
+
+[[dialect_glossary]]
+term = 'щот'
+standard = 'защото'
+register = 'разговорно'
+ipa = 'ʃtɔt'
+
+[[dialect_glossary]]
+term = 'щото'
+standard = 'защото'
+register = 'разговорно'
+ipa = 'ˈʃtɔto'
+
+[[dialect_glossary]]
+term = 'неска'
+standard = 'днеска / днес'
+register = 'разговорно/западен диалект'
+ipa = 'ˈnɛskɐ'
+
+[[dialect_glossary]]
+term = 'ся'
+standard = 'сега'
+register = 'разговорно/източен диалект'
+ipa = 'sʲa'
+
+[[dialect_glossary]]
+term = 'са'
+standard = 'сега (или спом. глагол са)'
+register = 'шопски/софийски разговорен'
+ipa = 'sa'
+
+[[dialect_glossary]]
+term = 'ша'
+standard = 'ще'
+register = 'източнобългарски/тракийски диалект'
+ipa = 'ʃa'
+
+[[dialect_glossary]]
+term = 'ше'
+standard = 'ще'
+register = 'разговорно/западен диалект'
+ipa = 'ʃɛ'
+
+[[dialect_glossary]]
+term = 'шъ'
+standard = 'ще'
+register = 'мизийски/балкански диалект'
+ipa = 'ʃɤ'
+
+[[dialect_glossary]]
+term = 'прай'
+standard = 'прави'
+register = 'разговорно'
+ipa = 'praj'
+
+[[dialect_glossary]]
+term = 'прайш'
+standard = 'правиш'
+register = 'разговорно'
+ipa = 'prajʃ'
+
+[[dialect_glossary]]
+term = 'праим'
+standard = 'правим'
+register = 'разговорно'
+ipa = 'ˈpraim'
+
+[[dialect_glossary]]
+term = 'праят'
+standard = 'правят'
+register = 'разговорно'
+ipa = 'ˈprajɐt'
+
+[[dialect_glossary]]
+term = 'начи'
+standard = 'значи'
+register = 'разговорно'
+ipa = 'ˈnatʃi'
+
+[[dialect_glossary]]
+term = 'ма'
+standard = 'ама / но'
+register = 'разговорно'
+ipa = 'ma'
+
+[[dialect_glossary]]
+term = 'нашта'
+standard = 'нашата'
+register = 'разговорно'
+ipa = 'ˈnaʃtɐ'
+
+[[dialect_glossary]]
+term = 'вашта'
+standard = 'вашата'
+register = 'разговорно'
+ipa = 'ˈvaʃtɐ'
+
+[[dialect_glossary]]
+term = 'тука'
+standard = 'тук'
+register = 'разговорно'
+ipa = 'ˈtukɐ'
+
+[[dialect_glossary]]
+term = 'тама'
+standard = 'там'
+register = 'диалектно'
+ipa = 'ˈtamɐ'
+
+[[dialect_glossary]]
+term = 'дека'
+standard = 'къде'
+register = 'западнобългарски/югозападен диалект'
+ipa = 'ˈdɛkɐ'
+
+[[dialect_glossary]]
+term = 'ора'
+standard = 'хора'
+register = 'западнобългарски/шопски диалект'
+ipa = 'ˈɔrɐ'
+
+[[dialect_glossary]]
+term = 'ората'
+standard = 'хората'
+register = 'западнобългарски/шопски диалект'
+ipa = 'ˈɔrɐtɐ'
+
+[[dialect_glossary]]
+term = 'леб'
+standard = 'хляб'
+register = 'западнобългарски диалект (екав рефлекс)'
+ipa = 'lɛp'
+
+[[dialect_glossary]]
+term = 'хлеб'
+standard = 'хляб'
+register = 'западнобългарски диалект (екав рефлекс)'
+ipa = 'xlɛp'
+
+[[dialect_glossary]]
+term = 'млеко'
+standard = 'мляко'
+register = 'западнобългарски диалект (екав рефлекс)'
+ipa = 'mlɛˈkɔ'
+
+[[dialect_glossary]]
+term = 'лето'
+standard = 'лято'
+register = 'западнобългарски диалект (екав рефлекс)'
+ipa = 'ˈlɛto'
+
+[[dialect_glossary]]
+term = 'нема'
+standard = 'няма'
+register = 'западнобългарски диалект'
+ipa = 'ˈnɛmɐ'
+
+[[dialect_glossary]]
+term = 'некога'
+standard = 'никога / някога'
+register = 'западнобългарски диалект'
+ipa = 'ˈnɛkoɡɐ'
+
+[[dialect_glossary]]
+term = 'влезна'
+standard = 'влезе'
+register = 'разговорно/западнобългарски'
+ipa = 'ˈvlɛznɐ'
+
+[[dialect_glossary]]
+term = 'влезнахме'
+standard = 'влязохме'
+register = 'разговорно/западнобългарски'
+ipa = 'ˈvlɛznɐxmɛ'
+
+[[dialect_glossary]]
+term = 'влезне'
+standard = 'влезе'
+register = 'разговорно/западнобългарски'
+ipa = 'ˈvlɛznɛ'
+
+[[dialect_glossary]]
+term = 'излезна'
+standard = 'излезе'
+register = 'разговорно/западнобългарски'
+ipa = 'izˈlɛznɐ'
+
+[[dialect_glossary]]
+term = 'оти'
+standard = 'защо / защото'
+register = 'родопски/югозападен диалект'
+ipa = 'ˈɔti'
+
+[[dialect_glossary]]
+term = 'баце'
+standard = 'бате / приятел (обръщение)'
+register = 'северозападен/софийски жаргон'
+ipa = 'ˈbatsɛ'
+
+[[dialect_glossary]]
+term = 'майна'
+standard = 'приятел / човек (обръщение)'
+register = 'пловдивски разговорен/жаргон'
+ipa = 'ˈmajnɐ'
+
+[[dialect_glossary]]
+term = 'лек'
+standard = 'приятел / пич (обръщение)'
+register = 'бургаски жаргон'
+ipa = 'lɛk'
+
+[[dialect_glossary]]
+term = 'ве'
+standard = 'бе (разговорна частица)'
+register = 'източнобългарски/варненски разговорен'
+ipa = 'vɛ'
+
+[[dialect_glossary]]
+term = 'чуек'
+standard = 'човек'
+register = 'източнобългарски/интернет жаргон'
+ipa = 'tʃuˈɛk'
+
+[[dialect_glossary]]
+term = 'кинти'
+standard = 'пари'
+register = 'жаргон'
+ipa = 'ˈkinti'
+
+[[dialect_glossary]]
+term = 'мангизи'
+standard = 'пари'
+register = 'жаргон'
+ipa = 'mɐnˈɡizi'
+
+[[dialect_glossary]]
+term = 'менте'
+standard = 'фалшификат / неистински'
+register = 'разговорно'
+ipa = 'mɛnˈtɛ'
+
+[[dialect_glossary]]
+term = 'далавера'
+standard = 'нерегламентирана сделка / изгода'
+register = 'разговорно'
+ipa = 'dɐɫɐˈvɛrɐ'
+
+[[dialect_glossary]]
+term = 'шашма'
+standard = 'измама / манипулация'
+register = 'разговорно'
+ipa = 'ˈʃaʃmɐ'
+
+[[dialect_glossary]]
+term = 'партенка'
+standard = 'фалшива новина / слух'
+register = 'разговорно/медиен жаргон'
+ipa = 'pɐrˈtɛŋkɐ'
+
+[[dialect_glossary]]
+term = 'бушон'
+standard = 'нарочен виновник / подставено лице'
+register = 'разговорен преносен смисъл'
+ipa = 'buˈʃɔn'
+
+[[dialect_glossary]]
+term = 'калинка'
+standard = 'назначен без квалификация партиен кадър'
+register = 'български политически жаргон'
+ipa = 'kɐˈliŋkɐ'
+
+[[acronyms]]
+abbr = 'ДДС'
+expansion = 'Данък върху добавената стойност'
+
+[[acronyms]]
+abbr = 'НСИ'
+expansion = 'Национален статистически институт'
+
+[[acronyms]]
+abbr = 'НОИ'
+expansion = 'Национален осигурителен институт'
+
+[[acronyms]]
+abbr = 'НЗОК'
+expansion = 'Национална здравноосигурителна каса'
+
+[[acronyms]]
+abbr = 'НАП'
+expansion = 'Национална агенция за приходите'
+
+[[acronyms]]
+abbr = 'КЕВР'
+expansion = 'Комисия за енергийно и водно регулиране'
+
+[[acronyms]]
+abbr = 'БНБ'
+expansion = 'Българска народна банка'
+
+[[acronyms]]
+abbr = 'БНТ'
+expansion = 'Българска национална телевизия'
+
+[[acronyms]]
+abbr = 'БНР'
+expansion = 'Българско национално радио'
+
+[[acronyms]]
+abbr = 'ЦИК'
+expansion = 'Централна избирателна комисия'
+
+[[acronyms]]
+abbr = 'МВР'
+expansion = 'Министерство на вътрешните работи'
+
+[[acronyms]]
+abbr = 'МОН'
+expansion = 'Министерство на образованието и науката'
+
+[[acronyms]]
+abbr = 'МЗ'
+expansion = 'Министерство на здравеопазването'
+
+[[acronyms]]
+abbr = 'ДАНС'
+expansion = 'Държавна агенция Национална сигурност'
+
+[[acronyms]]
+abbr = 'КЗП'
+expansion = 'Комисия за защита на потребителите'
+
+[[acronyms]]
+abbr = 'ЕСГРАОН'
+expansion = 'Единна система за гражданска регистрация и административно обслужване на населението'
+
+[[acronyms]]
+abbr = 'АПИ'
+expansion = 'Агенция Пътна инфраструктура'
+
+[[acronyms]]
+abbr = 'ТЕЛК'
+expansion = 'Трудово-експертна лекарска комисия'
