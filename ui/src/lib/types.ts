@@ -1,6 +1,6 @@
 export type Lane = 'leads' | 'already_checked' | 'low_quality' | 'failed' | 'screened_out' | 'pasted';
 
-export type Screen = 'inbox' | 'creators' | 'seeds' | 'calibration' | 'settings' | 'export';
+export type Screen = 'inbox' | 'creators' | 'seeds' | 'calibration' | 'settings' | 'export' | 'help';
 
 export interface LeadCard {
   id: string;

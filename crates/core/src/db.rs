@@ -323,8 +323,8 @@ impl Database {
              FROM videos v
              LEFT JOIN creators c ON c.id = v.creator_id
              WHERE (?1 IS NULL
-                    OR (?1 = 'pasted' AND (v.discovered_via LIKE 'paste%' OR v.lane = 'pasted'))
-                    OR (?1 = 'leads' AND (v.lane = 'leads' OR v.lane = 'pasted' OR v.lane IS NULL))
+                    OR (?1 = 'pasted' AND v.lane = 'pasted')
+                    OR (?1 = 'leads' AND (v.lane = 'leads' OR (v.lane IS NULL AND v.state IN ('VERIFIED', 'READY'))))
                     OR v.lane = ?1)
                AND (?2 IS NULL OR v.state = ?2)
                AND (?3 IS NULL OR v.creator_id = ?3)
@@ -360,20 +360,29 @@ impl Database {
 
     pub async fn get_lane_counts(&self) -> Result<std::collections::HashMap<String, i64>> {
         let rows = sqlx::query(
-            "SELECT COALESCE(lane, 'leads') AS lane_key, COUNT(*) AS cnt
+            "SELECT lane, COUNT(*) AS cnt
              FROM videos
-             GROUP BY COALESCE(lane, 'leads')",
+             WHERE lane IS NOT NULL
+             GROUP BY lane",
         )
         .fetch_all(&self.pool)
         .await?;
         let mut map = std::collections::HashMap::new();
         for r in rows {
-            let k: String = r.get("lane_key");
+            let k: String = r.get("lane");
             let c: i64 = r.get("cnt");
             map.insert(k, c);
         }
+        let leads_cnt_row = sqlx::query(
+            "SELECT COUNT(*) AS cnt FROM videos WHERE lane = 'leads' OR (lane IS NULL AND state IN ('VERIFIED', 'READY'))",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        let leads_cnt: i64 = leads_cnt_row.get("cnt");
+        map.insert("leads".to_string(), leads_cnt);
+
         let pasted_cnt_row = sqlx::query(
-            "SELECT COUNT(*) AS cnt FROM videos WHERE lane = 'pasted' OR discovered_via LIKE 'paste%'",
+            "SELECT COUNT(*) AS cnt FROM videos WHERE lane = 'pasted'",
         )
         .fetch_one(&self.pool)
         .await?;

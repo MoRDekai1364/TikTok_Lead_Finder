@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchVideoDetail, getCoreUrl, updateTranscript } from '../lib/api';
+  import { aiCheckTranscript, fetchVideoDetail, getCoreUrl, updateTranscript } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { VideoDetail } from '../lib/types';
@@ -22,6 +22,8 @@
   let isEditingTranscript = $state(false);
   let editedText = $state('');
   let isSavingTranscript = $state(false);
+  let isAiChecking = $state(false);
+  let copyToast = $state<string | null>(null);
   let videoElement = $state<HTMLVideoElement | null>(null);
   let currentTimeMs = $state(0);
   let metadataOpen = $state(false);
@@ -59,6 +61,34 @@
       isEditingTranscript = false;
     } finally {
       isSavingTranscript = false;
+    }
+  }
+
+  async function handleCopyTranscript() {
+    if (!detail?.transcript) return;
+    const txt = detail.transcript.edited_text || detail.transcript.text;
+    await navigator.clipboard.writeText(txt);
+    copyToast = currentLang === 'bg' ? '✓ Копирано в клипборда!' : '✓ Copied to clipboard!';
+    setTimeout(() => (copyToast = null), 2500);
+  }
+
+  async function handleAiCheckAndCopy() {
+    if (!detail?.transcript || isAiChecking) return;
+    isAiChecking = true;
+    copyToast = currentLang === 'bg' ? 'AI проверка на текста...' : 'Running AI spellcheck...';
+    try {
+      const res = await aiCheckTranscript(detail.video.id);
+      if (res && res.corrected_text) {
+        detail.transcript.edited_text = res.corrected_text;
+        editedText = res.corrected_text;
+        await navigator.clipboard.writeText(res.corrected_text);
+        copyToast = currentLang === 'bg' ? '✓ Коригирано с AI и копирано!' : '✓ AI corrected & copied!';
+      }
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при AI проверка' : 'AI check error';
+    } finally {
+      isAiChecking = false;
+      setTimeout(() => (copyToast = null), 3000);
     }
   }
 
@@ -124,15 +154,26 @@
       <div class="section-card transcript-section">
         <div class="section-header">
           <h3>{t.transcriptHeading}</h3>
-          {#if !isEditingTranscript}
-            <button class="btn btn-secondary btn-sm" onclick={() => (isEditingTranscript = true)}>
-              {t.transcriptEditBtn}
+          <div class="transcript-btn-group">
+            {#if copyToast}
+              <span class="copy-toast">{copyToast}</span>
+            {/if}
+            <button class="btn btn-secondary btn-sm" onclick={handleCopyTranscript} title={currentLang === 'bg' ? 'Копирай текста в клипборда' : 'Copy transcript to clipboard'}>
+              📋 {currentLang === 'bg' ? 'Копирай' : 'Copy'}
             </button>
-          {:else}
-            <button class="btn btn-primary btn-sm" onclick={handleSaveTranscript} disabled={isSavingTranscript}>
-              {isSavingTranscript ? '...' : t.transcriptSaveBtn}
+            <button class="btn btn-secondary btn-sm" onclick={handleAiCheckAndCopy} disabled={isAiChecking} title={currentLang === 'bg' ? 'AI проверка на думите и копиране' : 'AI spellcheck & copy'}>
+              {isAiChecking ? '...' : '🤖 AI проверка & копирай'}
             </button>
-          {/if}
+            {#if !isEditingTranscript}
+              <button class="btn btn-secondary btn-sm" onclick={() => (isEditingTranscript = true)}>
+                {t.transcriptEditBtn}
+              </button>
+            {:else}
+              <button class="btn btn-primary btn-sm" onclick={handleSaveTranscript} disabled={isSavingTranscript}>
+                {isSavingTranscript ? '...' : t.transcriptSaveBtn}
+              </button>
+            {/if}
+          </div>
         </div>
 
         {#if isEditingTranscript}
@@ -403,6 +444,24 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .transcript-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .copy-toast {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--verdict-supported);
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
   }
 
   .transcript-editor {

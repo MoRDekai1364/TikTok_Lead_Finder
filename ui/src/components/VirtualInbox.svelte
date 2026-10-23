@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { aiCheckTranscript, getCoreUrl } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { Lane, LeadCard } from '../lib/types';
@@ -40,7 +41,11 @@
   } = $props();
 
   const t = $derived(translations[currentLang]);
+  const coreUrl = getCoreUrl();
 
+  let isVideoFeedOpen = $state(false);
+  let feedToast = $state<string | null>(null);
+  let isAiCheckingFeed = $state(false);
   let searchQuery = $state('');
   let verdictFilter = $state('all');
   let sortBy = $state<'score' | 'views' | 'quality'>('score');
@@ -56,6 +61,33 @@
   export function focusSearch() {
     if (searchInputRef) {
       searchInputRef.focus();
+    }
+  }
+
+  async function handleCopyFeedText() {
+    if (!selectedCard) return;
+    const txt = selectedCard.top_claim_text || '';
+    await navigator.clipboard.writeText(txt);
+    feedToast = currentLang === 'bg' ? '✓ Копирано!' : '✓ Copied!';
+    setTimeout(() => (feedToast = null), 2000);
+  }
+
+  async function handleAiCheckFeed() {
+    if (!selectedCard || isAiCheckingFeed) return;
+    isAiCheckingFeed = true;
+    feedToast = currentLang === 'bg' ? 'AI проверка...' : 'AI check...';
+    try {
+      const res = await aiCheckTranscript(selectedCard.id);
+      if (res && res.corrected_text) {
+        selectedCard.top_claim_text = res.corrected_text;
+        await navigator.clipboard.writeText(res.corrected_text);
+        feedToast = currentLang === 'bg' ? '✓ AI коригирано и копирано!' : '✓ AI corrected & copied!';
+      }
+    } catch {
+      feedToast = currentLang === 'bg' ? 'Грешка' : 'Error';
+    } finally {
+      isAiCheckingFeed = false;
+      setTimeout(() => (feedToast = null), 2500);
     }
   }
 
@@ -96,6 +128,7 @@
   });
 
   const totalHeight = $derived(filteredCards.length * ITEM_HEIGHT);
+  const selectedCard = $derived(filteredCards.find((c: LeadCard) => c.id === selectedId) || filteredCards[0] || null);
 
   const visibleRange = $derived.by(() => {
     const startIdx = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER_COUNT);
@@ -228,6 +261,15 @@
         <option value="quality">{t.sortQuality}</option>
       </select>
 
+      <button
+        class="btn btn-secondary btn-sm feed-toggle-btn"
+        class:active={isVideoFeedOpen}
+        onclick={() => (isVideoFeedOpen = !isVideoFeedOpen)}
+        title={currentLang === 'bg' ? 'Включи/изключи видео фийд' : 'Toggle video feed'}
+      >
+        🎬 {t.toggleFeed}
+      </button>
+
       {#if activeLane === 'leads'}
         <button class="btn btn-secondary btn-sm" onclick={onPullMore} title={t.pullMoreButton}>
           +15 {t.pullMoreButton}
@@ -250,35 +292,95 @@
     </div>
   {/if}
 
-  <div
-    class="virtual-scroll-viewport"
-    bind:this={containerRef}
-    onscroll={handleScroll}
-    role="listbox"
-    aria-label="Списък с видеа"
-  >
-    {#if filteredCards.length === 0}
-      <div class="empty-inbox">
-        <p>{currentLang === 'bg' ? 'Няма видеа в този раздел.' : 'No videos in this lane.'}</p>
-      </div>
-    {:else}
-      <div class="virtual-scroll-spacer" style="height: {totalHeight}px;">
-        {#each visibleItems as { item, top } (item.id)}
-          <div class="virtual-item-wrapper" style="transform: translateY({top}px);">
-            <LeadCardComponent
-              card={item}
-              isSelected={selectedId === item.id}
-              isChecked={checkedIds.has(item.id)}
-              {currentLang}
-              onSelect={onSelectCard}
-              onToggleCheck={onToggleCheck}
-              onKeep={onKeep}
-              onDiscard={onDiscard}
-              onResearchMore={onResearchMore}
-            />
+  <div class="inbox-body-layout" class:with-feed={isVideoFeedOpen}>
+    <div
+      class="virtual-scroll-viewport"
+      bind:this={containerRef}
+      onscroll={handleScroll}
+      role="listbox"
+      aria-label="Списък с видеа"
+    >
+      {#if filteredCards.length === 0}
+        <div class="empty-inbox">
+          <p>{currentLang === 'bg' ? 'Няма видеа в този раздел.' : 'No videos in this lane.'}</p>
+        </div>
+      {:else}
+        <div class="virtual-scroll-spacer" style="height: {totalHeight}px;">
+          {#each visibleItems as { item, top } (item.id)}
+            <div class="virtual-item-wrapper" style="transform: translateY({top}px);">
+              <LeadCardComponent
+                card={item}
+                isSelected={selectedId === item.id}
+                isChecked={checkedIds.has(item.id)}
+                {currentLang}
+                onSelect={onSelectCard}
+                onToggleCheck={onToggleCheck}
+                onKeep={onKeep}
+                onDiscard={onDiscard}
+                onResearchMore={onResearchMore}
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    {#if isVideoFeedOpen}
+      <aside class="feed-sidebar">
+        {#if selectedCard}
+          <div class="feed-card">
+            <div class="feed-header">
+              <span class="feed-author">@{selectedCard.creator_handle || 'tiktok_user'}</span>
+              <span class="feed-views">{selectedCard.views.toLocaleString()} {currentLang === 'bg' ? 'гледания' : 'views'}</span>
+            </div>
+            <div class="feed-media-box">
+              {#key selectedCard.id}
+                <video
+                  src="{coreUrl}/api/media/{selectedCard.id}/video.mp4"
+                  poster={selectedCard.thumbnail_url || undefined}
+                  controls
+                  autoplay
+                  class="feed-video-player"
+                >
+                  <track kind="captions" />
+                </video>
+              {/key}
+            </div>
+            <div class="feed-details">
+              <div class="feed-details-header">
+                <span class="feed-claim-label">{currentLang === 'bg' ? 'Основно твърдение:' : 'Key Claim:'}</span>
+                {#if feedToast}
+                  <span class="feed-toast">{feedToast}</span>
+                {/if}
+              </div>
+              <p class="feed-claim-text">{selectedCard.top_claim_text || (currentLang === 'bg' ? 'Видеото се обработва...' : 'Processing...')}</p>
+              <div class="feed-text-actions">
+                <button class="btn btn-secondary btn-sm" onclick={handleCopyFeedText} title="Копирай текста">
+                  📋 {currentLang === 'bg' ? 'Копирай' : 'Copy'}
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick={handleAiCheckFeed} disabled={isAiCheckingFeed} title="AI проверка и копиране">
+                  {isAiCheckingFeed ? '...' : '🤖 AI проверка & копирай'}
+                </button>
+              </div>
+            </div>
+            <div class="feed-quick-actions">
+              <button class="btn btn-primary btn-sm" onclick={() => onKeep(selectedCard!.id)}>
+                ✓ {currentLang === 'bg' ? 'Запази' : 'Keep'}
+              </button>
+              <button class="btn btn-danger btn-sm" onclick={() => onDiscard(selectedCard!.id)}>
+                ✕ {currentLang === 'bg' ? 'Отхвърли' : 'Discard'}
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick={() => onResearchMore(selectedCard!.id)}>
+                R {currentLang === 'bg' ? 'Проучи' : 'Research'}
+              </button>
+            </div>
           </div>
-        {/each}
-      </div>
+        {:else}
+          <div class="feed-empty">
+            <p>{currentLang === 'bg' ? 'Няма избрано видео.' : 'No video selected.'}</p>
+          </div>
+        {/if}
+      </aside>
     {/if}
   </div>
 
@@ -434,5 +536,153 @@
     border-top: 1px solid var(--border-color);
     font-size: 0.74rem;
     color: var(--text-muted);
+  }
+
+  .inbox-body-layout {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .inbox-body-layout.with-feed .virtual-scroll-viewport {
+    flex: 1;
+  }
+
+  .feed-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .feed-toggle-btn.active {
+    background: var(--primary-accent);
+    color: #fff;
+    border-color: var(--primary-accent);
+  }
+
+  .feed-sidebar {
+    width: 380px;
+    border-left: 1px solid var(--border-color);
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 1rem;
+    flex-shrink: 0;
+  }
+
+  .feed-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .feed-author {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary-accent);
+  }
+
+  .feed-views {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .feed-media-box {
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    max-height: 480px;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feed-video-player {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .feed-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+  }
+
+  .feed-claim-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .feed-claim-text {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-heading);
+    line-height: 1.4;
+  }
+
+  .feed-details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .feed-toast {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--verdict-supported);
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .feed-text-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+  }
+
+  .feed-text-actions .btn {
+    font-size: 0.74rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .feed-quick-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .feed-quick-actions .btn {
+    flex: 1;
+    justify-content: center;
+    padding: 0.45rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .feed-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
   }
 </style>

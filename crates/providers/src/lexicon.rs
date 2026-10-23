@@ -670,7 +670,7 @@ impl LexiconNormalizer {
 
     fn try_repair_oov(&self, low: &str) -> Option<String> {
         let n_chars = low.chars().count();
-        if n_chars < 4 {
+        if n_chars < 3 {
             return None;
         }
 
@@ -683,7 +683,7 @@ impl LexiconNormalizer {
                     let len_diff = (cand.chars().count() as isize - n_chars as isize).unsigned_abs();
                     if dist <= 2 && len_diff <= 1 {
                         let freq = self.word_freq.get(cand).copied().unwrap_or(5);
-                        if freq < 20 {
+                        if freq < 5 {
                             continue;
                         }
                         let better = match best {
@@ -707,14 +707,14 @@ impl LexiconNormalizer {
             }
         }
 
-        if n_chars >= 7 {
+        if n_chars >= 4 {
             let mut best_1edit: Option<(String, u64)> = None;
 
             if let Some(cands) = self.delete_index.get(low) {
                 for cand in cands {
                     if is_single_insertion_or_deletion(low, cand) {
                         let freq = self.word_freq.get(cand).copied().unwrap_or(0);
-                        if freq >= 60
+                        if freq >= 10
                             && best_1edit.as_ref().map(|(_, bf)| freq > *bf).unwrap_or(true)
                         {
                             best_1edit = Some((cand.clone(), freq));
@@ -732,7 +732,7 @@ impl LexiconNormalizer {
                     .collect();
                 if self.valid_words.contains(&reduced) {
                     let freq = self.word_freq.get(&reduced).copied().unwrap_or(0);
-                    if freq >= 60
+                    if freq >= 10
                         && best_1edit.as_ref().map(|(_, bf)| freq > *bf).unwrap_or(true)
                     {
                         best_1edit = Some((reduced, freq));

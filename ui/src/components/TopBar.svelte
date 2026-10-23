@@ -45,8 +45,58 @@
 
   const t = $derived(translations[currentLang]);
 
+  function inspectUrlImmediately(text: string) {
+    const raw = text.trim();
+    if (!raw) return;
+    const tiktokMatch = raw.match(/tiktok\.com\/@([a-zA-Z0-9_.-]+)\/video\/([0-9]+)/i);
+    if (tiktokMatch) {
+      lastPasted = {
+        id: tiktokMatch[2],
+        creator_handle: tiktokMatch[1],
+        caption: currentLang === 'bg' ? 'Зареждане на видео данни...' : 'Loading video details...',
+        progress_pct: 15,
+        etr_seconds: 25,
+      };
+      return;
+    }
+    const shortMatch = raw.match(/(?:vm|vt)\.tiktok\.com\/([a-zA-Z0-9_-]+)/i);
+    if (shortMatch) {
+      lastPasted = {
+        id: shortMatch[1],
+        creator_handle: 'tiktok_user',
+        caption: currentLang === 'bg' ? 'Разрешаване на кратък линк...' : 'Resolving shortlink...',
+        progress_pct: 10,
+        etr_seconds: 30,
+      };
+      return;
+    }
+    if (raw.includes('tiktok.com')) {
+      lastPasted = {
+        id: 'tiktok_link',
+        creator_handle: 'tiktok_user',
+        caption: raw,
+        progress_pct: 10,
+        etr_seconds: 30,
+      };
+    }
+  }
+
+  function handlePasteEvent(e: ClipboardEvent) {
+    const pasted = e.clipboardData?.getData('text') || '';
+    if (pasted) {
+      inspectUrlImmediately(pasted);
+    }
+  }
+
+  function handleInput() {
+    if (pasteText.includes('tiktok.com')) {
+      inspectUrlImmediately(pasteText);
+    }
+  }
+
   async function handlePaste() {
     if (!pasteText.trim() || isPasting) return;
+    inspectUrlImmediately(pasteText);
     isPasting = true;
     toastMessage = currentLang === 'bg' ? 'Добавяне на линк...' : 'Adding link...';
     toastIsError = false;
@@ -92,6 +142,8 @@
         type="text"
         placeholder={t.pastePlaceholder}
         bind:value={pasteText}
+        oninput={handleInput}
+        onpaste={handlePasteEvent}
         onkeydown={handleKeyDown}
         aria-label={t.pastePlaceholder}
       />
@@ -191,6 +243,9 @@
     </button>
     <button class="nav-tab" class:active={activeScreen === 'export'} onclick={() => onNavigate('export')}>
       {t.tabExport}
+    </button>
+    <button class="nav-tab" class:active={activeScreen === 'help'} onclick={() => onNavigate('help')}>
+      ❓ {t.tabHelp}
     </button>
   </nav>
 </header>

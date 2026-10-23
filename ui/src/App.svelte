@@ -18,6 +18,7 @@
   import CreatorsScreen from './components/CreatorsScreen.svelte';
   import DetailDrawer from './components/DetailDrawer.svelte';
   import ExportScreen from './components/ExportScreen.svelte';
+  import HelpScreen from './components/HelpScreen.svelte';
   import SeedsScreen from './components/SeedsScreen.svelte';
   import SettingsScreen from './components/SettingsScreen.svelte';
   import TopBar from './components/TopBar.svelte';
@@ -320,6 +321,8 @@
         <SettingsScreen {currentLang} />
       {:else if activeScreen === 'export'}
         <ExportScreen {currentLang} />
+      {:else if activeScreen === 'help'}
+        <HelpScreen {currentLang} />
       {/if}
     </div>
 

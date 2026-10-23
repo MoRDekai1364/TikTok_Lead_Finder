@@ -133,6 +133,12 @@ export async function fetchVideoDetail(id: string): Promise<VideoDetail> {
   return fetchJson<VideoDetail>(`/api/videos/${encodeURIComponent(id)}`);
 }
 
+export async function aiCheckTranscript(id: string): Promise<{ ok: boolean; video_id: string; corrected_text: string }> {
+  return fetchJson<{ ok: boolean; video_id: string; corrected_text: string }>(`/api/videos/${encodeURIComponent(id)}/ai-check`, {
+    method: 'POST',
+  });
+}
+
 export async function pasteLinks(text: string): Promise<{ count?: number; ingested?: number; videos?: any[] }> {
   return fetchJson<{ count?: number; ingested?: number; videos?: any[] }>('/api/inbox/paste', {
     method: 'POST',

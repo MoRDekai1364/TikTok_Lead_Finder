@@ -133,6 +133,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id", get(handle_video_detail))
         .route("/api/videos/:id/decision", post(handle_decision))
         .route("/api/videos/:id/transcript", patch(handle_edit_transcript))
+        .route("/api/videos/:id/ai-check", post(handle_ai_check_transcript))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
         .route("/api/seeds/:id", delete(handle_delete_seed))
         .route("/api/creators", get(handle_list_creators))
@@ -438,6 +439,80 @@ async fn handle_edit_transcript(
         }
     }
     Json(serde_json::json!({ "ok": true, "video_id": id })).into_response()
+}
+
+async fn handle_ai_check_transcript(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+) -> Response {
+    let tr_opt = match ctx.db.get_transcript(&id).await {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let Some(tr) = tr_opt else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Transcript not found" })),
+        )
+            .into_response();
+    };
+
+    let base_text = tr.edited_text.unwrap_or(tr.text);
+    let cfg = ctx.config.read().await.clone();
+    let lex = leadfinder_providers::global_lexicon(
+        &ctx.paths,
+        &cfg.normalisation.lexicon_config_file,
+    );
+
+    let stage1 = lex.normalize_text(&base_text);
+
+    let system_prompt = "You are a Bulgarian language spellcheck and grammar assistant. Fix speech recognition mistakes, merged words, and punctuation in the provided Bulgarian transcript while preserving the exact original meaning and structure. Output a JSON object with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
+    let user_prompt = format!("Original transcript:\n{stage1}");
+
+    let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+    let schema_val = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "corrected_text": { "type": "string" }
+        },
+        "required": ["corrected_text"]
+    });
+
+    let llm_req = leadfinder_core::LlmJsonRequest {
+        system_prompt,
+        user_prompt,
+        json_schema: Some(schema_val),
+        max_tokens: 1024,
+        temperature: 0.1,
+    };
+
+    let corrected = match runner.complete_validated(&llm_req, &ctx.db).await {
+        Ok(val) => {
+            val.response.parsed_json
+                .get("corrected_text")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.trim().to_string())
+                .unwrap_or(stage1)
+        }
+        Err(_) => stage1,
+    };
+
+    let _ = ctx.db.update_transcript_edited_text(&id, &corrected).await;
+
+    Json(serde_json::json!({
+        "ok": true,
+        "video_id": id,
+        "corrected_text": corrected
+    }))
+    .into_response()
 }
 
 async fn handle_list_seeds(State(ctx): State<Arc<PipelineContext>>) -> Response {
