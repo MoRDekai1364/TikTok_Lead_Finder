@@ -67,8 +67,47 @@ async function fetchJson<T>(endpoint: string, options: RequestInit = {}): Promis
   }
 }
 
+function mapSummaryToCard(raw: any): LeadCard {
+  const v = raw?.video || raw || {};
+  const vidId = String(v.id || raw?.id || '');
+  return {
+    id: vidId,
+    creator_handle: v.creator_handle ?? raw?.creator_handle ?? null,
+    creator_display_name: v.creator_display_name ?? raw?.creator_display_name ?? null,
+    creator_follower_count: v.creator_follower_count ?? raw?.creator_follower_count ?? null,
+    views: typeof v.views === 'number' ? v.views : typeof raw?.views === 'number' ? raw.views : 0,
+    duration_s: v.duration_s ?? raw?.duration_s ?? null,
+    thumbnail_url: raw?.thumbnail_url ?? (vidId ? `${cachedBaseUrl}/api/media/${vidId}/thumb.jpg` : null),
+    top_claim_text: raw?.top_claim_bg ?? raw?.top_claim_text ?? null,
+    top_claim_verdict: raw?.top_verdict ?? raw?.top_claim_verdict ?? null,
+    top_claim_label: raw?.top_label ?? raw?.top_claim_label ?? null,
+    lead_score: typeof v.lead_score === 'number' ? v.lead_score : typeof raw?.lead_score === 'number' ? raw.lead_score : 0,
+    lane: v.lane ?? raw?.lane ?? 'leads',
+    transcript_quality: raw?.transcript_quality ?? null,
+    transcript_source: raw?.transcript_source ?? null,
+    max_checkworthiness: raw?.max_checkworthiness ?? null,
+    max_evidence_strength: raw?.max_evidence_strength ?? null,
+    cluster_size: raw?.cluster_size ?? 1,
+    cluster_total_views: raw?.cluster_total_views ?? (typeof v.views === 'number' ? v.views : 0),
+    research_running: Boolean(raw?.research_running),
+    reason_flagged: raw?.reason_flagged ?? '',
+  };
+}
+
+function normalizeProfile(res: any): HardwareProfile | null {
+  if (!res) return null;
+  return {
+    ...res,
+    hardware: res.hardware || res.hardware_json || {},
+    chosen: res.chosen || res.chosen_json || {},
+    capacity_per_day: res.capacity_per_day ?? 0,
+    measured_at: res.measured_at || '',
+  } as HardwareProfile;
+}
+
 export async function fetchQueueStatus(): Promise<QueueCounts> {
-  return fetchJson<QueueCounts>('/api/health');
+  const res = await fetchJson<any>('/api/health');
+  return (res?.queue || res || {}) as QueueCounts;
 }
 
 export async function fetchScaleStatus(): Promise<ScaleStatus> {
@@ -76,11 +115,14 @@ export async function fetchScaleStatus(): Promise<ScaleStatus> {
 }
 
 export async function fetchProfile(): Promise<HardwareProfile | null> {
-  return fetchJson<HardwareProfile | null>('/api/profile');
+  const res = await fetchJson<any>('/api/profile');
+  return normalizeProfile(res);
 }
 
 export async function fetchVideos(lane: string = 'leads', limit: number = 2000): Promise<LeadCard[]> {
-  return fetchJson<LeadCard[]>(`/api/videos?lane=${encodeURIComponent(lane)}&limit=${limit}`);
+  const res = await fetchJson<any>(`/api/videos?lane=${encodeURIComponent(lane)}&limit=${limit}`);
+  const list = Array.isArray(res) ? res : Array.isArray(res?.cards) ? res.cards : [];
+  return list.map(mapSummaryToCard);
 }
 
 export async function fetchVideoDetail(id: string): Promise<VideoDetail> {
@@ -144,14 +186,16 @@ export async function setCreatorWatchlist(handle: string, watchlist: boolean): P
 }
 
 export async function triggerCalibration(): Promise<HardwareProfile> {
-  return fetchJson<HardwareProfile>('/api/calibrate', { method: 'POST' });
+  const res = await fetchJson<any>('/api/calibrate', { method: 'POST' });
+  return normalizeProfile(res)!;
 }
 
 export async function updateOverrides(overrides: Record<string, string>): Promise<HardwareProfile> {
-  return fetchJson<HardwareProfile>('/api/calibrate/overrides', {
+  const res = await fetchJson<any>('/api/calibrate/overrides', {
     method: 'POST',
     body: JSON.stringify(overrides),
   });
+  return normalizeProfile(res)!;
 }
 
 export async function fetchSettings(): Promise<Record<string, unknown>> {

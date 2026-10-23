@@ -146,6 +146,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
 
     Router::new()
         .route("/metrics", get(handle_metrics))
+        .nest_service("/api/media", tower_http::services::ServeDir::new(ctx.media_root()))
         .merge(protected)
         .layer(CorsLayer::permissive())
         .with_state(ctx)
