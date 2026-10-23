@@ -181,6 +181,12 @@ export async function retranscribeVideo(id: string, warmStart: boolean = true, r
   });
 }
 
+export async function googleAiFixTranscript(id: string): Promise<{ ok: boolean; video_id: string; corrected_text: string }> {
+  return fetchJson<{ ok: boolean; video_id: string; corrected_text: string }>(`/api/videos/${encodeURIComponent(id)}/google-ai-fix`, {
+    method: 'POST',
+  });
+}
+
 export async function deleteVideo(id: string): Promise<{ ok: boolean }> {
   return fetchJson<{ ok: boolean }>(`/api/videos/${encodeURIComponent(id)}`, {
     method: 'DELETE',

@@ -6,6 +6,7 @@
     fetchVideoDetail,
     fetchVideosByCreator,
     getCoreUrl,
+    googleAiFixTranscript,
     logDecision,
     researchPerson,
     retranscribeVideo,
@@ -40,6 +41,7 @@
   let editedText = $state('');
   let isSavingTranscript = $state(false);
   let isAiChecking = $state(false);
+  let isGoogleAiFixing = $state(false);
   let isRetranscribing = $state(false);
   let copyToast = $state<string | null>(null);
   let videoElement = $state<HTMLVideoElement | null>(null);
@@ -320,6 +322,26 @@
     }
   }
 
+  async function handleGoogleAiFix() {
+    if (!detail?.transcript || isGoogleAiFixing) return;
+    isGoogleAiFixing = true;
+    copyToast = currentLang === 'bg' ? '🌐 Google AI обработка...' : '🌐 Running Google AI fix...';
+    try {
+      const res = await googleAiFixTranscript(detail.video.id);
+      if (res && res.corrected_text) {
+        detail.transcript.edited_text = res.corrected_text;
+        editedText = res.corrected_text;
+        await navigator.clipboard.writeText(res.corrected_text);
+        copyToast = currentLang === 'bg' ? '✓ Поправено с Google AI и запазено!' : '✓ Corrected with Google AI & saved!';
+      }
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при Google AI поправка' : 'Google AI fix error';
+    } finally {
+      isGoogleAiFixing = false;
+      setTimeout(() => (copyToast = null), 3000);
+    }
+  }
+
   async function handleTriggerClaimVerify(claimText: string) {
     if (!detail) return;
     copyToast = currentLang === 'bg' ? '🔍 Проверка в мрежата...' : '🔍 Searching online...';
@@ -543,8 +565,25 @@
             >
               {isAiChecking ? '...' : '🤖 AI'}
             </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={handleGoogleAiFix}
+              disabled={isGoogleAiFixing}
+              title={currentLang === 'bg' ? 'Автоматична поправка чрез Google AI във фонов режим' : 'Automated fix via Google AI search in background'}
+            >
+              {isGoogleAiFixing ? '...' : '🌐 Google AI Fix'}
+            </button>
             <a
-              href={`https://www.google.com/search?udm=50&q=${encodeURIComponent('what would the fixed text look like?\n' + (editedText || detail.transcript?.text || ''))}`}
+              href="https://google.com/ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-secondary btn-sm"
+              title="google.com/ai"
+            >
+              ↗ google.com/ai
+            </a>
+            <a
+              href={`https://www.google.com/search?udm=50&q=${encodeURIComponent(' what would the fixed text look like?\n' + (editedText || detail.transcript?.text || ''))}`}
               target="_blank"
               rel="noopener noreferrer"
               class="btn btn-secondary btn-sm google-sge-btn"

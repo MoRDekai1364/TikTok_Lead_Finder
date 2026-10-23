@@ -152,6 +152,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id/transcript", patch(handle_edit_transcript))
         .route("/api/videos/:id/retranscribe", post(handle_retranscribe))
         .route("/api/videos/:id/ai-check", post(handle_ai_check_transcript))
+        .route("/api/videos/:id/google-ai-fix", post(handle_google_ai_fix))
         .route("/api/evidence/preview", get(handle_evidence_preview))
         .route("/api/people/:id/research", post(handle_research_person))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
@@ -562,7 +563,7 @@ async fn handle_retranscribe(
         let stage1 = lex.normalize_text(&base_text);
 
         let system_prompt = "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
-        let user_prompt = format!("what would the fixed text look like?\n{stage1}");
+        let user_prompt = format!(" what would the fixed text look like?\n{stage1}");
 
         let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
         let schema_val = serde_json::json!({
@@ -649,7 +650,7 @@ async fn handle_ai_check_transcript(
     let stage1 = lex.normalize_text(&base_text);
 
     let system_prompt = "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
-    let user_prompt = format!("what would the fixed text look like?\n{stage1}");
+    let user_prompt = format!(" what would the fixed text look like?\n{stage1}");
 
     let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
     let schema_val = serde_json::json!({
@@ -686,6 +687,146 @@ async fn handle_ai_check_transcript(
         "ok": true,
         "video_id": id,
         "corrected_text": corrected
+    }))
+    .into_response()
+}
+
+async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
+    let prompt = format!(" what would the fixed text look like?\n{}", raw_text.trim());
+    let encoded_query: String = url::form_urlencoded::byte_serialize(prompt.as_bytes()).collect();
+    let url = format!("https://www.google.com/search?udm=50&q={}", encoded_query);
+
+    let edge_paths = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    ];
+
+    let mut browser_path = None;
+    for p in &edge_paths {
+        if std::path::Path::new(p).exists() {
+            browser_path = Some(*p);
+            break;
+        }
+    }
+
+    let Some(bin) = browser_path else {
+        return None;
+    };
+
+    let output = tokio::process::Command::new(bin)
+        .arg("--headless=new")
+        .arg("--disable-gpu")
+        .arg("--virtual-time-budget=10000")
+        .arg("--dump-dom")
+        .arg(&url)
+        .output()
+        .await
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let dom = String::from_utf8_lossy(&output.stdout);
+    extract_fixed_text_from_google_dom(&dom)
+}
+
+fn extract_fixed_text_from_google_dom(dom: &str) -> Option<String> {
+    if let Ok(re_quotes) = regex::Regex::new(r#"[„"“]([А-ЯA-Z][^"“”]{15,})[“"”]"#) {
+        if let Some(caps) = re_quotes.captures(dom) {
+            if let Some(m) = caps.get(1) {
+                let res = m.as_str().trim();
+                if !res.is_empty() {
+                    return Some(res.to_string());
+                }
+            }
+        }
+    }
+
+    let re_block = regex::Regex::new(r#"data-processed="true">(.*?)</div>"#).ok()?;
+    let blocks: Vec<&str> = re_block.find_iter(dom).map(|m| m.as_str()).collect();
+    let re_tag = regex::Regex::new(r#"<[^>]+>"#).ok()?;
+    for (i, b) in blocks.iter().enumerate() {
+        let clean = re_tag.replace_all(b, " ");
+        let s = clean.trim();
+        if s.contains("би изглеждал така") || s.contains("вариант на текста") {
+            if i + 1 < blocks.len() {
+                let nxt_clean = re_tag.replace_all(blocks[i + 1], " ");
+                let nxt = nxt_clean.trim().trim_matches(|c| c == '„' || c == '"' || c == '”' || c == '“');
+                if nxt.chars().count() > 10 {
+                    return Some(nxt.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+async fn handle_google_ai_fix(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+) -> Response {
+    let tr_opt = match ctx.db.get_transcript(&id).await {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let Some(tr) = tr_opt else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Transcript not found" })),
+        )
+            .into_response();
+    };
+
+    let base_text = tr.edited_text.unwrap_or(tr.text);
+    let maybe_fixed = run_google_ai_mode_fix(&base_text).await;
+
+    let final_text = match maybe_fixed {
+        Some(t) if !t.trim().is_empty() => t,
+        _ => {
+            let cfg = ctx.config.read().await.clone();
+            let lex = leadfinder_providers::global_lexicon(
+                &ctx.paths,
+                &cfg.normalisation.lexicon_config_file,
+            );
+            let stage1 = lex.normalize_text(&base_text);
+            let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+            let schema_val = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "corrected_text": { "type": "string" }
+                },
+                "required": ["corrected_text"]
+            });
+            let llm_req = leadfinder_core::LlmJsonRequest {
+                system_prompt: "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string(),
+                user_prompt: format!(" what would the fixed text look like?\n{stage1}"),
+                json_schema: Some(schema_val),
+                max_tokens: 1024,
+                temperature: 0.1,
+            };
+            match runner.complete_validated(&llm_req, &ctx.db).await {
+                Ok(val) => val.response.parsed_json.get("corrected_text").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or(stage1),
+                Err(_) => stage1,
+            }
+        }
+    };
+
+    let _ = ctx.db.update_transcript_edited_text(&id, &final_text).await;
+
+    Json(serde_json::json!({
+        "ok": true,
+        "video_id": id,
+        "corrected_text": final_text,
+        "source": "google_ai_mode"
     }))
     .into_response()
 }
