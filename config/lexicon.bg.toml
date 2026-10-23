@@ -180,6 +180,18 @@ right = 'Илияна'
 wrong = 'напрао'
 right = 'направо'
 
+[[asr_repairs]]
+wrong = 'хасфалт'
+right = 'асфалт'
+
+[[asr_repairs]]
+wrong = 'фнимавай'
+right = 'внимавай'
+
+[[asr_repairs]]
+wrong = 'сагласен'
+right = 'съгласен'
+
 [[orth_phonetic_clusters]]
 from = 'щн'
 to = 'SHN'
@@ -881,6 +893,36 @@ term = 'баси'
 standard = 'баси / възклицание'
 register = 'разговорно/жаргон'
 ipa = 'ˈbasi'
+
+[[dialect_glossary]]
+term = 'верно'
+standard = 'вярно'
+register = 'разговорно/западен диалект'
+ipa = 'ˈvɛrnɔ'
+
+[[dialect_glossary]]
+term = 'голем'
+standard = 'голям'
+register = 'западнобългарски диалект (екав рефлекс)'
+ipa = 'ɡɔˈlɛm'
+
+[[dialect_glossary]]
+term = 'убаво'
+standard = 'хубаво'
+register = 'разговорно/западен диалект'
+ipa = 'uˈbavɔ'
+
+[[dialect_glossary]]
+term = 'зел'
+standard = 'взел'
+register = 'разговорно/диалектно'
+ipa = 'zɛl'
+
+[[dialect_glossary]]
+term = "к'во"
+standard = 'какво'
+register = 'разговорно'
+ipa = 'kvɔ'
 
 [[acronyms]]
 abbr = 'ДДС'
