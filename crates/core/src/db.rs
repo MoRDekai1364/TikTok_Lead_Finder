@@ -1,0 +1,1345 @@
+use std::path::Path;
+use std::str::FromStr;
+use std::time::Duration;
+use anyhow::Result;
+use chrono::{DateTime, Utc};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteRow, SqliteSynchronous};
+use sqlx::{Row, SqlitePool};
+use crate::config::SeedEntry;
+use crate::models::{
+    AttributionAct, Claim, ClaimWithEvidence, Creator, Decision, Evidence, HardwareProfile, Job,
+    LeadCardSummary, OcrText, Person, Seed, Stage, Transcript, TranscriptSegment, Video,
+    VideoDetail, VideoRef, VideoState,
+};
+use crate::politeness::compute_backoff_delay;
+
+const INITIAL_SCHEMA_SQL: &str = include_str!("../migrations/0001_initial.sql");
+
+#[derive(Clone)]
+pub struct Database {
+    pool: SqlitePool,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct VideoFilter {
+    pub lane: Option<String>,
+    pub state: Option<String>,
+    pub verdict: Option<String>,
+    pub label: Option<String>,
+    pub creator_id: Option<String>,
+    pub search_query: Option<String>,
+    pub min_score: Option<f64>,
+    pub min_views: Option<i64>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+impl Database {
+    pub async fn connect(db_path: &Path) -> Result<Self> {
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let dsn = format!("sqlite://{}?mode=rwc", db_path.to_string_lossy().replace('\\', "/"));
+        let opts = SqliteConnectOptions::from_str(&dsn)?
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal)
+            .foreign_keys(true)
+            .busy_timeout(Duration::from_secs(15));
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(8)
+            .connect_with(opts)
+            .await?;
+
+        sqlx::raw_sql(INITIAL_SCHEMA_SQL).execute(&pool).await?;
+
+        Ok(Self { pool })
+    }
+
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
+    pub async fn journal_mode(&self) -> Result<String> {
+        let row = sqlx::query("PRAGMA journal_mode;").fetch_one(&self.pool).await?;
+        Ok(row.get::<String, _>(0))
+    }
+
+    pub async fn seed_defaults(&self, entries: &[SeedEntry]) -> Result<usize> {
+        let mut inserted = 0usize;
+        for entry in entries {
+            let res = sqlx::query(
+                "INSERT OR IGNORE INTO seeds (kind, value, topic, active) VALUES (?1, ?2, ?3, 1)",
+            )
+            .bind(&entry.kind)
+            .bind(&entry.value)
+            .bind(&entry.topic)
+            .execute(&self.pool)
+            .await?;
+            inserted += res.rows_affected() as usize;
+        }
+        Ok(inserted)
+    }
+
+    pub async fn upsert_creator_from_ref(&self, vref: &VideoRef, expansion_depth: i64) -> Result<Option<String>> {
+        let handle = match vref.creator_handle.as_deref() {
+            Some(h) if !h.trim().is_empty() => h.trim().trim_start_matches('@').to_string(),
+            _ => return Ok(None),
+        };
+        let creator_id = vref
+            .creator_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| handle.to_lowercase());
+        let now = Utc::now().to_rfc3339();
+
+        sqlx::query(
+            "INSERT INTO creators (id, handle, display_name, region, follower_count, first_seen_at, expansion_depth)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO UPDATE SET
+               handle = excluded.handle,
+               display_name = COALESCE(excluded.display_name, creators.display_name),
+               region = COALESCE(excluded.region, creators.region),
+               follower_count = COALESCE(excluded.follower_count, creators.follower_count)",
+        )
+        .bind(&creator_id)
+        .bind(&handle)
+        .bind(&vref.creator_display_name)
+        .bind(&vref.creator_region)
+        .bind(vref.creator_follower_count)
+        .bind(&now)
+        .bind(expansion_depth)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(Some(creator_id))
+    }
+
+    pub async fn upsert_video_discovered(&self, vref: &VideoRef, expansion_depth: i64) -> Result<(Video, bool)> {
+        let creator_id = self.upsert_creator_from_ref(vref, expansion_depth).await?;
+        let existing = self.get_video(&vref.id).await?;
+        let now = Utc::now().to_rfc3339();
+        let hashtags_json = serde_json::to_string(&vref.hashtags)?;
+
+        if let Some(prev) = existing {
+            sqlx::query(
+                "UPDATE videos SET
+                   creator_id = COALESCE(?2, creator_id),
+                   caption = COALESCE(?3, caption),
+                   hashtags = CASE WHEN ?4 != '[]' THEN ?4 ELSE hashtags END,
+                   posted_at = COALESCE(?5, posted_at),
+                   views = COALESCE(?6, views),
+                   likes = COALESCE(?7, likes),
+                   shares = COALESCE(?8, shares),
+                   comments = COALESCE(?9, comments),
+                   duration_s = COALESCE(?10, duration_s)
+                 WHERE id = ?1",
+            )
+            .bind(&vref.id)
+            .bind(&creator_id)
+            .bind(&vref.caption)
+            .bind(&hashtags_json)
+            .bind(&vref.posted_at)
+            .bind(vref.views)
+            .bind(vref.likes)
+            .bind(vref.shares)
+            .bind(vref.comments)
+            .bind(vref.duration_s)
+            .execute(&self.pool)
+            .await?;
+
+            let updated = self.get_video(&vref.id).await?.unwrap_or(prev);
+            return Ok((updated, false));
+        }
+
+        sqlx::query(
+            "INSERT INTO videos (
+                id, creator_id, url, caption, hashtags, posted_at, views, likes, shares, comments,
+                duration_s, discovered_via, discovered_at, state
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        )
+        .bind(&vref.id)
+        .bind(&creator_id)
+        .bind(&vref.url)
+        .bind(&vref.caption)
+        .bind(&hashtags_json)
+        .bind(&vref.posted_at)
+        .bind(vref.views)
+        .bind(vref.likes)
+        .bind(vref.shares)
+        .bind(vref.comments)
+        .bind(vref.duration_s)
+        .bind(&vref.discovered_via)
+        .bind(&now)
+        .bind(VideoState::Discovered.as_str())
+        .execute(&self.pool)
+        .await?;
+
+        let inserted = self
+            .get_video(&vref.id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("inserted video missing: {}", vref.id))?;
+        Ok((inserted, true))
+    }
+
+    fn map_video_row(row: &SqliteRow) -> Video {
+        let hashtags_raw: Option<String> = row.try_get("hashtags").ok().flatten();
+        let hashtags = hashtags_raw
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .unwrap_or_default();
+
+        Video {
+            id: row.get("id"),
+            creator_id: row.try_get("creator_id").ok().flatten(),
+            creator_handle: row.try_get("creator_handle").ok().flatten(),
+            creator_display_name: row.try_get("creator_display_name").ok().flatten(),
+            url: row.get("url"),
+            caption: row.try_get("caption").ok().flatten(),
+            hashtags,
+            posted_at: row.try_get("posted_at").ok().flatten(),
+            views: row.try_get("views").ok().flatten(),
+            likes: row.try_get("likes").ok().flatten(),
+            shares: row.try_get("shares").ok().flatten(),
+            comments: row.try_get("comments").ok().flatten(),
+            duration_s: row.try_get("duration_s").ok().flatten(),
+            discovered_via: row.get("discovered_via"),
+            discovered_at: row.get("discovered_at"),
+            phash: row.try_get("phash").ok().flatten(),
+            state: row.get("state"),
+            state_reason: row.try_get("state_reason").ok().flatten(),
+            media_path: row.try_get("media_path").ok().flatten(),
+            lead_score: row.try_get("lead_score").ok().flatten(),
+            lane: row.try_get("lane").ok().flatten(),
+            cluster_id: row.try_get("cluster_id").ok().flatten(),
+        }
+    }
+
+    pub async fn get_video(&self, video_id: &str) -> Result<Option<Video>> {
+        let row = sqlx::query(
+            "SELECT v.*, c.handle AS creator_handle, c.display_name AS creator_display_name
+             FROM videos v
+             LEFT JOIN creators c ON c.id = v.creator_id
+             WHERE v.id = ?1",
+        )
+        .bind(video_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.as_ref().map(Self::map_video_row))
+    }
+
+    pub async fn set_video_state(&self, video_id: &str, state: VideoState, reason: Option<&str>) -> Result<()> {
+        sqlx::query("UPDATE videos SET state = ?2, state_reason = ?3 WHERE id = ?1")
+            .bind(video_id)
+            .bind(state.as_str())
+            .bind(reason)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn set_video_media_and_phash(&self, video_id: &str, media_path: Option<&str>, phash: Option<&str>) -> Result<()> {
+        sqlx::query(
+            "UPDATE videos SET
+               media_path = COALESCE(?2, media_path),
+               phash = COALESCE(?3, phash)
+             WHERE id = ?1",
+        )
+        .bind(video_id)
+        .bind(media_path)
+        .bind(phash)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn clear_video_media_path(&self, video_id: &str) -> Result<()> {
+        sqlx::query("UPDATE videos SET media_path = NULL WHERE id = ?1")
+            .bind(video_id)
+            .bind(Option::<String>::None)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn set_video_ranking(
+        &self,
+        video_id: &str,
+        lead_score: f64,
+        lane: &str,
+        cluster_id: Option<i64>,
+        state: VideoState,
+        reason: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE videos SET
+               lead_score = ?2,
+               lane = ?3,
+               cluster_id = COALESCE(?4, cluster_id),
+               state = ?5,
+               state_reason = ?6
+             WHERE id = ?1",
+        )
+        .bind(video_id)
+        .bind(lead_score)
+        .bind(lane)
+        .bind(cluster_id)
+        .bind(state.as_str())
+        .bind(reason)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_videos(&self, filter: &VideoFilter) -> Result<Vec<Video>> {
+        let limit = filter.limit.unwrap_or(200).clamp(1, 5000);
+        let offset = filter.offset.unwrap_or(0).max(0);
+        let rows = sqlx::query(
+            "SELECT v.*, c.handle AS creator_handle, c.display_name AS creator_display_name
+             FROM videos v
+             LEFT JOIN creators c ON c.id = v.creator_id
+             WHERE (?1 IS NULL OR v.lane = ?1)
+               AND (?2 IS NULL OR v.state = ?2)
+               AND (?3 IS NULL OR v.creator_id = ?3)
+               AND (?4 IS NULL OR COALESCE(v.lead_score, 0.0) >= ?4)
+               AND (?5 IS NULL OR COALESCE(v.views, 0) >= ?5)
+               AND (?6 IS NULL OR LOWER(COALESCE(v.caption, '')) LIKE '%' || LOWER(?6) || '%'
+                    OR LOWER(COALESCE(c.handle, '')) LIKE '%' || LOWER(?6) || '%'
+                    OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND LOWER(cl.text_bg) LIKE '%' || LOWER(?6) || '%'))
+               AND (?7 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.verdict = ?7))
+               AND (?8 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.label = ?8))
+             ORDER BY COALESCE(v.lead_score, -1.0) DESC, v.discovered_at DESC
+             LIMIT ?9 OFFSET ?10",
+        )
+        .bind(&filter.lane)
+        .bind(&filter.state)
+        .bind(&filter.creator_id)
+        .bind(filter.min_score)
+        .bind(filter.min_views)
+        .bind(&filter.search_query)
+        .bind(&filter.verdict)
+        .bind(&filter.label)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.iter().map(Self::map_video_row).collect())
+    }
+
+    pub async fn list_lead_cards(&self, filter: &VideoFilter) -> Result<Vec<LeadCardSummary>> {
+        let videos = self.list_videos(filter).await?;
+        let mut cards = Vec::with_capacity(videos.len());
+
+        for video in videos {
+            let tr_row = sqlx::query("SELECT source, quality FROM transcripts WHERE video_id = ?1")
+                .bind(&video.id)
+                .fetch_optional(&self.pool)
+                .await?;
+            let (transcript_source, transcript_quality) = match tr_row {
+                Some(r) => (
+                    r.try_get::<Option<String>, _>("source").ok().flatten(),
+                    r.try_get::<Option<f64>, _>("quality").ok().flatten(),
+                ),
+                None => (None, None),
+            };
+
+            let top_claim_row = sqlx::query(
+                "SELECT text_bg, verdict, label, checkworthiness, evidence_strength
+                 FROM claims
+                 WHERE video_id = ?1
+                 ORDER BY COALESCE(checkworthiness, 0.0) DESC, id ASC
+                 LIMIT 1",
+            )
+            .bind(&video.id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+            let (top_claim_bg, top_verdict, top_label, max_checkworthiness, max_evidence_strength) =
+                match top_claim_row {
+                    Some(r) => (
+                        r.try_get::<Option<String>, _>("text_bg").ok().flatten(),
+                        r.try_get::<Option<String>, _>("verdict").ok().flatten(),
+                        r.try_get::<Option<String>, _>("label").ok().flatten(),
+                        r.try_get::<Option<f64>, _>("checkworthiness").ok().flatten(),
+                        r.try_get::<Option<f64>, _>("evidence_strength").ok().flatten(),
+                    ),
+                    None => (None, None, None, None, None),
+                };
+
+            let (cluster_size, cluster_total_views) = if let Some(cid) = video.cluster_id {
+                let crow = sqlx::query(
+                    "SELECT COUNT(*) AS cnt, COALESCE(SUM(COALESCE(views, 0)), 0) AS sum_views
+                     FROM videos WHERE cluster_id = ?1",
+                )
+                .bind(cid)
+                .fetch_one(&self.pool)
+                .await?;
+                (
+                    crow.get::<i64, _>("cnt").max(1),
+                    crow.get::<i64, _>("sum_views"),
+                )
+            } else {
+                (1, video.views.unwrap_or(0))
+            };
+
+            let research_running_row = sqlx::query(
+                "SELECT COUNT(*) AS cnt FROM jobs
+                 WHERE video_id = ?1 AND stage = 'RESEARCH_MORE' AND status IN ('queued', 'running')",
+            )
+            .bind(&video.id)
+            .fetch_one(&self.pool)
+            .await?;
+            let research_running = research_running_row.get::<i64, _>("cnt") > 0;
+
+            let reason_flagged = video
+                .state_reason
+                .clone()
+                .or_else(|| top_claim_bg.clone())
+                .unwrap_or_else(|| video.discovered_via.clone());
+
+            cards.push(LeadCardSummary {
+                video,
+                top_claim_bg,
+                top_verdict,
+                top_label,
+                transcript_quality,
+                transcript_source,
+                max_checkworthiness,
+                max_evidence_strength,
+                cluster_size,
+                cluster_total_views,
+                research_running,
+                reason_flagged,
+            });
+        }
+
+        Ok(cards)
+    }
+
+    pub async fn get_video_detail(&self, video_id: &str) -> Result<Option<VideoDetail>> {
+        let Some(video) = self.get_video(video_id).await? else {
+            return Ok(None);
+        };
+
+        let creator = if let Some(cid) = &video.creator_id {
+            self.get_creator(cid).await?
+        } else {
+            None
+        };
+
+        let transcript = self.get_transcript(video_id).await?;
+        let ocr_texts = self.get_ocr_texts(video_id).await?;
+        let claims_raw = self.get_claims_for_video(video_id).await?;
+        let mut claims = Vec::with_capacity(claims_raw.len());
+        for claim in claims_raw {
+            let evidence = self.get_evidence_for_claim(claim.id).await?;
+            claims.push(ClaimWithEvidence { claim, evidence });
+        }
+        let people = self.get_people_for_video(video_id).await?;
+        let decisions = self.get_decisions_for_video(video_id).await?;
+
+        Ok(Some(VideoDetail {
+            video,
+            creator,
+            transcript,
+            ocr_texts,
+            claims,
+            people,
+            decisions,
+        }))
+    }
+
+    pub async fn get_creator(&self, creator_id: &str) -> Result<Option<Creator>> {
+        let row = sqlx::query("SELECT * FROM creators WHERE id = ?1")
+            .bind(creator_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| Creator {
+            id: r.get("id"),
+            handle: r.get("handle"),
+            display_name: r.try_get("display_name").ok().flatten(),
+            region: r.try_get("region").ok().flatten(),
+            follower_count: r.try_get("follower_count").ok().flatten(),
+            first_seen_at: r.get("first_seen_at"),
+            watchlist: r.get::<i64, _>("watchlist") != 0,
+            flagged_count: r.get("flagged_count"),
+            expansion_depth: r.get("expansion_depth"),
+        }))
+    }
+
+    pub async fn list_creators(&self) -> Result<Vec<Creator>> {
+        let rows = sqlx::query("SELECT * FROM creators ORDER BY watchlist DESC, flagged_count DESC, handle ASC")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Creator {
+                id: r.get("id"),
+                handle: r.get("handle"),
+                display_name: r.try_get("display_name").ok().flatten(),
+                region: r.try_get("region").ok().flatten(),
+                follower_count: r.try_get("follower_count").ok().flatten(),
+                first_seen_at: r.get("first_seen_at"),
+                watchlist: r.get::<i64, _>("watchlist") != 0,
+                flagged_count: r.get("flagged_count"),
+                expansion_depth: r.get("expansion_depth"),
+            })
+            .collect())
+    }
+
+    pub async fn set_creator_watchlist(&self, handle_or_id: &str, watchlist: bool) -> Result<Creator> {
+        let clean = handle_or_id.trim().trim_start_matches('@');
+        let id = clean.to_lowercase();
+        let now = Utc::now().to_rfc3339();
+        let wl_int = if watchlist { 1i64 } else { 0i64 };
+
+        sqlx::query(
+            "INSERT INTO creators (id, handle, first_seen_at, watchlist)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(id) DO UPDATE SET watchlist = ?4",
+        )
+        .bind(&id)
+        .bind(clean)
+        .bind(&now)
+        .bind(wl_int)
+        .execute(&self.pool)
+        .await?;
+
+        self.get_creator(&id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("creator not found after upsert"))
+    }
+
+    pub async fn save_transcript(&self, tr: &Transcript) -> Result<()> {
+        let segments_json = serde_json::to_string(&tr.segments)?;
+        sqlx::query(
+            "INSERT INTO transcripts (video_id, source, engine, model, language, quality, text, segments_json, edited_text)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(video_id) DO UPDATE SET
+               source = excluded.source,
+               engine = excluded.engine,
+               model = excluded.model,
+               language = excluded.language,
+               quality = excluded.quality,
+               text = excluded.text,
+               segments_json = excluded.segments_json,
+               edited_text = COALESCE(excluded.edited_text, transcripts.edited_text)",
+        )
+        .bind(&tr.video_id)
+        .bind(&tr.source)
+        .bind(&tr.engine)
+        .bind(&tr.model)
+        .bind(&tr.language)
+        .bind(tr.quality)
+        .bind(&tr.text)
+        .bind(&segments_json)
+        .bind(&tr.edited_text)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_transcript_edited_text(&self, video_id: &str, edited_text: &str) -> Result<()> {
+        sqlx::query("UPDATE transcripts SET edited_text = ?2 WHERE video_id = ?1")
+            .bind(video_id)
+            .bind(edited_text)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_transcript(&self, video_id: &str) -> Result<Option<Transcript>> {
+        let row = sqlx::query("SELECT * FROM transcripts WHERE video_id = ?1")
+            .bind(video_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| {
+            let seg_raw: Option<String> = r.try_get("segments_json").ok().flatten();
+            let segments = seg_raw
+                .as_deref()
+                .and_then(|s| serde_json::from_str::<Vec<TranscriptSegment>>(s).ok())
+                .unwrap_or_default();
+            Transcript {
+                video_id: r.get("video_id"),
+                source: r.get("source"),
+                engine: r.try_get("engine").ok().flatten(),
+                model: r.try_get("model").ok().flatten(),
+                language: r.try_get("language").ok().flatten(),
+                quality: r.try_get("quality").ok().flatten(),
+                text: r.get("text"),
+                segments,
+                edited_text: r.try_get("edited_text").ok().flatten(),
+            }
+        }))
+    }
+
+    pub async fn replace_ocr_texts(&self, video_id: &str, items: &[OcrText]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM ocr_texts WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        for item in items {
+            sqlx::query(
+                "INSERT OR REPLACE INTO ocr_texts (video_id, frame_ms, text, confidence)
+                 VALUES (?1, ?2, ?3, ?4)",
+            )
+            .bind(video_id)
+            .bind(item.frame_ms)
+            .bind(&item.text)
+            .bind(item.confidence)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn get_ocr_texts(&self, video_id: &str) -> Result<Vec<OcrText>> {
+        let rows = sqlx::query("SELECT * FROM ocr_texts WHERE video_id = ?1 ORDER BY frame_ms ASC")
+            .bind(video_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| OcrText {
+                video_id: r.get("video_id"),
+                frame_ms: r.get("frame_ms"),
+                text: r.try_get::<Option<String>, _>("text").ok().flatten().unwrap_or_default(),
+                confidence: r.try_get("confidence").ok().flatten(),
+            })
+            .collect())
+    }
+
+    pub async fn replace_claims_for_video(&self, video_id: &str, claims: &[Claim]) -> Result<Vec<Claim>> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM evidence WHERE claim_id IN (SELECT id FROM claims WHERE video_id = ?1)")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM claims WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+
+        for c in claims {
+            let attr_json = serde_json::to_string(&c.attribution)?;
+            sqlx::query(
+                "INSERT INTO claims (
+                    video_id, text_bg, claim_type, speaker, attribution_json, start_ms, end_ms,
+                    checkworthiness, verdict, label, reasoning_bg, evidence_strength, verified_at, cluster_id
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            )
+            .bind(video_id)
+            .bind(&c.text_bg)
+            .bind(&c.claim_type)
+            .bind(&c.speaker)
+            .bind(&attr_json)
+            .bind(c.start_ms)
+            .bind(c.end_ms)
+            .bind(c.checkworthiness)
+            .bind(&c.verdict)
+            .bind(&c.label)
+            .bind(&c.reasoning_bg)
+            .bind(c.evidence_strength)
+            .bind(&c.verified_at)
+            .bind(c.cluster_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        self.get_claims_for_video(video_id).await
+    }
+
+    pub async fn get_claims_for_video(&self, video_id: &str) -> Result<Vec<Claim>> {
+        let rows = sqlx::query("SELECT * FROM claims WHERE video_id = ?1 ORDER BY id ASC")
+            .bind(video_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let attr_raw: Option<String> = r.try_get("attribution_json").ok().flatten();
+                let attribution = attr_raw
+                    .as_deref()
+                    .and_then(|s| serde_json::from_str::<Vec<AttributionAct>>(s).ok())
+                    .unwrap_or_default();
+                Claim {
+                    id: r.get("id"),
+                    video_id: r.get("video_id"),
+                    text_bg: r.get("text_bg"),
+                    claim_type: r.get("claim_type"),
+                    speaker: r.try_get("speaker").ok().flatten(),
+                    attribution,
+                    start_ms: r.try_get("start_ms").ok().flatten(),
+                    end_ms: r.try_get("end_ms").ok().flatten(),
+                    checkworthiness: r.try_get("checkworthiness").ok().flatten(),
+                    verdict: r.try_get("verdict").ok().flatten(),
+                    label: r.try_get("label").ok().flatten(),
+                    reasoning_bg: r.try_get("reasoning_bg").ok().flatten(),
+                    evidence_strength: r.try_get("evidence_strength").ok().flatten(),
+                    verified_at: r.try_get("verified_at").ok().flatten(),
+                    cluster_id: r.try_get("cluster_id").ok().flatten(),
+                }
+            })
+            .collect())
+    }
+
+    pub async fn update_claim_verification(
+        &self,
+        claim_id: i64,
+        verdict: &str,
+        label: &str,
+        reasoning_bg: &str,
+        evidence_strength: f64,
+        evidence_items: &[Evidence],
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "UPDATE claims SET
+               verdict = ?2,
+               label = ?3,
+               reasoning_bg = ?4,
+               evidence_strength = ?5,
+               verified_at = ?6
+             WHERE id = ?1",
+        )
+        .bind(claim_id)
+        .bind(verdict)
+        .bind(label)
+        .bind(reasoning_bg)
+        .bind(evidence_strength)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query("DELETE FROM evidence WHERE claim_id = ?1")
+            .bind(claim_id)
+            .execute(&mut *tx)
+            .await?;
+
+        for ev in evidence_items {
+            sqlx::query(
+                "INSERT INTO evidence (
+                    claim_id, passage_id, source_url, source_name, source_kind, published_at, passage, stance, retrieved_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            )
+            .bind(claim_id)
+            .bind(&ev.passage_id)
+            .bind(&ev.source_url)
+            .bind(&ev.source_name)
+            .bind(&ev.source_kind)
+            .bind(&ev.published_at)
+            .bind(&ev.passage)
+            .bind(&ev.stance)
+            .bind(&ev.retrieved_at)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn get_evidence_for_claim(&self, claim_id: i64) -> Result<Vec<Evidence>> {
+        let rows = sqlx::query("SELECT * FROM evidence WHERE claim_id = ?1 ORDER BY id ASC")
+            .bind(claim_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Evidence {
+                id: r.get("id"),
+                claim_id: r.get("claim_id"),
+                passage_id: r.get("passage_id"),
+                source_url: r.get("source_url"),
+                source_name: r.try_get("source_name").ok().flatten(),
+                source_kind: r.get("source_kind"),
+                published_at: r.try_get("published_at").ok().flatten(),
+                passage: r.get("passage"),
+                stance: r.try_get("stance").ok().flatten(),
+                retrieved_at: r.get("retrieved_at"),
+            })
+            .collect())
+    }
+
+    pub async fn upsert_person_for_video(
+        &self,
+        video_id: &str,
+        canonical_name: &str,
+        variants: &[String],
+        role: Option<&str>,
+        public_figure: bool,
+        wikidata_id: Option<&str>,
+        summary: Option<&str>,
+        mentions: i64,
+        found_in: &str,
+    ) -> Result<i64> {
+        let existing = sqlx::query("SELECT id, variants_json FROM people WHERE LOWER(canonical_name) = LOWER(?1) LIMIT 1")
+            .bind(canonical_name)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let now = Utc::now().to_rfc3339();
+        let person_id = if let Some(row) = existing {
+            let pid: i64 = row.get("id");
+            let prev_vars: Vec<String> = row
+                .try_get::<Option<String>, _>("variants_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            let mut merged = prev_vars;
+            for v in variants {
+                if !merged.iter().any(|x| x.eq_ignore_ascii_case(v)) {
+                    merged.push(v.clone());
+                }
+            }
+            let vars_json = serde_json::to_string(&merged)?;
+            sqlx::query(
+                "UPDATE people SET
+                   variants_json = ?2,
+                   role = COALESCE(?3, role),
+                   public_figure = CASE WHEN ?4 = 1 THEN 1 ELSE public_figure END,
+                   wikidata_id = COALESCE(?5, wikidata_id),
+                   summary = COALESCE(?6, summary),
+                   researched_at = CASE WHEN ?6 IS NOT NULL THEN ?7 ELSE researched_at END
+                 WHERE id = ?1",
+            )
+            .bind(pid)
+            .bind(&vars_json)
+            .bind(role)
+            .bind(if public_figure { 1i64 } else { 0i64 })
+            .bind(wikidata_id)
+            .bind(summary)
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+            pid
+        } else {
+            let vars_json = serde_json::to_string(variants)?;
+            let researched = if summary.is_some() { Some(now) } else { None };
+            let res = sqlx::query(
+                "INSERT INTO people (canonical_name, variants_json, role, public_figure, wikidata_id, summary, researched_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            )
+            .bind(canonical_name)
+            .bind(&vars_json)
+            .bind(role)
+            .bind(if public_figure { 1i64 } else { 0i64 })
+            .bind(wikidata_id)
+            .bind(summary)
+            .bind(researched)
+            .execute(&self.pool)
+            .await?;
+            res.last_insert_rowid()
+        };
+
+        sqlx::query(
+            "INSERT INTO video_people (video_id, person_id, mentions, found_in)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(video_id, person_id) DO UPDATE SET
+               mentions = excluded.mentions,
+               found_in = excluded.found_in",
+        )
+        .bind(video_id)
+        .bind(person_id)
+        .bind(mentions.max(1))
+        .bind(found_in)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(person_id)
+    }
+
+    pub async fn get_people_for_video(&self, video_id: &str) -> Result<Vec<Person>> {
+        let rows = sqlx::query(
+            "SELECT p.*, vp.mentions, vp.found_in
+             FROM video_people vp
+             JOIN people p ON p.id = vp.person_id
+             WHERE vp.video_id = ?1
+             ORDER BY p.public_figure DESC, vp.mentions DESC",
+        )
+        .bind(video_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let vars: Vec<String> = r
+                    .try_get::<Option<String>, _>("variants_json")
+                    .ok()
+                    .flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default();
+                Person {
+                    id: r.get("id"),
+                    canonical_name: r.get("canonical_name"),
+                    variants: vars,
+                    role: r.try_get("role").ok().flatten(),
+                    public_figure: r.get::<i64, _>("public_figure") != 0,
+                    wikidata_id: r.try_get("wikidata_id").ok().flatten(),
+                    summary: r.try_get("summary").ok().flatten(),
+                    researched_at: r.try_get("researched_at").ok().flatten(),
+                    mentions: r.try_get("mentions").ok(),
+                    found_in: r.try_get("found_in").ok().flatten(),
+                }
+            })
+            .collect())
+    }
+
+    pub async fn log_decision(&self, video_id: &str, action: &str, note: Option<&str>) -> Result<Decision> {
+        let now = Utc::now().to_rfc3339();
+        let res = sqlx::query(
+            "INSERT INTO decisions (video_id, action, note, decided_at) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(video_id)
+        .bind(action)
+        .bind(note)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        let new_state = match action {
+            "keep" => Some(VideoState::Kept),
+            "discard" => Some(VideoState::Discarded),
+            "undo" => Some(VideoState::Ready),
+            _ => None,
+        };
+        if let Some(st) = new_state {
+            self.set_video_state(video_id, st, None).await?;
+        }
+
+        Ok(Decision {
+            id: res.last_insert_rowid(),
+            video_id: video_id.to_string(),
+            action: action.to_string(),
+            note: note.map(|s| s.to_string()),
+            decided_at: now,
+        })
+    }
+
+    pub async fn get_decisions_for_video(&self, video_id: &str) -> Result<Vec<Decision>> {
+        let rows = sqlx::query("SELECT * FROM decisions WHERE video_id = ?1 ORDER BY id DESC")
+            .bind(video_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Decision {
+                id: r.get("id"),
+                video_id: r.get("video_id"),
+                action: r.get("action"),
+                note: r.try_get("note").ok().flatten(),
+                decided_at: r.get("decided_at"),
+            })
+            .collect())
+    }
+
+    pub async fn list_seeds(&self, active_only: bool) -> Result<Vec<Seed>> {
+        let rows = if active_only {
+            sqlx::query("SELECT * FROM seeds WHERE active = 1 ORDER BY kind ASC, value ASC")
+                .fetch_all(&self.pool)
+                .await?
+        } else {
+            sqlx::query("SELECT * FROM seeds ORDER BY kind ASC, value ASC")
+                .fetch_all(&self.pool)
+                .await?
+        };
+        Ok(rows
+            .into_iter()
+            .map(|r| Seed {
+                id: r.get("id"),
+                kind: r.get("kind"),
+                value: r.get("value"),
+                topic: r.try_get("topic").ok().flatten(),
+                active: r.get::<i64, _>("active") != 0,
+                last_run_at: r.try_get("last_run_at").ok().flatten(),
+            })
+            .collect())
+    }
+
+    pub async fn upsert_seed(&self, kind: &str, value: &str, topic: Option<&str>, active: bool) -> Result<Seed> {
+        let act = if active { 1i64 } else { 0i64 };
+        sqlx::query(
+            "INSERT INTO seeds (kind, value, topic, active)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(kind, value) DO UPDATE SET
+               topic = COALESCE(excluded.topic, seeds.topic),
+               active = excluded.active",
+        )
+        .bind(kind)
+        .bind(value)
+        .bind(topic)
+        .bind(act)
+        .execute(&self.pool)
+        .await?;
+
+        let row = sqlx::query("SELECT * FROM seeds WHERE kind = ?1 AND value = ?2")
+            .bind(kind)
+            .bind(value)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(Seed {
+            id: row.get("id"),
+            kind: row.get("kind"),
+            value: row.get("value"),
+            topic: row.try_get("topic").ok().flatten(),
+            active: row.get::<i64, _>("active") != 0,
+            last_run_at: row.try_get("last_run_at").ok().flatten(),
+        })
+    }
+
+    pub async fn delete_seed(&self, id: i64) -> Result<()> {
+        sqlx::query("DELETE FROM seeds WHERE id = ?1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn mark_seed_ran(&self, id: i64) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query("UPDATE seeds SET last_run_at = ?2 WHERE id = ?1")
+            .bind(id)
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn enqueue_job(&self, video_id: Option<&str>, stage: Stage) -> Result<Job> {
+        if let Some(vid) = video_id {
+            let existing = sqlx::query(
+                "SELECT * FROM jobs
+                 WHERE video_id = ?1 AND stage = ?2 AND status IN ('queued', 'running')
+                 ORDER BY id DESC LIMIT 1",
+            )
+            .bind(vid)
+            .bind(stage.as_str())
+            .fetch_optional(&self.pool)
+            .await?;
+
+            if let Some(r) = existing {
+                return Ok(Self::map_job_row(&r));
+            }
+        }
+
+        let now = Utc::now().to_rfc3339();
+        let res = sqlx::query(
+            "INSERT INTO jobs (video_id, stage, status, attempts, updated_at)
+             VALUES (?1, ?2, 'queued', 0, ?3)",
+        )
+        .bind(video_id)
+        .bind(stage.as_str())
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        let id = res.last_insert_rowid();
+        let row = sqlx::query("SELECT * FROM jobs WHERE id = ?1")
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(Self::map_job_row(&row))
+    }
+
+    fn map_job_row(row: &SqliteRow) -> Job {
+        Job {
+            id: row.get("id"),
+            video_id: row.try_get("video_id").ok().flatten(),
+            stage: row.get("stage"),
+            status: row.get("status"),
+            attempts: row.get("attempts"),
+            last_error: row.try_get("last_error").ok().flatten(),
+            run_after: row.try_get("run_after").ok().flatten(),
+            updated_at: row.get("updated_at"),
+        }
+    }
+
+    pub async fn claim_next_job(&self, stage_filter: Option<Stage>) -> Result<Option<Job>> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+
+        let candidate = if let Some(st) = stage_filter {
+            sqlx::query(
+                "SELECT * FROM jobs
+                 WHERE status IN ('queued', 'deferred')
+                   AND stage = ?1
+                   AND (run_after IS NULL OR run_after <= ?2)
+                 ORDER BY id ASC
+                 LIMIT 1",
+            )
+            .bind(st.as_str())
+            .bind(&now)
+            .fetch_optional(&mut *tx)
+            .await?
+        } else {
+            sqlx::query(
+                "SELECT * FROM jobs
+                 WHERE status IN ('queued', 'deferred')
+                   AND (run_after IS NULL OR run_after <= ?1)
+                 ORDER BY id ASC
+                 LIMIT 1",
+            )
+            .bind(&now)
+            .fetch_optional(&mut *tx)
+            .await?
+        };
+
+        let Some(row) = candidate else {
+            tx.commit().await?;
+            return Ok(None);
+        };
+
+        let job_id: i64 = row.get("id");
+        let updated = sqlx::query(
+            "UPDATE jobs
+             SET status = 'running', attempts = attempts + 1, updated_at = ?2
+             WHERE id = ?1 AND status IN ('queued', 'deferred')",
+        )
+        .bind(job_id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+
+        if updated.rows_affected() == 0 {
+            tx.commit().await?;
+            return Ok(None);
+        }
+
+        let claimed = sqlx::query("SELECT * FROM jobs WHERE id = ?1")
+            .bind(job_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+
+        Ok(Some(Self::map_job_row(&claimed)))
+    }
+
+    pub async fn complete_job(&self, job_id: i64) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE jobs SET status = 'succeeded', last_error = NULL, run_after = NULL, updated_at = ?2 WHERE id = ?1",
+        )
+        .bind(job_id)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn defer_job_until(&self, job_id: i64, run_after: DateTime<Utc>, reason: &str) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let after = run_after.to_rfc3339();
+        sqlx::query(
+            "UPDATE jobs
+             SET status = 'deferred',
+                 attempts = CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END,
+                 last_error = ?2,
+                 run_after = ?3,
+                 updated_at = ?4
+             WHERE id = ?1",
+        )
+        .bind(job_id)
+        .bind(reason)
+        .bind(&after)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn fail_or_retry_job(&self, job: &Job, error_msg: &str, max_attempts: i64, retryable: bool) -> Result<bool> {
+        let now = Utc::now();
+        let now_str = now.to_rfc3339();
+
+        if retryable && job.attempts < max_attempts {
+            let delay = compute_backoff_delay(job.attempts.max(1) as u32);
+            let run_after = (now + chrono::Duration::from_std(delay).unwrap_or_else(|_| chrono::Duration::seconds(5))).to_rfc3339();
+            sqlx::query(
+                "UPDATE jobs SET status = 'queued', last_error = ?2, run_after = ?3, updated_at = ?4 WHERE id = ?1",
+            )
+            .bind(job.id)
+            .bind(error_msg)
+            .bind(&run_after)
+            .bind(&now_str)
+            .execute(&self.pool)
+            .await?;
+            return Ok(true);
+        }
+
+        sqlx::query(
+            "UPDATE jobs SET status = 'failed', last_error = ?2, run_after = NULL, updated_at = ?3 WHERE id = ?1",
+        )
+        .bind(job.id)
+        .bind(error_msg)
+        .bind(&now_str)
+        .execute(&self.pool)
+        .await?;
+
+        if let Some(vid) = &job.video_id {
+            sqlx::query("UPDATE videos SET state = 'FAILED', state_reason = ?2, lane = 'failed' WHERE id = ?1")
+                .bind(vid)
+                .bind(error_msg)
+                .execute(&self.pool)
+                .await?;
+        }
+        Ok(false)
+    }
+
+    pub async fn recover_running_jobs(&self) -> Result<u64> {
+        let now = Utc::now().to_rfc3339();
+        let res = sqlx::query(
+            "UPDATE jobs
+             SET status = 'queued',
+                 attempts = CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END,
+                 run_after = NULL,
+                 updated_at = ?1
+             WHERE status = 'running'",
+        )
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.rows_affected())
+    }
+
+    pub async fn queue_counts(&self) -> Result<serde_json::Value> {
+        let rows = sqlx::query("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status")
+            .fetch_all(&self.pool)
+            .await?;
+        let mut map = serde_json::Map::new();
+        for r in rows {
+            let st: String = r.get("status");
+            let cnt: i64 = r.get("cnt");
+            map.insert(st, serde_json::Value::from(cnt));
+        }
+        Ok(serde_json::Value::Object(map))
+    }
+
+    pub async fn record_provider_usage(
+        &self,
+        provider: &str,
+        model: &str,
+        tokens_in: u64,
+        tokens_out: u64,
+        is_429: bool,
+    ) -> Result<()> {
+        let day = Utc::now().format("%Y-%m-%d").to_string();
+        let err_inc = if is_429 { 1i64 } else { 0i64 };
+        sqlx::query(
+            "INSERT INTO provider_usage (provider, model, day, requests, tokens_in, tokens_out, errors_429)
+             VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6)
+             ON CONFLICT(provider, model, day) DO UPDATE SET
+               requests = provider_usage.requests + 1,
+               tokens_in = provider_usage.tokens_in + excluded.tokens_in,
+               tokens_out = provider_usage.tokens_out + excluded.tokens_out,
+               errors_429 = provider_usage.errors_429 + excluded.errors_429",
+        )
+        .bind(provider)
+        .bind(model)
+        .bind(&day)
+        .bind(tokens_in as i64)
+        .bind(tokens_out as i64)
+        .bind(err_inc)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn total_requests_today_for_prefix(&self, provider_prefix: &str) -> Result<u64> {
+        let day = Utc::now().format("%Y-%m-%d").to_string();
+        let row = sqlx::query(
+            "SELECT COALESCE(SUM(requests), 0) AS total
+             FROM provider_usage
+             WHERE day = ?1 AND provider LIKE ?2 || '%'",
+        )
+        .bind(&day)
+        .bind(provider_prefix)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.get::<i64, _>("total").max(0) as u64)
+    }
+
+    pub async fn save_profile(&self, profile: &HardwareProfile) -> Result<()> {
+        let hw = serde_json::to_string(&profile.hardware_json)?;
+        let ch = serde_json::to_string(&profile.chosen_json)?;
+        sqlx::query(
+            "INSERT INTO profile (id, hardware_json, chosen_json, capacity_per_day, measured_at)
+             VALUES (1, ?1, ?2, ?3, ?4)
+             ON CONFLICT(id) DO UPDATE SET
+               hardware_json = excluded.hardware_json,
+               chosen_json = excluded.chosen_json,
+               capacity_per_day = excluded.capacity_per_day,
+               measured_at = excluded.measured_at",
+        )
+        .bind(&hw)
+        .bind(&ch)
+        .bind(profile.capacity_per_day)
+        .bind(&profile.measured_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_profile(&self) -> Result<Option<HardwareProfile>> {
+        let row = sqlx::query("SELECT * FROM profile WHERE id = 1")
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| {
+            let hw_raw: String = r.get("hardware_json");
+            let ch_raw: String = r.get("chosen_json");
+            HardwareProfile {
+                hardware_json: serde_json::from_str(&hw_raw).unwrap_or(serde_json::Value::Null),
+                chosen_json: serde_json::from_str(&ch_raw).unwrap_or(serde_json::Value::Null),
+                capacity_per_day: r.try_get("capacity_per_day").ok().flatten(),
+                measured_at: r.get("measured_at"),
+            }
+        }))
+    }
+
+    pub async fn set_setting(&self, key: &str, value: &serde_json::Value) -> Result<()> {
+        let raw = serde_json::to_string(value)?;
+        sqlx::query(
+            "INSERT INTO settings (key, value_json) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json",
+        )
+        .bind(key)
+        .bind(&raw)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_setting(&self, key: &str) -> Result<Option<serde_json::Value>> {
+        let row = sqlx::query("SELECT value_json FROM settings WHERE key = ?1")
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.and_then(|r| {
+            let s: String = r.get("value_json");
+            serde_json::from_str(&s).ok()
+        }))
+    }
+
+    pub async fn list_settings(&self) -> Result<serde_json::Map<String, serde_json::Value>> {
+        let rows = sqlx::query("SELECT key, value_json FROM settings ORDER BY key ASC")
+            .fetch_all(&self.pool)
+            .await?;
+        let mut map = serde_json::Map::new();
+        for r in rows {
+            let k: String = r.get("key");
+            let v_raw: String = r.get("value_json");
+            if let Ok(val) = serde_json::from_str(&v_raw) {
+                map.insert(k, val);
+            }
+        }
+        Ok(map)
+    }
+}

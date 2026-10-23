@@ -1,14 +1,14 @@
 # Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 0 complete, ready for Phase 1.
+Last updated: 2026-10-23 · Current active phase: Phase 1 complete, ready for Phase 2.
 
 ## Phase Summary
 
 | Phase | Title | Status |
 | --- | --- | --- |
 | Phase 0 | Owner decisions and scaffold | PASS |
-| Phase 1 | Core skeleton, paste-a-link, discovery spike (go/no-go) | PENDING |
-| Phase 2 | Bulgarian single-video pipeline | PENDING |
+| Phase 1 | Core skeleton, paste-a-link, discovery spike (go/no-go) | PASS |
+| Phase 2 | Bulgarian single-video pipeline | IN PROGRESS |
 | Phase 3 | Calibration | PENDING |
 | Phase 4 | Claims and people | PENDING |
 | Phase 5 | Verification | PENDING |
@@ -56,3 +56,34 @@ Last updated: 2026-10-23 · Current active phase: Phase 0 complete, ready for Ph
   - `cargo run -p leadfinder-cli` prints `leadfinder-core` and exits `0`.
   - `npm run build` inside `ui` builds `dist/` cleanly and exits `0`.
   - `cargo check` inside `ui/src-tauri` exits `0`.
+
+---
+
+## Phase 1: Core skeleton, paste-a-link, discovery spike (go/no-go)
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - SQLite WAL database engine (`crates/core/src/db.rs`) and full Section 4 schema migration (`crates/core/migrations/0001_initial.sql`).
+  - Durable `jobs` queue (`enqueue_job`, atomic `claim_next_job`, exponential backoff with jitter in `fail_or_retry_job`, crash recovery `recover_running_jobs`) and worker loop (`crates/pipeline/src/engine.rs`).
+  - Token-authenticated localhost Axum HTTP/JSON API + SSE live event stream (`/api/events`) + `/metrics` (`crates/pipeline/src/server.rs`).
+  - Core provider traits (`VideoSource`, `Transcriber`, `Ocr`, `Llm`, `Search`, `FactCheckArchive`), per-host token-bucket rate limiter (12 req/min), circuit breaker (5 failures -> 30m cooldown), and URL response cache (`crates/core/src/politeness.rs`).
+  - `YtDlpClient` metadata subprocess wrapper with configurable timeout, JSON parser, and structured error taxonomy (`crates/providers/src/ytdlp.rs`), plus `PasteLinkSource` (single/multi-URL, short links, CSV/TSV/semicolon/text partner import, TikTok public oEmbed fallback).
+  - Empirical 3-approach discovery spike (`ytdlp_public`, `headless_browser_public`, `direct_http_public`) across 10 Bulgarian seeds x 3 runs (`docs/SPIKE_DISCOVERY.md`).
+  - CLI commands (`add-url`, `import-file`, `discover`, `spike-discovery`, `list-videos`, `serve`, `setup-deps`) in `crates/cli/src/main.rs`.
+- **Decisions taken**:
+  - `D-004`: Recorded **NO-GO** default (`automated_discovery_enabled = false`) for automated seeded discovery because unauthenticated `/search?q=` keyword pages were gated (50.0% combined gate rate >= 20% ceiling), while noting `headless_browser_public` achieved 100% success (60 unique BG videos, 0% block) on `/tag/{hashtag}` pages and remains opt-in behind the circuit breaker. Paste-a-Link and Partner-Export import proceed as primary discovery sources.
+- **Open issues**:
+  - None blocking Phase 2.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+  cargo test --workspace
+  cargo run -p leadfinder-cli -- import-file fixtures/phase1_20_urls.txt
+  cargo run -p leadfinder-cli -- list-videos --limit 20
+  Get-Content docs/SPIKE_DISCOVERY.md | Select-Object -First 20
+  ```
+  Expected output:
+  - `cargo test --workspace` runs 7 unit and integration tests and exits `0` with zero warnings.
+  - `import-file fixtures/phase1_20_urls.txt` prints `"imported_count": 20` with populated creator handles, views, durations, captions, and `DISCOVERED` states.
+  - `list-videos --limit 20` outputs JSON array of 20 stored Bulgarian TikTok videos.
+  - `docs/SPIKE_DISCOVERY.md` displays the measured table across `ytdlp_public`, `headless_browser_public`, and `direct_http_public` and the `NO-GO` recommendation.
