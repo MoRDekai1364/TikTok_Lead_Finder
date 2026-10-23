@@ -5808,6 +5808,648 @@ standard = 'батко'
 register = 'тракийски диалект'
 ipa = 'ˈba.tʃu'
 
+[[dialect_glossary]]
+term = 'снег'
+standard = 'сняг'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'snɛk'
+
+[[dialect_glossary]]
+term = 'цвет'
+standard = 'цвят'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 't͡svɛt'
+
+[[dialect_glossary]]
+term = 'мерка'
+standard = 'мярка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈmɛr.ka'
+
+[[dialect_glossary]]
+term = 'сенкя'
+standard = 'сянка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈsɛn.kʲa'
+
+[[dialect_glossary]]
+term = 'песък'
+standard = 'пясък'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈpɛ.sɤk'
+
+[[dialect_glossary]]
+term = 'ветър'
+standard = 'вятър'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈvɛ.tɤr'
+
+[[dialect_glossary]]
+term = 'место'
+standard = 'място'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈmɛ.stɔ'
+
+[[dialect_glossary]]
+term = 'железо'
+standard = 'желязо'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ʒɛ.ˈlɛ.zɔ'
+
+[[dialect_glossary]]
+term = 'десно'
+standard = 'дясно'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈdɛ.snɔ'
+
+[[dialect_glossary]]
+term = 'пресно'
+standard = 'прясно'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈprɛ.snɔ'
+
+[[dialect_glossary]]
+term = 'тесно'
+standard = 'тясно'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈtɛ.snɔ'
+
+[[dialect_glossary]]
+term = 'бръже'
+standard = 'бързо'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈbrɤ.ʒɛ'
+
+[[dialect_glossary]]
+term = 'цръв'
+standard = 'червей'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 't͡srɤf'
+
+[[dialect_glossary]]
+term = 'цреша'
+standard = 'череша'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈt͡srɛ.ʃa'
+
+[[dialect_glossary]]
+term = 'црево'
+standard = 'черво'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈt͡srɛ.vɔ'
+
+[[dialect_glossary]]
+term = 'цръпам'
+standard = 'черпя / изгребвам'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈt͡srɤ.pam'
+
+[[dialect_glossary]]
+term = 'сръп'
+standard = 'сърп'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'srɤp'
+
+[[dialect_glossary]]
+term = 'фръгам'
+standard = 'хвърлям'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈfrɤ.ɡam'
+
+[[dialect_glossary]]
+term = 'фръчим'
+standard = 'хвърча'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈfrɤ.t͡ʃim'
+
+[[dialect_glossary]]
+term = 'кръпим'
+standard = 'кърпя'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈkrɤ.pim'
+
+[[dialect_glossary]]
+term = 'тръпим'
+standard = 'търпя'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈtrɤ.pim'
+
+[[dialect_glossary]]
+term = 'гръне'
+standard = 'гърне'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɡrɤ.nɛ'
+
+[[dialect_glossary]]
+term = 'зръно'
+standard = 'зърно'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈzrɤ.nɔ'
+
+[[dialect_glossary]]
+term = 'връшам'
+standard = 'вършея'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈvrɤ.ʃam'
+
+[[dialect_glossary]]
+term = 'клъвем'
+standard = 'кълва'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈklɤ.vɛm'
+
+[[dialect_glossary]]
+term = 'клънем'
+standard = 'кълна'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈklɤ.nɛm'
+
+[[dialect_glossary]]
+term = 'глътам'
+standard = 'гълтам'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɡlɤ.tam'
+
+[[dialect_glossary]]
+term = 'млъчим'
+standard = 'мълча'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈmlɤ.t͡ʃim'
+
+[[dialect_glossary]]
+term = 'яблъка'
+standard = 'ябълка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈja.blɤ.ka'
+
+[[dialect_glossary]]
+term = 'блъха'
+standard = 'бълха'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈblɤ.xa'
+
+[[dialect_glossary]]
+term = 'куде'
+standard = 'къде'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ku.ˈdɛ'
+
+[[dialect_glossary]]
+term = 'отдека'
+standard = 'откъде'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ɔd.ˈdɛ.ka'
+
+[[dialect_glossary]]
+term = 'додека'
+standard = 'докъде / докато'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'dɔ.ˈdɛ.ka'
+
+[[dialect_glossary]]
+term = 'надека'
+standard = 'накъде'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'na.ˈdɛ.ka'
+
+[[dialect_glossary]]
+term = 'кък'
+standard = 'как'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'kɤk'
+
+[[dialect_glossary]]
+term = 'огин'
+standard = 'огън'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɔ.ɡin'
+
+[[dialect_glossary]]
+term = 'векя'
+standard = 'вече'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈvɛ.kʲa'
+
+[[dialect_glossary]]
+term = 'сеги'
+standard = 'сега'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'sɛ.ˈɡi'
+
+[[dialect_glossary]]
+term = 'тогай'
+standard = 'тогава'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'tɔ.ˈɡaj'
+
+[[dialect_glossary]]
+term = 'тува'
+standard = 'тук'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈtu.va'
+
+[[dialect_glossary]]
+term = 'тамо'
+standard = 'там'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈta.mɔ'
+
+[[dialect_glossary]]
+term = 'овам'
+standard = 'насам'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ɔ.ˈvam'
+
+[[dialect_glossary]]
+term = 'онам'
+standard = 'натам'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ɔ.ˈnam'
+
+[[dialect_glossary]]
+term = 'оро'
+standard = 'хоро'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɔ.rɔ'
+
+[[dialect_glossary]]
+term = 'арен'
+standard = 'харен / добър'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈa.rɛn'
+
+[[dialect_glossary]]
+term = 'абер'
+standard = 'хабер / вест'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'a.ˈbɛr'
+
+[[dialect_glossary]]
+term = 'амбар'
+standard = 'хамбар'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'am.ˈbar'
+
+[[dialect_glossary]]
+term = 'арч'
+standard = 'харч / разход'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'art͡ʃ'
+
+[[dialect_glossary]]
+term = 'арчим'
+standard = 'харча'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈar.t͡ʃim'
+
+[[dialect_glossary]]
+term = 'апе'
+standard = 'хапе'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈa.pɛ'
+
+[[dialect_glossary]]
+term = 'апка'
+standard = 'хапка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈap.ka'
+
+[[dialect_glossary]]
+term = 'върлим'
+standard = 'хвърлям'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈvɤr.lim'
+
+[[dialect_glossary]]
+term = 'фанем'
+standard = 'хвана'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈfa.nɛm'
+
+[[dialect_glossary]]
+term = 'фалим'
+standard = 'хваля'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈfa.lim'
+
+[[dialect_glossary]]
+term = 'фурка'
+standard = 'хурка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈfur.ka'
+
+[[dialect_glossary]]
+term = 'мува'
+standard = 'муха'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈmu.va'
+
+[[dialect_glossary]]
+term = 'бува'
+standard = 'бълха'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈbu.va'
+
+[[dialect_glossary]]
+term = 'сув'
+standard = 'сух'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'suf'
+
+[[dialect_glossary]]
+term = 'глув'
+standard = 'глух'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ɡluf'
+
+[[dialect_glossary]]
+term = 'куйня'
+standard = 'кухня'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈkuj.nʲa'
+
+[[dialect_glossary]]
+term = 'пазува'
+standard = 'пазва'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈpa.zu.va'
+
+[[dialect_glossary]]
+term = 'кожув'
+standard = 'кожух'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'kɔ.ˈʒuf'
+
+[[dialect_glossary]]
+term = 'сиромав'
+standard = 'сиромах'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'si.rɔ.ˈmaf'
+
+[[dialect_glossary]]
+term = 'грев'
+standard = 'грях'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ɡrɛf'
+
+[[dialect_glossary]]
+term = 'смев'
+standard = 'смях'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'smɛf'
+
+[[dialect_glossary]]
+term = 'страв'
+standard = 'страх'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'straf'
+
+[[dialect_glossary]]
+term = 'орев'
+standard = 'орех'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɔ.rɛf'
+
+[[dialect_glossary]]
+term = 'язека'
+standard = 'аз'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ja.ˈzɛ.ka'
+
+[[dialect_glossary]]
+term = 'тизека'
+standard = 'ти'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ti.ˈzɛ.ka'
+
+[[dialect_glossary]]
+term = 'фатим'
+standard = 'хвана'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈfa.tim'
+
+[[dialect_glossary]]
+term = 'лезем'
+standard = 'вляза / изляза'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈlɛ.zɛm'
+
+[[dialect_glossary]]
+term = 'улезем'
+standard = 'вляза'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'u.ˈlɛ.zɛm'
+
+[[dialect_glossary]]
+term = 'мрем'
+standard = 'мра / умирам'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'mrɛm'
+
+[[dialect_glossary]]
+term = 'кю'
+standard = 'ще (1 л. ед.ч.)'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'kʲu'
+
+[[dialect_glossary]]
+term = 'ке'
+standard = 'ще'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'kɛ'
+
+[[dialect_glossary]]
+term = 'некю'
+standard = 'няма да / не ща'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈnɛ.kʲu'
+
+[[dialect_glossary]]
+term = 'некеш'
+standard = 'няма да / не щеш'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈnɛ.kɛʃ'
+
+[[dialect_glossary]]
+term = 'неке'
+standard = 'няма да / не ще'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈnɛ.kɛ'
+
+[[dialect_glossary]]
+term = 'немой'
+standard = 'недей'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'nɛ.ˈmɔj'
+
+[[dialect_glossary]]
+term = 'немойте'
+standard = 'недейте'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'nɛ.ˈmɔj.tɛ'
+
+[[dialect_glossary]]
+term = 'макя'
+standard = 'майка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈma.kʲa'
+
+[[dialect_glossary]]
+term = 'муш'
+standard = 'мъж'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'muʃ'
+
+[[dialect_glossary]]
+term = 'снаа'
+standard = 'снаха'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'sna.ˈa'
+
+[[dialect_glossary]]
+term = 'свекръва'
+standard = 'свекърва'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈsvɛ.krɤ.va'
+
+[[dialect_glossary]]
+term = 'етръва'
+standard = 'етърва'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɛ.trɤ.va'
+
+[[dialect_glossary]]
+term = 'стрико'
+standard = 'чичо'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈstri.kɔ'
+
+[[dialect_glossary]]
+term = 'тетка'
+standard = 'леля'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈtɛt.ka'
+
+[[dialect_glossary]]
+term = 'тетин'
+standard = 'лелин / свако'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈtɛ.tin'
+
+[[dialect_glossary]]
+term = 'унук'
+standard = 'внук'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈu.nuk'
+
+[[dialect_glossary]]
+term = 'унука'
+standard = 'внучка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'u.ˈnu.ka'
+
+[[dialect_glossary]]
+term = 'госкье'
+standard = 'гости'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈɡɔ.skʲɛ'
+
+[[dialect_glossary]]
+term = 'люге'
+standard = 'хора / люде'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈlʲu.ɡʲɛ'
+
+[[dialect_glossary]]
+term = 'аргатин'
+standard = 'ратай / слуга'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ar.ˈɡa.tin'
+
+[[dialect_glossary]]
+term = 'измекяр'
+standard = 'слуга'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'iz.mɛ.ˈkʲar'
+
+[[dialect_glossary]]
+term = 'свиняр'
+standard = 'свинар'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'svi.ˈnʲar'
+
+[[dialect_glossary]]
+term = 'дръвар'
+standard = 'дървар'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'drɤ.ˈvar'
+
+[[dialect_glossary]]
+term = 'кюркчия'
+standard = 'кожухар'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'kʲurk.ˈt͡ʃi.ja'
+
+[[dialect_glossary]]
+term = 'папукчия'
+standard = 'обущар'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'pa.puk.ˈt͡ʃi.ja'
+
+[[dialect_glossary]]
+term = 'перчин'
+standard = 'кичур коса отпред'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'pɛr.ˈt͡ʃin'
+
+[[dialect_glossary]]
+term = 'клепка'
+standard = 'клепач / мигла'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈklɛp.ka'
+
+[[dialect_glossary]]
+term = 'бръна'
+standard = 'устна / бърна'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈbrɤ.na'
+
+[[dialect_glossary]]
+term = 'зуби'
+standard = 'зъби'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈzu.bi'
+
+[[dialect_glossary]]
+term = 'рука'
+standard = 'ръка'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈru.ka'
+
+[[dialect_glossary]]
+term = 'боска'
+standard = 'женска гръд'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈbɔ.ska'
+
+[[dialect_glossary]]
+term = 'ижа'
+standard = 'къща / хижа'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈi.ʒa'
+
+[[dialect_glossary]]
+term = 'катанец'
+standard = 'катинар'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ka.ˈta.nɛt͡s'
+
+[[dialect_glossary]]
+term = 'пенджер'
+standard = 'прозорец'
+register = 'видинско-ломски/северозападен диалект'
+ipa = 'ˈpɛn.dʒɛr'
+
 [[acronyms]]
 abbr = 'ДДС'
 expansion = 'Данък върху добавената стойност'
