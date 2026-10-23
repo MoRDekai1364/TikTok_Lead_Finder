@@ -335,7 +335,12 @@
 
     {#if drawerVideoId}
       {#key drawerVideoId}
-        <DetailDrawer videoId={drawerVideoId} {currentLang} onClose={() => (drawerVideoId = null)} />
+        <DetailDrawer
+          videoId={drawerVideoId}
+          {currentLang}
+          onClose={() => (drawerVideoId = null)}
+          onSelectVideo={(id) => (drawerVideoId = id)}
+        />
       {/key}
     {/if}
   </main>

@@ -75,9 +75,26 @@ pub struct DecisionRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct TranscriptEditRequest {
+    #[serde(alias = "text")]
     pub edited_text: String,
     #[serde(default)]
     pub rerun_claims: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RetranscribeRequest {
+    #[serde(default = "default_retranscribe_warm")]
+    pub warm_start: bool,
+    #[serde(default = "default_retranscribe_claims")]
+    pub rerun_claims: bool,
+}
+
+fn default_retranscribe_warm() -> bool {
+    true
+}
+
+fn default_retranscribe_claims() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +150,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id", get(handle_video_detail))
         .route("/api/videos/:id/decision", post(handle_decision))
         .route("/api/videos/:id/transcript", patch(handle_edit_transcript))
+        .route("/api/videos/:id/retranscribe", post(handle_retranscribe))
         .route("/api/videos/:id/ai-check", post(handle_ai_check_transcript))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
         .route("/api/seeds/:id", delete(handle_delete_seed))
@@ -383,7 +401,7 @@ async fn handle_decision(
     Path(id): Path<String>,
     Json(body): Json<DecisionRequest>,
 ) -> Response {
-    if !matches!(body.action.as_str(), "keep" | "discard" | "research_more" | "undo") {
+    if !matches!(body.action.as_str(), "keep" | "discard" | "research_more" | "undo" | "rerun_claims" | "rerun_extract" | "rerun_verify") {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({ "error": "invalid decision action" })),
@@ -392,8 +410,26 @@ async fn handle_decision(
     }
     match ctx.db.log_decision(&id, &body.action, body.note.as_deref()).await {
         Ok(dec) => {
-            if body.action == "research_more" {
+            if matches!(body.action.as_str(), "research_more" | "rerun_verify") {
                 if let Ok(job) = ctx.db.enqueue_job(Some(&id), Stage::ResearchMore).await {
+                    ctx.emit(CoreEvent::JobUpdated {
+                        job_id: job.id,
+                        video_id: Some(id.clone()),
+                        stage: job.stage,
+                        status: job.status,
+                    });
+                }
+            } else if body.action == "rerun_claims" {
+                if let Ok(job) = ctx.db.enqueue_job(Some(&id), Stage::Claims).await {
+                    ctx.emit(CoreEvent::JobUpdated {
+                        job_id: job.id,
+                        video_id: Some(id.clone()),
+                        stage: job.stage,
+                        status: job.status,
+                    });
+                }
+            } else if body.action == "rerun_extract" {
+                if let Ok(job) = ctx.db.enqueue_job(Some(&id), Stage::Extract).await {
                     ctx.emit(CoreEvent::JobUpdated {
                         job_id: job.id,
                         video_id: Some(id.clone()),
@@ -438,7 +474,123 @@ async fn handle_edit_transcript(
             });
         }
     }
-    Json(serde_json::json!({ "ok": true, "video_id": id })).into_response()
+    if let Ok(Some(detail)) = ctx.db.get_video_detail(&id).await {
+        Json(serde_json::to_value(detail).unwrap_or(serde_json::json!({ "ok": true, "video_id": id }))).into_response()
+    } else {
+        Json(serde_json::json!({ "ok": true, "video_id": id })).into_response()
+    }
+}
+
+async fn handle_retranscribe(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+    Json(body): Json<RetranscribeRequest>,
+) -> Response {
+    if !body.warm_start {
+        match ctx.db.enqueue_job(Some(&id), Stage::Extract).await {
+            Ok(job) => {
+                ctx.emit(CoreEvent::JobUpdated {
+                    job_id: job.id,
+                    video_id: Some(id.clone()),
+                    stage: job.stage,
+                    status: job.status,
+                });
+                Json(serde_json::json!({
+                    "ok": true,
+                    "video_id": id,
+                    "warm_start": false,
+                    "enqueued": true
+                }))
+                .into_response()
+            }
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response(),
+        }
+    } else {
+        let tr_opt = match ctx.db.get_transcript(&id).await {
+            Ok(t) => t,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+                    .into_response();
+            }
+        };
+
+        let Some(tr) = tr_opt else {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Transcript not found" })),
+            )
+                .into_response();
+        };
+
+        let base_text = tr.edited_text.unwrap_or(tr.text);
+        let cfg = ctx.config.read().await.clone();
+        let lex = leadfinder_providers::global_lexicon(
+            &ctx.paths,
+            &cfg.normalisation.lexicon_config_file,
+        );
+
+        let stage1 = lex.normalize_text(&base_text);
+
+        let system_prompt = "You are a Bulgarian language spellcheck and grammar assistant. Fix speech recognition mistakes, merged words, and punctuation in the provided Bulgarian transcript while preserving the exact original meaning and structure. Output a JSON object with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
+        let user_prompt = format!("Original transcript:\n{stage1}");
+
+        let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+        let schema_val = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "corrected_text": { "type": "string" }
+            },
+            "required": ["corrected_text"]
+        });
+
+        let llm_req = leadfinder_core::LlmJsonRequest {
+            system_prompt,
+            user_prompt,
+            json_schema: Some(schema_val),
+            max_tokens: 1024,
+            temperature: 0.1,
+        };
+
+        let corrected = match runner.complete_validated(&llm_req, &ctx.db).await {
+            Ok(val) => {
+                val.response.parsed_json
+                    .get("corrected_text")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.trim().is_empty())
+                    .map(|s| s.trim().to_string())
+                    .unwrap_or(stage1)
+            }
+            Err(_) => stage1,
+        };
+
+        let _ = ctx.db.update_transcript_edited_text(&id, &corrected).await;
+
+        if body.rerun_claims {
+            if let Ok(job) = ctx.db.enqueue_job(Some(&id), Stage::Claims).await {
+                ctx.emit(CoreEvent::JobUpdated {
+                    job_id: job.id,
+                    video_id: Some(id.clone()),
+                    stage: job.stage,
+                    status: job.status,
+                });
+            }
+        }
+
+        Json(serde_json::json!({
+            "ok": true,
+            "video_id": id,
+            "corrected_text": corrected,
+            "warm_start": true
+        }))
+        .into_response()
+    }
 }
 
 async fn handle_ai_check_transcript(

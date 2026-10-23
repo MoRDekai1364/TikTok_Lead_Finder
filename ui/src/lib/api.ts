@@ -167,11 +167,24 @@ export async function logDecision(id: string, action: string, note?: string): Pr
   });
 }
 
-export async function updateTranscript(id: string, text: string): Promise<VideoDetail> {
+export async function updateTranscript(id: string, text: string, rerunClaims: boolean = true): Promise<VideoDetail> {
   return fetchJson<VideoDetail>(`/api/videos/${encodeURIComponent(id)}/transcript`, {
     method: 'PATCH',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ edited_text: text, text, rerun_claims: rerunClaims }),
   });
+}
+
+export async function retranscribeVideo(id: string, warmStart: boolean = true, rerunClaims: boolean = true): Promise<{ ok: boolean; video_id: string; corrected_text?: string; warm_start?: boolean }> {
+  return fetchJson<{ ok: boolean; video_id: string; corrected_text?: string; warm_start?: boolean }>(`/api/videos/${encodeURIComponent(id)}/retranscribe`, {
+    method: 'POST',
+    body: JSON.stringify({ warm_start: warmStart, rerun_claims: rerunClaims }),
+  });
+}
+
+export async function fetchVideosByCreator(creatorId: string, limit: number = 10): Promise<LeadCard[]> {
+  const res = await fetchJson<any>(`/api/videos?creator_id=${encodeURIComponent(creatorId)}&limit=${limit}`);
+  const list = Array.isArray(res) ? res : Array.isArray(res?.cards) ? res.cards : [];
+  return list.map(mapSummaryToCard);
 }
 
 export async function fetchSeeds(): Promise<Seed[]> {
@@ -390,6 +403,15 @@ function getMockFallback<T>(endpoint: string, options: RequestInit): T {
       decisions: [],
     };
     return detail as T;
+  }
+
+  if (endpoint.includes('/retranscribe')) {
+    return {
+      ok: true,
+      video_id: 'mock_vid_1',
+      corrected_text: 'Коригиран примерен текст след warm-start преработка с речника и AI.',
+      warm_start: true,
+    } as T;
   }
 
   if (endpoint === '/api/health') {

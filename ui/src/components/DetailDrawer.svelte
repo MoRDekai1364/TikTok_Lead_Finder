@@ -1,17 +1,28 @@
 <script lang="ts">
-  import { aiCheckTranscript, fetchVideoDetail, getCoreUrl, updateTranscript } from '../lib/api';
+  import {
+    aiCheckTranscript,
+    fetchVideoDetail,
+    fetchVideosByCreator,
+    getCoreUrl,
+    logDecision,
+    retranscribeVideo,
+    setCreatorWatchlist,
+    updateTranscript,
+  } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
-  import type { VideoDetail } from '../lib/types';
+  import type { ClaimWithEvidence, LeadCard, Person, VideoDetail } from '../lib/types';
 
   let {
     videoId,
     currentLang,
     onClose,
+    onSelectVideo,
   }: {
     videoId: string;
     currentLang: Language;
     onClose: () => void;
+    onSelectVideo?: (id: string) => void;
   } = $props();
 
   const t = $derived(translations[currentLang]);
@@ -22,10 +33,16 @@
   let editedText = $state('');
   let isSavingTranscript = $state(false);
   let isAiChecking = $state(false);
+  let isRetranscribing = $state(false);
   let copyToast = $state<string | null>(null);
   let videoElement = $state<HTMLVideoElement | null>(null);
   let currentTimeMs = $state(0);
   let metadataOpen = $state(false);
+  let activeClaimId = $state<number | null>(null);
+  let highlightedSegmentMs = $state<number | null>(null);
+  let creatorVideos = $state<LeadCard[]>([]);
+  let isLoadingCreatorVideos = $state(false);
+  let isTogglingWatchlist = $state(false);
 
   let activeLoadId = '';
 
@@ -41,6 +58,7 @@
     isLoading = true;
     isEditingTranscript = false;
     currentTimeMs = 0;
+    creatorVideos = [];
     try {
       const res = await fetchVideoDetail(id);
       if (activeLoadId === id) {
@@ -49,6 +67,11 @@
           editedText = res.transcript.edited_text || res.transcript.text;
         } else {
           editedText = '';
+        }
+        if (res?.creator?.id) {
+          loadCreatorVideos(res.creator.id);
+        } else if (res?.video.creator_handle) {
+          loadCreatorVideos(res.video.creator_handle);
         }
       }
     } catch {
@@ -59,6 +82,27 @@
       if (activeLoadId === id) {
         isLoading = false;
       }
+    }
+  }
+
+  async function loadCreatorVideos(creatorIdOrHandle: string) {
+    isLoadingCreatorVideos = true;
+    try {
+      const list = await fetchVideosByCreator(creatorIdOrHandle, 8);
+      creatorVideos = list.filter((v) => v.id !== videoId);
+    } catch {
+      creatorVideos = [];
+    } finally {
+      isLoadingCreatorVideos = false;
+    }
+  }
+
+  function selectOtherVideo(id: string) {
+    if (onSelectVideo) {
+      onSelectVideo(id);
+    } else {
+      activeLoadId = id;
+      loadDetail(id);
     }
   }
 
@@ -75,14 +119,66 @@
     }
   }
 
+  function jumpToClaim(claimId: number) {
+    activeClaimId = claimId;
+    const el = document.getElementById(`claim-${claimId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setTimeout(() => {
+      if (activeClaimId === claimId) {
+        activeClaimId = null;
+      }
+    }, 2500);
+  }
+
+  function jumpToSegment(startMs?: number | null) {
+    if (startMs === undefined || startMs === null) return;
+    seekToMs(startMs);
+    highlightedSegmentMs = startMs;
+    const el = document.getElementById(`seg-${startMs}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setTimeout(() => {
+      if (highlightedSegmentMs === startMs) {
+        highlightedSegmentMs = null;
+      }
+    }, 2500);
+  }
+
+  function getSegmentClaimInfo(seg: { start_ms: number; end_ms: number }) {
+    if (!detail?.claims || detail.claims.length === 0) return null;
+    for (let i = 0; i < detail.claims.length; i++) {
+      const c = detail.claims[i].claim;
+      const s = c.start_ms ?? 0;
+      const e = c.end_ms ?? 0;
+      if (
+        (seg.start_ms >= s && seg.start_ms < e) ||
+        (seg.end_ms > s && seg.end_ms <= e) ||
+        (s >= seg.start_ms && e <= seg.end_ms)
+      ) {
+        return {
+          claimId: c.id,
+          index: i + 1,
+          verdict: (c.verdict || '').toLowerCase(),
+          text: c.text_bg,
+        };
+      }
+    }
+    return null;
+  }
+
   async function handleSaveTranscript() {
     if (!detail || isSavingTranscript) return;
     isSavingTranscript = true;
     try {
-      detail = await updateTranscript(detail.video.id, editedText);
+      detail = await updateTranscript(detail.video.id, editedText, true);
       isEditingTranscript = false;
+      copyToast = currentLang === 'bg' ? '✓ Стенограмата е запазена!' : '✓ Transcript saved!';
     } finally {
       isSavingTranscript = false;
+      setTimeout(() => (copyToast = null), 2500);
     }
   }
 
@@ -92,6 +188,41 @@
     await navigator.clipboard.writeText(txt);
     copyToast = currentLang === 'bg' ? '✓ Копирано в клипборда!' : '✓ Copied to clipboard!';
     setTimeout(() => (copyToast = null), 2500);
+  }
+
+  async function handleWarmStartRedact() {
+    if (!detail || isRetranscribing) return;
+    isRetranscribing = true;
+    copyToast = currentLang === 'bg' ? '⚡ Преработка с речника и AI...' : '⚡ Running warm-start redaction...';
+    try {
+      const res = await retranscribeVideo(detail.video.id, true, true);
+      if (res?.corrected_text && detail.transcript) {
+        detail.transcript.edited_text = res.corrected_text;
+        editedText = res.corrected_text;
+      }
+      copyToast = currentLang === 'bg' ? '✓ Преработено с речника и AI!' : '✓ Redacted with lexicon & AI!';
+      await loadDetail(detail.video.id);
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при преработка' : 'Redaction error';
+    } finally {
+      isRetranscribing = false;
+      setTimeout(() => (copyToast = null), 3000);
+    }
+  }
+
+  async function handleFullRetranscribe() {
+    if (!detail || isRetranscribing) return;
+    isRetranscribing = true;
+    copyToast = currentLang === 'bg' ? '🔄 Изпратено за Whisper...' : '🔄 Whisper queued...';
+    try {
+      await retranscribeVideo(detail.video.id, false, true);
+      copyToast = currentLang === 'bg' ? '✓ Whisper задачата е стартирана!' : '✓ Whisper task queued!';
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при Whisper задача' : 'Whisper queue error';
+    } finally {
+      isRetranscribing = false;
+      setTimeout(() => (copyToast = null), 3000);
+    }
   }
 
   async function handleAiCheckAndCopy() {
@@ -112,6 +243,88 @@
       isAiChecking = false;
       setTimeout(() => (copyToast = null), 3000);
     }
+  }
+
+  async function handleTriggerClaimVerify(claimText: string) {
+    if (!detail) return;
+    copyToast = currentLang === 'bg' ? '🔍 Проверка в мрежата...' : '🔍 Searching online...';
+    try {
+      await logDecision(detail.video.id, 'research_more', claimText);
+      copyToast = currentLang === 'bg' ? '✓ Изпратено за онлайн проверка!' : '✓ Enqueued for web research!';
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при изпращане' : 'Verification error';
+    } finally {
+      setTimeout(() => (copyToast = null), 3000);
+    }
+  }
+
+  async function handleCopyCitation(cwith: ClaimWithEvidence) {
+    if (!detail) return;
+    const author = detail.creator?.handle ? `@${detail.creator.handle}` : (detail.video.creator_handle ? `@${detail.video.creator_handle}` : 'неизвестен');
+    const startS = Math.round((cwith.claim.start_ms || 0) / 1000);
+    const endS = Math.round((cwith.claim.end_ms || 0) / 1000);
+    const citation = `"${cwith.claim.text_bg}" (Видео ID: ${detail.video.id}, Автор: ${author}, Времеви отрязък: ${startS}s-${endS}s, Присъда: ${cwith.claim.label || cwith.claim.verdict || 'Неверифицирано'})`;
+    await navigator.clipboard.writeText(citation);
+    copyToast = currentLang === 'bg' ? '✓ Цитатът е копиран!' : '✓ Citation copied!';
+    setTimeout(() => (copyToast = null), 2500);
+  }
+
+  async function handleToggleWatchlist() {
+    if (!detail?.creator || isTogglingWatchlist) return;
+    isTogglingWatchlist = true;
+    const nextState = !detail.creator.watchlist;
+    try {
+      await setCreatorWatchlist(detail.creator.handle, nextState);
+      detail.creator.watchlist = nextState;
+      copyToast = nextState
+        ? (currentLang === 'bg' ? '✓ Добавен в наблюдение' : '✓ Added to watchlist')
+        : (currentLang === 'bg' ? '✓ Премахнат от наблюдение' : '✓ Removed from watchlist');
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при обновяване' : 'Watchlist update error';
+    } finally {
+      isTogglingWatchlist = false;
+      setTimeout(() => (copyToast = null), 2500);
+    }
+  }
+
+  function computePersonCredibility(person: Person) {
+    if (!detail?.claims || detail.claims.length === 0) {
+      return { score: 60, level: 'moderate', label: 'Умерена достоверност', badgeClass: 'cred-moderate' };
+    }
+    const nameLower = person.canonical_name.toLowerCase();
+    const related = detail.claims.filter((c) => {
+      const sp = (c.claim.speaker || '').toLowerCase();
+      const attr = (c.claim.attribution || []).some((a) => (a.actor || '').toLowerCase().includes(nameLower));
+      return sp.includes(nameLower) || attr;
+    });
+
+    const hasContradicted = related.some((c) => (c.claim.verdict || '').toUpperCase() === 'CONTRADICTED');
+    if (hasContradicted) {
+      return { score: 25, level: 'high-risk', label: '⚠️ Повишен риск от дезинформация', badgeClass: 'cred-low' };
+    }
+
+    const hasSupported = related.some((c) => (c.claim.verdict || '').toUpperCase() === 'SUPPORTED');
+    if (hasSupported) {
+      return { score: 88, level: 'supported', label: '✅ Висока достоверност', badgeClass: 'cred-high' };
+    }
+
+    if (related.length > 0) {
+      return { score: 50, level: 'unverifiable', label: 'ℹ️ Изисква проверка', badgeClass: 'cred-moderate' };
+    }
+
+    return { score: 65, level: 'neutral', label: 'Споменато лице', badgeClass: 'cred-neutral' };
+  }
+
+  function computeAuthorRisk(creator: any) {
+    const flagged = creator?.flagged_count ?? 0;
+    const hasContradicted = detail?.claims?.some((c) => (c.claim.verdict || '').toUpperCase() === 'CONTRADICTED');
+    if (flagged >= 3 || hasContradicted) {
+      return { level: 'high', label: '🔴 Висок риск', badgeClass: 'risk-high' };
+    }
+    if (flagged > 0) {
+      return { level: 'moderate', label: '🟡 Умерен риск', badgeClass: 'risk-moderate' };
+    }
+    return { level: 'low', label: '🟢 Нисък риск', badgeClass: 'risk-low' };
   }
 
   function stanceClass(stance: string): string {
@@ -175,20 +388,52 @@
 
       <div class="section-card transcript-section">
         <div class="section-header">
-          <h3>{t.transcriptHeading}</h3>
+          <div>
+            <h3>{t.transcriptHeading}</h3>
+            <span class="section-subhint">
+              {currentLang === 'bg'
+                ? 'Цветовете отразяват присъдата: Червено = Опровергано, Зелено = Потвърдено, Жълто = Непроверимо'
+                : 'Colors indicate verdict: Red = Contradicted, Green = Supported, Yellow = Unverifiable'}
+            </span>
+          </div>
           <div class="transcript-btn-group">
             {#if copyToast}
               <span class="copy-toast">{copyToast}</span>
             {/if}
-            <button class="btn btn-secondary btn-sm" onclick={handleCopyTranscript} title={currentLang === 'bg' ? 'Копирай текста в клипборда' : 'Copy transcript to clipboard'}>
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={handleCopyTranscript}
+              title={currentLang === 'bg' ? 'Копирай текста в клипборда' : 'Copy transcript to clipboard'}
+            >
               📋 {currentLang === 'bg' ? 'Копирай' : 'Copy'}
             </button>
-            <button class="btn btn-secondary btn-sm" onclick={handleAiCheckAndCopy} disabled={isAiChecking} title={currentLang === 'bg' ? 'AI проверка на думите и копиране' : 'AI spellcheck & copy'}>
-              {isAiChecking ? '...' : '🤖 AI проверка & копирай'}
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={handleWarmStartRedact}
+              disabled={isRetranscribing}
+              title={currentLang === 'bg' ? 'Преработка с българския речник (1567 думи) и AI без изтриване' : 'Fast lexicon & AI warm-start redaction'}
+            >
+              {isRetranscribing ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Бърза преработка' : 'Warm-start')}
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={handleFullRetranscribe}
+              disabled={isRetranscribing}
+              title={currentLang === 'bg' ? 'Пълно повторно разпознаване с Whisper' : 'Full Whisper re-transcription'}
+            >
+              🔄 Whisper
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={handleAiCheckAndCopy}
+              disabled={isAiChecking}
+              title={currentLang === 'bg' ? 'AI проверка на думите и копиране' : 'AI spellcheck & copy'}
+            >
+              {isAiChecking ? '...' : '🤖 AI'}
             </button>
             {#if !isEditingTranscript}
               <button class="btn btn-secondary btn-sm" onclick={() => (isEditingTranscript = true)}>
-                {t.transcriptEditBtn}
+                ✏️ {t.transcriptEditBtn}
               </button>
             {:else}
               <button class="btn btn-primary btn-sm" onclick={handleSaveTranscript} disabled={isSavingTranscript}>
@@ -203,14 +448,46 @@
         {:else if detail.transcript}
           <div class="transcript-segments">
             {#each detail.transcript.segments as seg}
+              {@const cinfo = getSegmentClaimInfo(seg)}
               <span
+                id={`seg-${seg.start_ms}`}
                 class="transcript-segment"
                 class:active={currentTimeMs >= seg.start_ms && currentTimeMs <= seg.end_ms}
-                onclick={() => seekToMs(seg.start_ms)}
+                class:highlighted-pulse={highlightedSegmentMs === seg.start_ms}
+                class:claim-mark-contradicted={cinfo?.verdict === 'contradicted'}
+                class:claim-mark-supported={cinfo?.verdict === 'supported'}
+                class:claim-mark-unverifiable={cinfo?.verdict === 'unverifiable' || cinfo?.verdict === 'already_checked'}
+                onclick={() => {
+                  seekToMs(seg.start_ms);
+                  if (cinfo) {
+                    jumpToClaim(cinfo.claimId);
+                  }
+                }}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => e.key === 'Enter' && seekToMs(seg.start_ms)}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') {
+                    seekToMs(seg.start_ms);
+                    if (cinfo) jumpToClaim(cinfo.claimId);
+                  }
+                }}
+                title={cinfo ? `Твърдение #${cinfo.index}: ${cinfo.verdict}` : `Сегмент: ${Math.round(seg.start_ms / 1000)}s`}
               >
+                {#if cinfo}
+                  <span
+                    class="claim-badge-inline {cinfo.verdict}"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      jumpToClaim(cinfo.claimId);
+                    }}
+                    role="button"
+                    tabindex="0"
+                    onkeydown={(e) => e.key === 'Enter' && jumpToClaim(cinfo.claimId)}
+                    title="Отиди на твърдение #{cinfo.index}"
+                  >
+                    [Т{cinfo.index}]
+                  </span>
+                {/if}
                 {seg.text}{' '}
               </span>
             {/each}
@@ -221,27 +498,64 @@
       </div>
 
       <div class="section-card claims-section">
-        <h3>{t.claimsHeading}</h3>
+        <div class="section-header">
+          <div>
+            <h3>{t.claimsHeading}</h3>
+            <span class="section-subhint">
+              {currentLang === 'bg'
+                ? 'Директни връзки за фактчекинг в български и международни източници'
+                : 'Direct fact-checking search tools and external evidence verification'}
+            </span>
+          </div>
+        </div>
+
         {#if detail.claims.length === 0}
           <p class="empty-hint">{t.noClaimsFound}</p>
         {:else}
-          {#each detail.claims as cwith}
-            <div class="claim-block">
+          {#each detail.claims as cwith, cIdx}
+            {@const claim = cwith.claim}
+            <div
+              id={`claim-${claim.id}`}
+              class="claim-block"
+              class:claim-pulse={activeClaimId === claim.id}
+            >
               <div class="claim-header">
-                <span class="claim-type-tag">{cwith.claim.claim_type}</span>
-                <span class="verdict-tag {cwith.claim.verdict?.toLowerCase()}">
-                  {cwith.claim.label || cwith.claim.verdict}
+                <span class="claim-index-pill">Т{cIdx + 1}</span>
+                <span class="claim-type-tag">{claim.claim_type}</span>
+                <span class="verdict-tag {claim.verdict?.toLowerCase()}">
+                  {claim.label || claim.verdict}
                 </span>
-                <button class="btn btn-text btn-sm" onclick={() => seekToMs(cwith.claim.start_ms)}>
-                  ⏱ {Math.round(cwith.claim.start_ms / 1000)}s - {Math.round(cwith.claim.end_ms / 1000)}s
+
+                <button
+                  class="btn btn-shortcut btn-sm"
+                  onclick={() => jumpToSegment(claim.start_ms)}
+                  title="Отиди на точния цитат в стенограмата"
+                >
+                  📍 {currentLang === 'bg' ? 'Към цитата в текста' : 'Jump to transcript'}
+                </button>
+
+                <button
+                  class="btn btn-text btn-sm"
+                  onclick={() => seekToMs(claim.start_ms || 0)}
+                  title="Пусни видеото от този момент"
+                >
+                  ⏱ {Math.round((claim.start_ms || 0) / 1000)}s - {Math.round((claim.end_ms || 0) / 1000)}s
+                </button>
+
+                <button
+                  class="btn btn-text btn-sm"
+                  onclick={() => handleCopyCitation(cwith)}
+                  title="Копирай цитат с метаданни за доклад"
+                >
+                  📋 {currentLang === 'bg' ? 'Цитат' : 'Cite'}
                 </button>
               </div>
 
-              <div class="claim-text">{cwith.claim.text_bg}</div>
+              <div class="claim-text">{claim.text_bg}</div>
 
-              {#if cwith.claim.attribution.length > 0}
+              {#if claim.attribution && claim.attribution.length > 0}
                 <div class="attribution-box">
-                  {#each cwith.claim.attribution as attr}
+                  {#each claim.attribution as attr}
                     <div class="attr-row">
                       <span class="attr-label">{t.assertedPart}</span>
                       <span class="attr-val">{attr.asserted_part || attr.actor}</span>
@@ -254,30 +568,92 @@
                 </div>
               {/if}
 
-              {#if cwith.claim.reasoning_bg}
+              {#if claim.reasoning_bg}
                 <div class="claim-reasoning">
-                  <strong>{currentLang === 'bg' ? 'Мотиви:' : 'Reasoning:'}</strong> {cwith.claim.reasoning_bg}
+                  <strong>{currentLang === 'bg' ? 'Мотиви и оценка:' : 'Reasoning:'}</strong> {claim.reasoning_bg}
                 </div>
               {/if}
+
+              <div class="factcheck-action-bar">
+                <span class="factcheck-bar-title">🔍 {currentLang === 'bg' ? 'Проверка на фактите:' : 'Fact-check this claim:'}</span>
+                <div class="factcheck-links-grid">
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg ' + claim.text_bg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="factcheck-link-btn factcheck-bg"
+                    title="Търсене в архивите на Factcheck.bg и БНР Проверено"
+                  >
+                    🇧🇬 Factcheck.bg / БНР ↗
+                  </a>
+                  <a
+                    href={`https://toolbox.google.com/factcheck/explorer/search/list:recent?query=${encodeURIComponent(claim.text_bg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="factcheck-link-btn factcheck-google"
+                    title="Търсене в Google Fact Check Explorer"
+                  >
+                    🔎 Google Fact Check Tools ↗
+                  </a>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent('site:bta.bg ' + claim.text_bg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="factcheck-link-btn factcheck-bta"
+                    title="Търсене в архива на Българска телеграфна агенция (БТА)"
+                  >
+                    📰 БТА Архив ↗
+                  </a>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(claim.text_bg)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="factcheck-link-btn factcheck-web"
+                    title="Общо търсене на твърдението в Google"
+                  >
+                    🌐 Google Търсене ↗
+                  </a>
+                  <button
+                    class="btn btn-secondary btn-sm factcheck-verify-btn"
+                    onclick={() => handleTriggerClaimVerify(claim.text_bg)}
+                    title="Стартирай автоматично проучване и извличане на доказателства с AI"
+                  >
+                    ⚡ {currentLang === 'bg' ? 'Провери онлайн (AI & Web)' : 'Online Verify'}
+                  </button>
+                </div>
+              </div>
 
               <div class="evidence-list">
                 <h4>{t.evidenceHeading}</h4>
                 {#if cwith.evidence.length === 0}
-                  <p class="empty-hint">{t.noEvidenceFound}</p>
+                  <div class="evidence-empty-box">
+                    <p class="empty-hint">{t.noEvidenceFound}</p>
+                    <button
+                      class="btn btn-outline btn-sm"
+                      onclick={() => handleTriggerClaimVerify(claim.text_bg)}
+                    >
+                      ⚡ {currentLang === 'bg' ? 'Търси доказателства в мрежата сега' : 'Search web evidence now'}
+                    </button>
+                  </div>
                 {:else}
                   {#each cwith.evidence as ev}
                     <div class="evidence-item">
                       <div class="evidence-meta">
-                        <span class="stance-badge {stanceClass(ev.stance)}">{stanceLabel(ev.stance)}</span>
-                        <span class="evidence-source">{ev.source_name}</span>
+                        <span class="stance-badge {stanceClass(ev.stance || '')}">{stanceLabel(ev.stance || '')}</span>
+                        <span class="evidence-source">{ev.source_name || ev.source_kind}</span>
                         {#if ev.published_at}
                           <span class="evidence-date">• {ev.published_at.substring(0, 10)}</span>
                         {/if}
                       </div>
-                      <div class="evidence-snippet">{ev.snippet}</div>
-                      {#if ev.url}
-                        <a href={ev.url} target="_blank" rel="noopener noreferrer" class="evidence-link">
-                          {ev.title || ev.url} ↗
+                      <div class="evidence-snippet">{ev.passage || (ev as any).snippet}</div>
+                      {#if ev.source_url || (ev as any).url}
+                        <a
+                          href={ev.source_url || (ev as any).url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="evidence-link"
+                        >
+                          {(ev as any).title || ev.source_url || (ev as any).url} ↗
                         </a>
                       {/if}
                     </div>
@@ -291,44 +667,197 @@
 
       {#if detail.people.length > 0}
         <div class="section-card people-section">
-          <h3>{t.peopleHeading}</h3>
+          <div class="section-header">
+            <div>
+              <h3>{t.peopleHeading}</h3>
+              <span class="section-subhint">
+                {currentLang === 'bg'
+                  ? 'Автоматично профилиране, оценка на достоверност и проверка на изказванията'
+                  : 'Automated figure dossier, credibility scale & statement verification'}
+              </span>
+            </div>
+          </div>
+
           <div class="people-grid">
             {#each detail.people as person}
+              {@const cred = computePersonCredibility(person)}
               <div class="person-card">
-                <span class="person-name">{person.canonical_name}</span>
-                {#if person.role_hint}
-                  <span class="person-role">{person.role_hint}</span>
-                {/if}
-                {#if person.wikidata_id}
+                <div class="person-card-header">
+                  <div class="person-name-group">
+                    <span class="person-name">{person.canonical_name}</span>
+                    {#if person.role || (person as any).role_hint}
+                      <span class="person-role">{person.role || (person as any).role_hint}</span>
+                    {/if}
+                  </div>
+                  <span class="person-cred-badge {cred.badgeClass}">{cred.label}</span>
+                </div>
+
+                <div class="credibility-meter">
+                  <div class="meter-bar-track">
+                    <div
+                      class="meter-bar-fill {cred.badgeClass}"
+                      style={`width: ${cred.score}%`}
+                    ></div>
+                  </div>
+                  <div class="meter-labels">
+                    <span>{currentLang === 'bg' ? 'Оценка на достоверност' : 'Credibility score'}</span>
+                    <strong>{cred.score}%</strong>
+                  </div>
+                </div>
+
+                <div class="person-actions-row">
                   <a
-                    href="https://www.wikidata.org/wiki/{person.wikidata_id}"
+                    href={`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg "' + person.canonical_name + '"')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="wikidata-badge"
+                    class="person-link-btn"
+                    title="Проверка на изказвания на това лице във Factcheck.bg / БНР"
                   >
-                    Wikidata ({person.wikidata_id}) ↗
+                    🇧🇬 Factcheck / БНР ↗
                   </a>
-                {/if}
+                  <a
+                    href={`https://bg.wikipedia.org/w/index.php?search=${encodeURIComponent(person.canonical_name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="person-link-btn"
+                    title="Търсене в Уикипедия на български"
+                  >
+                    🌐 Уикипедия ↗
+                  </a>
+                  <a
+                    href={`https://news.google.com/search?q=${encodeURIComponent(person.canonical_name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="person-link-btn"
+                    title="Новини за личността в Google Новини"
+                  >
+                    📰 Новини ↗
+                  </a>
+                  {#if person.wikidata_id}
+                    <a
+                      href={`https://www.wikidata.org/wiki/${person.wikidata_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="person-link-btn wikidata-link"
+                      title="Wikidata ID"
+                    >
+                      Wikidata ({person.wikidata_id}) ↗
+                    </a>
+                  {/if}
+                  <button
+                    class="btn btn-secondary btn-sm person-verify-btn"
+                    onclick={() => handleTriggerClaimVerify(person.canonical_name)}
+                    title="Стартирай автоматично онлайн проучване за тази личност"
+                  >
+                    ⚡ {currentLang === 'bg' ? 'Проучи' : 'Research'}
+                  </button>
+                </div>
               </div>
             {/each}
           </div>
         </div>
       {/if}
 
-      {#if detail.creator}
+      {#if detail.creator || detail.video.creator_handle}
+        {@const creator = detail.creator || { handle: detail.video.creator_handle, display_name: detail.video.creator_display_name, flagged_count: 0, watchlist: false }}
+        {@const authorRisk = computeAuthorRisk(creator)}
         <div class="section-card creator-section">
-          <h3>{t.creatorHeading}</h3>
-          <div class="creator-box">
+          <div class="section-header">
             <div>
-              <span class="creator-name">@{detail.creator.handle}</span>
-              {#if detail.creator.display_name}
-                <span class="creator-sub">({detail.creator.display_name})</span>
+              <h3>{t.creatorHeading}</h3>
+              <span class="section-subhint">
+                {currentLang === 'bg'
+                  ? 'Профил на автора, рисков профил и предишни засечени видеа'
+                  : 'Author profile, risk tier and previous high-risk flagged videos'}
+              </span>
+            </div>
+            <span class="author-risk-badge {authorRisk.badgeClass}">{authorRisk.label}</span>
+          </div>
+
+          <div class="creator-box">
+            <div class="creator-main-row">
+              <div>
+                <a
+                  href={`https://www.tiktok.com/@${creator.handle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="creator-name-link"
+                  title="Отвори профила в TikTok"
+                >
+                  @{creator.handle} ↗
+                </a>
+                {#if creator.display_name}
+                  <span class="creator-sub">({creator.display_name})</span>
+                {/if}
+              </div>
+
+              <button
+                class="btn btn-sm"
+                class:btn-secondary={creator.watchlist}
+                class:btn-outline={!creator.watchlist}
+                onclick={handleToggleWatchlist}
+                disabled={isTogglingWatchlist}
+              >
+                {creator.watchlist
+                  ? (currentLang === 'bg' ? '👁 В наблюдение' : '👁 Watchlisted')
+                  : (currentLang === 'bg' ? '+ Добави в наблюдение' : '+ Add to watchlist')}
+              </button>
+            </div>
+
+            <div class="creator-stat-row">
+              <span>{t.creatorFlaggedCount} <strong>{creator.flagged_count ?? 0}</strong></span>
+              {#if creator.follower_count}
+                <span>• Последователи: <strong>{(creator.follower_count).toLocaleString()}</strong></span>
+              {/if}
+              <span>• Регион: <strong>{creator.region || 'BG'}</strong></span>
+            </div>
+          </div>
+
+          <div class="author-other-videos">
+            <div class="author-other-header">
+              <h4>🎬 {currentLang === 'bg' ? 'Други видеа от този автор в базата:' : 'Other videos by this author:'}</h4>
+              {#if isLoadingCreatorVideos}
+                <span class="loading-mini-spin">...</span>
               {/if}
             </div>
-            <div class="creator-stat-row">
-              <span>{t.creatorFlaggedCount} <strong>{detail.creator.flagged_count}</strong></span>
-              <span>• Watchlist: <strong>{detail.creator.watchlist ? 'Да' : 'Не'}</strong></span>
-            </div>
+
+            {#if creatorVideos.length > 0}
+              <div class="other-videos-grid">
+                {#each creatorVideos as ov}
+                  <div
+                    class="other-video-card"
+                    onclick={() => selectOtherVideo(ov.id)}
+                    role="button"
+                    tabindex="0"
+                    onkeydown={(e) => e.key === 'Enter' && selectOtherVideo(ov.id)}
+                  >
+                    <div class="other-vid-top">
+                      <span class="other-vid-id">ID: {ov.id}</span>
+                      <span class="verdict-tag {ov.top_claim_verdict?.toLowerCase()}">
+                        {ov.top_claim_label || ov.top_claim_verdict || 'НОВО'}
+                      </span>
+                    </div>
+                    <div class="other-vid-claim">
+                      {ov.top_claim_text || 'Няма извлечено заглавие'}
+                    </div>
+                    <div class="other-vid-stats">
+                      <span>👁 {(ov.views || 0).toLocaleString()}</span>
+                      {#if ov.duration_s}
+                        <span>⏱ {Math.round(ov.duration_s)}s</span>
+                      {/if}
+                      <span>Ранг: {Math.round((ov.lead_score || 0) * 100)}%</span>
+                      <span class="inspect-btn">Инспектирай ↗</span>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {:else if !isLoadingCreatorVideos}
+              <p class="empty-hint">
+                {currentLang === 'bg'
+                  ? 'Няма други записани видеа от този автор в локалната база.'
+                  : 'No other videos by this creator in local database.'}
+              </p>
+            {/if}
           </div>
         </div>
       {/if}
@@ -348,13 +877,13 @@
 
 <style>
   .detail-drawer {
-    width: 540px;
+    width: 620px;
     height: 100%;
     background: var(--surface-bg);
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12);
     position: relative;
     z-index: 50;
   }
@@ -455,24 +984,32 @@
   }
 
   .section-card h3 {
-    margin: 0 0 0.65rem 0;
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--text-heading);
   }
 
+  .section-subhint {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+  }
+
   .section-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.65rem;
     gap: 0.5rem;
   }
 
   .transcript-btn-group {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    flex-wrap: wrap;
+    gap: 0.35rem;
   }
 
   .copy-toast {
@@ -500,14 +1037,19 @@
 
   .transcript-segments {
     font-size: 0.88rem;
-    line-height: 1.5;
+    line-height: 1.6;
+    background: var(--surface-bg);
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
   }
 
   .transcript-segment {
     cursor: pointer;
-    padding: 1px 2px;
-    border-radius: 3px;
-    transition: background 0.12s ease;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    display: inline;
   }
 
   .transcript-segment:hover {
@@ -520,19 +1062,98 @@
     font-weight: 600;
   }
 
+  .transcript-segment.claim-mark-contradicted {
+    background: rgba(225, 29, 72, 0.15);
+    border-bottom: 2px solid var(--verdict-contradicted);
+    color: var(--text-heading);
+  }
+
+  .transcript-segment.claim-mark-supported {
+    background: rgba(16, 185, 129, 0.15);
+    border-bottom: 2px solid var(--verdict-supported);
+    color: var(--text-heading);
+  }
+
+  .transcript-segment.claim-mark-unverifiable {
+    background: rgba(217, 119, 6, 0.15);
+    border-bottom: 2px solid var(--verdict-unverifiable);
+    color: var(--text-heading);
+  }
+
+  .claim-badge-inline {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-right: 2px;
+    cursor: pointer;
+    background: var(--primary-accent-alpha);
+    color: var(--primary-accent);
+  }
+
+  .claim-badge-inline.contradicted {
+    background: rgba(225, 29, 72, 0.25);
+    color: var(--verdict-contradicted);
+  }
+
+  .claim-badge-inline.supported {
+    background: rgba(16, 185, 129, 0.25);
+    color: var(--verdict-supported);
+  }
+
+  .claim-badge-inline.unverifiable {
+    background: rgba(217, 119, 6, 0.25);
+    color: var(--verdict-unverifiable);
+  }
+
+  .highlighted-pulse {
+    animation: segPulse 1.8s ease-in-out;
+  }
+
+  @keyframes segPulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.8);
+      background: rgba(37, 99, 235, 0.35);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(37, 99, 235, 0);
+      background: rgba(37, 99, 235, 0.45);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    }
+  }
+
   .claim-block {
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.75rem;
-    margin-bottom: 0.65rem;
+    padding: 0.8rem;
+    margin-bottom: 0.75rem;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .claim-pulse {
+    border-color: var(--primary-accent) !important;
+    box-shadow: 0 0 14px rgba(37, 99, 235, 0.3) !important;
   }
 
   .claim-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.4rem;
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .claim-index-pill {
+    font-size: 0.7rem;
+    font-weight: 800;
+    background: var(--pill-bg);
+    color: var(--text-heading);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
   }
 
   .claim-type-tag {
@@ -562,16 +1183,34 @@
     color: var(--verdict-supported);
   }
 
-  .verdict-tag.unverifiable {
+  .verdict-tag.unverifiable,
+  .verdict-tag.already_checked {
     background: rgba(217, 119, 6, 0.15);
     color: var(--verdict-unverifiable);
   }
 
+  .btn-shortcut {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--primary-accent-alpha);
+    color: var(--primary-accent);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    cursor: pointer;
+  }
+
+  .btn-shortcut:hover {
+    background: var(--primary-accent);
+    color: #fff;
+  }
+
   .claim-text {
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-heading);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.55rem;
+    line-height: 1.45;
   }
 
   .attribution-box {
@@ -579,7 +1218,7 @@
     border-left: 3px solid var(--primary-accent);
     padding: 0.45rem 0.65rem;
     border-radius: 0 4px 4px 0;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.55rem;
     font-size: 0.8rem;
   }
 
@@ -601,7 +1240,75 @@
   .claim-reasoning {
     font-size: 0.8rem;
     color: var(--text-body);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.65rem;
+    line-height: 1.4;
+    background: var(--card-bg);
+    padding: 0.45rem 0.65rem;
+    border-radius: 4px;
+    border: 1px dashed var(--border-color);
+  }
+
+  .factcheck-action-bar {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.55rem 0.65rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .factcheck-bar-title {
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .factcheck-links-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .factcheck-link-btn {
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    background: var(--surface-bg);
+    color: var(--text-body);
+    transition: all 0.12s ease;
+  }
+
+  .factcheck-link-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-heading);
+    border-color: var(--primary-accent);
+  }
+
+  .factcheck-bg {
+    color: #0284c7;
+    border-color: rgba(2, 132, 199, 0.3);
+  }
+
+  .factcheck-google {
+    color: #4f46e5;
+    border-color: rgba(79, 70, 229, 0.3);
+  }
+
+  .factcheck-bta {
+    color: #059669;
+    border-color: rgba(5, 150, 105, 0.3);
+  }
+
+  .factcheck-verify-btn {
+    font-size: 0.74rem;
+    font-weight: 700;
   }
 
   .evidence-list h4 {
@@ -610,6 +1317,17 @@
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
+  }
+
+  .evidence-empty-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card-bg);
+    border: 1px dashed var(--border-color);
+    padding: 0.5rem 0.65rem;
+    border-radius: 4px;
+    gap: 0.5rem;
   }
 
   .evidence-item {
@@ -676,58 +1394,289 @@
   }
 
   .people-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
   }
 
   .person-card {
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.45rem 0.65rem;
+    padding: 0.65rem 0.8rem;
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    font-size: 0.8rem;
+    gap: 0.45rem;
+  }
+
+  .person-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .person-name-group {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
   }
 
   .person-name {
     font-weight: 700;
     color: var(--text-heading);
+    font-size: 0.88rem;
   }
 
   .person-role {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+  }
+
+  .person-cred-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+
+  .cred-low {
+    background: rgba(225, 29, 72, 0.15);
+    color: var(--verdict-contradicted);
+  }
+
+  .cred-high {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--verdict-supported);
+  }
+
+  .cred-moderate {
+    background: rgba(217, 119, 6, 0.15);
+    color: var(--verdict-unverifiable);
+  }
+
+  .cred-neutral {
+    background: rgba(100, 116, 139, 0.15);
+    color: #64748b;
+  }
+
+  .credibility-meter {
+    background: var(--card-bg);
+    padding: 0.4rem 0.55rem;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+  }
+
+  .meter-bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+  }
+
+  .meter-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+
+  .meter-bar-fill.cred-low {
+    background: var(--verdict-contradicted);
+  }
+
+  .meter-bar-fill.cred-high {
+    background: var(--verdict-supported);
+  }
+
+  .meter-bar-fill.cred-moderate {
+    background: var(--verdict-unverifiable);
+  }
+
+  .meter-bar-fill.cred-neutral {
+    background: #64748b;
+  }
+
+  .meter-labels {
+    display: flex;
+    justify-content: space-between;
     font-size: 0.72rem;
     color: var(--text-muted);
   }
 
-  .wikidata-badge {
-    font-size: 0.68rem;
-    color: var(--primary-accent);
+  .person-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+  }
+
+  .person-link-btn {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
     text-decoration: none;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-body);
+    transition: all 0.12s ease;
+  }
+
+  .person-link-btn:hover {
+    border-color: var(--primary-accent);
+    color: var(--text-heading);
+  }
+
+  .wikidata-link {
+    color: var(--primary-accent);
+  }
+
+  .person-verify-btn {
+    font-size: 0.72rem;
+    font-weight: 700;
   }
 
   .creator-box {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.45rem;
     font-size: 0.85rem;
+    background: var(--surface-bg);
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 0.75rem;
   }
 
-  .creator-name {
-    font-weight: 700;
+  .creator-main-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .creator-name-link {
+    font-weight: 800;
+    font-size: 0.95rem;
     color: var(--primary-accent);
+    text-decoration: none;
+  }
+
+  .creator-name-link:hover {
+    text-decoration: underline;
   }
 
   .creator-sub {
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: 0.8rem;
+    margin-left: 0.3rem;
   }
 
   .creator-stat-row {
     font-size: 0.78rem;
     color: var(--text-muted);
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .author-risk-badge {
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  .risk-high {
+    background: rgba(225, 29, 72, 0.18);
+    color: var(--verdict-contradicted);
+    border: 1px solid rgba(225, 29, 72, 0.35);
+  }
+
+  .risk-moderate {
+    background: rgba(217, 119, 6, 0.18);
+    color: var(--verdict-unverifiable);
+    border: 1px solid rgba(217, 119, 6, 0.35);
+  }
+
+  .risk-low {
+    background: rgba(16, 185, 129, 0.18);
+    color: var(--verdict-supported);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+  }
+
+  .author-other-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+  }
+
+  .author-other-header h4 {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .other-videos-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .other-video-card {
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 0.45rem 0.65rem;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+
+  .other-video-card:hover {
+    background: var(--hover-bg);
+    border-color: var(--primary-accent);
+  }
+
+  .other-vid-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+  }
+
+  .other-vid-id {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
+  .other-vid-claim {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin-bottom: 0.3rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.35;
+  }
+
+  .other-vid-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .inspect-btn {
+    margin-left: auto;
+    color: var(--primary-accent);
+    font-weight: 700;
   }
 
   .collapsible-header {
