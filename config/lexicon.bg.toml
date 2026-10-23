@@ -3912,6 +3912,798 @@ standard = 'кърпа'
 register = 'северозападен/врачански диалект'
 ipa = 'ˈkrɤ.pa'
 
+[[dialect_glossary]]
+term = 'болярски'
+standard = 'търновски'
+register = 'търновски/балкански диалект'
+ipa = 'bu.ˈlʲar.ski'
+
+[[dialect_glossary]]
+term = 'Търнуу'
+standard = 'Търново'
+register = 'търновски/балкански диалект'
+ipa = 'ˈtɤr.nu.u'
+
+[[dialect_glossary]]
+term = 'Горна'
+standard = 'Горна Оряховица'
+register = 'търновски/балкански диалект'
+ipa = 'ˈɡɔr.nɐ'
+
+[[dialect_glossary]]
+term = 'Ляскуец'
+standard = 'Лясковец'
+register = 'търновски/балкански диалект'
+ipa = 'ˈlʲas.ku.ɛt͡s'
+
+[[dialect_glossary]]
+term = 'Янтрата'
+standard = 'река Янтра'
+register = 'търновски/балкански диалект'
+ipa = 'ˈjan.trɐ.tɐ'
+
+[[dialect_glossary]]
+term = 'мелчоолу'
+standard = 'охлюв'
+register = 'търновски/балкански диалект'
+ipa = 'mɛl.ˈt͡ʃɔ.o.lu'
+
+[[dialect_glossary]]
+term = 'мъни'
+standard = 'махни / остави'
+register = 'търновски/балкански диалект'
+ipa = 'mɤ.ˈni'
+
+[[dialect_glossary]]
+term = 'мисирка'
+standard = 'пуйка'
+register = 'търновски/балкански диалект'
+ipa = 'mi.ˈsir.kɐ'
+
+[[dialect_glossary]]
+term = 'пипон'
+standard = 'пъпеш'
+register = 'търновски/балкански диалект'
+ipa = 'pi.ˈpɔn'
+
+[[dialect_glossary]]
+term = 'кумпир'
+standard = 'картоф'
+register = 'търновски/балкански диалект'
+ipa = 'kum.ˈpir'
+
+[[dialect_glossary]]
+term = 'домать'
+standard = 'домат'
+register = 'търновски/балкански диалект'
+ipa = 'du.ˈmatʲ'
+
+[[dialect_glossary]]
+term = 'армея'
+standard = 'кисело зеле / зелева чорба'
+register = 'търновски/балкански диалект'
+ipa = 'ɐr.ˈmɛ.jɐ'
+
+[[dialect_glossary]]
+term = 'белия ляб'
+standard = 'белият хляб'
+register = 'търновски/балкански диалект'
+ipa = 'ˈbɛ.li.jɐ ˈlʲap'
+
+[[dialect_glossary]]
+term = 'мляку'
+standard = 'мляко'
+register = 'търновски/балкански диалект'
+ipa = 'ˈmlʲa.ku'
+
+[[dialect_glossary]]
+term = 'сирни'
+standard = 'сирене'
+register = 'търновски/балкански диалект'
+ipa = 'ˈsir.ni'
+
+[[dialect_glossary]]
+term = 'сирини'
+standard = 'сирене'
+register = 'търновски/балкански диалект'
+ipa = 'ˈsi.ri.ni'
+
+[[dialect_glossary]]
+term = 'маслу'
+standard = 'масло'
+register = 'търновски/балкански диалект'
+ipa = 'ˈmas.lu'
+
+[[dialect_glossary]]
+term = 'ийце'
+standard = 'яйце'
+register = 'търновски/балкански диалект'
+ipa = 'ij.ˈt͡sɛ'
+
+[[dialect_glossary]]
+term = 'ийца'
+standard = 'яйца'
+register = 'търновски/балкански диалект'
+ipa = 'ij.ˈt͡sa'
+
+[[dialect_glossary]]
+term = 'мисо'
+standard = 'месо'
+register = 'търновски/балкански диалект'
+ipa = 'mi.ˈsɔ'
+
+[[dialect_glossary]]
+term = 'пичино'
+standard = 'печено'
+register = 'търновски/балкански диалект'
+ipa = 'pi.ˈt͡ʃi.nu'
+
+[[dialect_glossary]]
+term = 'варену'
+standard = 'варено'
+register = 'търновски/балкански диалект'
+ipa = 'vɐ.ˈrɛ.nu'
+
+[[dialect_glossary]]
+term = 'пържину'
+standard = 'пържено'
+register = 'търновски/балкански диалект'
+ipa = 'ˈpɤr.ʒi.nu'
+
+[[dialect_glossary]]
+term = 'буранея'
+standard = 'ястие с кисело зеле и ориз'
+register = 'търновски/балкански диалект'
+ipa = 'bu.rɐ.ˈnɛ.jɐ'
+
+[[dialect_glossary]]
+term = 'тиганици'
+standard = 'мекици / бухти'
+register = 'търновски/балкански диалект'
+ipa = 'ti.ˈɡa.ni.t͡si'
+
+[[dialect_glossary]]
+term = 'микици'
+standard = 'мекици'
+register = 'търновски/балкански диалект'
+ipa = 'mi.ˈki.t͡si'
+
+[[dialect_glossary]]
+term = 'тиквеник'
+standard = 'баница с тиква'
+register = 'търновски/балкански диалект'
+ipa = 'ˈtik.vi.nik'
+
+[[dialect_glossary]]
+term = 'маджун'
+standard = 'петмез / мармалад'
+register = 'търновски/балкански диалект'
+ipa = 'mɐ.ˈd͡ʒun'
+
+[[dialect_glossary]]
+term = 'рачел'
+standard = 'сладко от тиква със сгъстен гроздов сок'
+register = 'търновски/балкански диалект'
+ipa = 'rɐ.ˈt͡ʃɛl'
+
+[[dialect_glossary]]
+term = 'вину'
+standard = 'вино'
+register = 'търновски/балкански диалект'
+ipa = 'ˈvi.nu'
+
+[[dialect_glossary]]
+term = 'ръкия'
+standard = 'ракия'
+register = 'търновски/балкански диалект'
+ipa = 'rɤ.ˈki.jɐ'
+
+[[dialect_glossary]]
+term = 'вуда'
+standard = 'вода'
+register = 'търновски/балкански диалект'
+ipa = 'vu.ˈda'
+
+[[dialect_glossary]]
+term = 'каве'
+standard = 'кафе'
+register = 'търновски/балкански диалект'
+ipa = 'kɐ.ˈvɛ'
+
+[[dialect_glossary]]
+term = 'лимунада'
+standard = 'лимонада'
+register = 'търновски/балкански диалект'
+ipa = 'li.mu.ˈna.dɐ'
+
+[[dialect_glossary]]
+term = 'буза'
+standard = 'боза'
+register = 'търновски/балкански диалект'
+ipa = 'bu.ˈza'
+
+[[dialect_glossary]]
+term = 'бакър'
+standard = 'меден съд / котел'
+register = 'търновски/балкански диалект'
+ipa = 'bɐ.ˈkɤr'
+
+[[dialect_glossary]]
+term = 'тинджура'
+standard = 'тенджера'
+register = 'търновски/балкански диалект'
+ipa = 'ˈtin.d͡ʒu.rɐ'
+
+[[dialect_glossary]]
+term = 'гаванка'
+standard = 'дървена паничка'
+register = 'търновски/балкански диалект'
+ipa = 'ɡɐ.ˈvan.kɐ'
+
+[[dialect_glossary]]
+term = 'нош'
+standard = 'нож'
+register = 'търновски/балкански диалект'
+ipa = 'nɔʃ'
+
+[[dialect_glossary]]
+term = 'чикия'
+standard = 'джобно ножче'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃi.ˈki.jɐ'
+
+[[dialect_glossary]]
+term = 'въглавница'
+standard = 'възглавница'
+register = 'търновски/балкански диалект'
+ipa = 'vɤ.ˈɡlav.ni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'възглаве'
+standard = 'възглавница'
+register = 'търновски/балкански диалект'
+ipa = 'vɤz.ˈɡla.vi'
+
+[[dialect_glossary]]
+term = 'кюмбе'
+standard = 'печка на дърва и въглища'
+register = 'търновски/балкански диалект'
+ipa = 'kʲum.ˈbɛ'
+
+[[dialect_glossary]]
+term = 'одая'
+standard = 'стая'
+register = 'търновски/балкански диалект'
+ipa = 'u.ˈda.jɐ'
+
+[[dialect_glossary]]
+term = 'маза'
+standard = 'мазе / изба'
+register = 'търновски/балкански диалект'
+ipa = 'mɐ.ˈza'
+
+[[dialect_glossary]]
+term = 'кучина'
+standard = 'кочина'
+register = 'търновски/балкански диалект'
+ipa = 'ˈku.t͡ʃi.nɐ'
+
+[[dialect_glossary]]
+term = 'стобор'
+standard = 'дървена ограда'
+register = 'търновски/балкански диалект'
+ipa = 'stu.ˈbɔr'
+
+[[dialect_glossary]]
+term = 'плят'
+standard = 'плет'
+register = 'търновски/балкански диалект'
+ipa = 'plʲat'
+
+[[dialect_glossary]]
+term = 'вратник'
+standard = 'дворна врата'
+register = 'търновски/балкански диалект'
+ipa = 'ˈvrat.nik'
+
+[[dialect_glossary]]
+term = 'джам'
+standard = 'стъкло / прозорец'
+register = 'търновски/балкански диалект'
+ipa = 'd͡ʒam'
+
+[[dialect_glossary]]
+term = 'пенджур'
+standard = 'прозорец'
+register = 'търновски/балкански диалект'
+ipa = 'ˈpɛn.d͡ʒur'
+
+[[dialect_glossary]]
+term = 'калдаръм'
+standard = 'каменна настилка'
+register = 'търновски/балкански диалект'
+ipa = 'kɐl.dɐ.ˈrɤm'
+
+[[dialect_glossary]]
+term = 'сокак'
+standard = 'тясна уличка'
+register = 'търновски/балкански диалект'
+ipa = 'su.ˈkak'
+
+[[dialect_glossary]]
+term = 'мегдан'
+standard = 'площад'
+register = 'търновски/балкански диалект'
+ipa = 'miɡ.ˈdan'
+
+[[dialect_glossary]]
+term = 'чаршия'
+standard = 'търговска улица'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃɐr.ˈʃi.jɐ'
+
+[[dialect_glossary]]
+term = 'дюкян'
+standard = 'магазин / работилница'
+register = 'търновски/балкански диалект'
+ipa = 'dʲu.ˈkʲan'
+
+[[dialect_glossary]]
+term = 'кръчма'
+standard = 'питейно заведение'
+register = 'търновски/балкански диалект'
+ipa = 'ˈkrɤt͡ʃ.mɐ'
+
+[[dialect_glossary]]
+term = 'черква'
+standard = 'църква'
+register = 'търновски/балкански диалект'
+ipa = ''
+
+[[dialect_glossary]]
+term = 'шкуло'
+standard = 'училище'
+register = 'търновски/балкански диалект'
+ipa = 'ˈʃku.lu'
+
+[[dialect_glossary]]
+term = 'даскал'
+standard = 'учител'
+register = 'търновски/балкански диалект'
+ipa = 'ˈdas.kɐl'
+
+[[dialect_glossary]]
+term = 'даскалица'
+standard = 'учителка'
+register = 'търновски/балкански диалект'
+ipa = 'dɐs.kɐ.ˈli.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'попадия'
+standard = 'съпруга на свещеник'
+register = 'търновски/балкански диалект'
+ipa = 'pu.pɐ.ˈdi.jɐ'
+
+[[dialect_glossary]]
+term = 'чорбаджия'
+standard = 'богаташ / господар'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃur.bɐ.ˈd͡ʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'сиромах'
+standard = 'бедняк'
+register = 'търновски/балкански диалект'
+ipa = 'si.ru.ˈmax'
+
+[[dialect_glossary]]
+term = 'фукара'
+standard = 'беден човек'
+register = 'търновски/балкански диалект'
+ipa = 'fu.kɐ.ˈra'
+
+[[dialect_glossary]]
+term = 'дюлгерин'
+standard = 'строител / зидар'
+register = 'търновски/балкански диалект'
+ipa = 'dʲul.ˈɡɛ.rin'
+
+[[dialect_glossary]]
+term = 'кундурджия'
+standard = 'обущар'
+register = 'търновски/балкански диалект'
+ipa = 'kun.dur.ˈd͡ʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'бакърджия'
+standard = 'медникар'
+register = 'търновски/балкански диалект'
+ipa = 'bɐ.kɤr.ˈd͡ʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'бахчеванджия'
+standard = 'градинар / гурбетчия градинар'
+register = 'търновски/балкански диалект'
+ipa = 'bɐx.t͡ʃi.vɐn.ˈd͡ʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'пъдар'
+standard = 'полски пазач'
+register = 'търновски/балкански диалект'
+ipa = 'pɤ.ˈdar'
+
+[[dialect_glossary]]
+term = 'джамбазин'
+standard = 'търговец на коне'
+register = 'търновски/балкански диалект'
+ipa = 'd͡ʒɐm.ˈba.zin'
+
+[[dialect_glossary]]
+term = 'берберин'
+standard = 'бръснар'
+register = 'търновски/балкански диалект'
+ipa = 'bir.ˈbɛ.rin'
+
+[[dialect_glossary]]
+term = 'хекимин'
+standard = 'лекар'
+register = 'търновски/балкански диалект'
+ipa = 'xi.ˈki.min'
+
+[[dialect_glossary]]
+term = 'знахарка'
+standard = 'народна лечителка'
+register = 'търновски/балкански диалект'
+ipa = 'znɐ.ˈxar.kɐ'
+
+[[dialect_glossary]]
+term = 'дяду'
+standard = 'дядо'
+register = 'търновски/балкански диалект'
+ipa = 'ˈdʲa.du'
+
+[[dialect_glossary]]
+term = 'тати'
+standard = 'татко / баща'
+register = 'търновски/балкански диалект'
+ipa = 'ˈta.ti'
+
+[[dialect_glossary]]
+term = 'тетьо'
+standard = 'татко / баща'
+register = 'търновски/балкански диалект'
+ipa = 'ˈtɛ.tʲu'
+
+[[dialect_glossary]]
+term = 'мале'
+standard = 'майко'
+register = 'търновски/балкански диалект'
+ipa = 'ˈma.li'
+
+[[dialect_glossary]]
+term = 'батю'
+standard = 'батко / по-голям брат'
+register = 'търновски/балкански диалект'
+ipa = 'ˈba.tʲu'
+
+[[dialect_glossary]]
+term = 'чичу'
+standard = 'чичо'
+register = 'търновски/балкански диалект'
+ipa = 'ˈt͡ʃi.t͡ʃu'
+
+[[dialect_glossary]]
+term = 'уйчу'
+standard = 'вуйчо'
+register = 'търновски/балкански диалект'
+ipa = 'ˈuj.t͡ʃu'
+
+[[dialect_glossary]]
+term = 'свако'
+standard = 'съпруг на лелята'
+register = 'търновски/балкански диалект'
+ipa = 'ˈsva.ku'
+
+[[dialect_glossary]]
+term = 'калеко'
+standard = 'съпруг на лелята'
+register = 'търновски/балкански диалект'
+ipa = 'kɐ.ˈlɛ.ku'
+
+[[dialect_glossary]]
+term = 'буля'
+standard = 'съпруга на по-голям брат / снаха'
+register = 'търновски/балкански диалект'
+ipa = 'ˈbu.lʲɐ'
+
+[[dialect_glossary]]
+term = 'девер'
+standard = 'брат на съпруга'
+register = 'търновски/балкански диалект'
+ipa = 'ˈdɛ.vir'
+
+[[dialect_glossary]]
+term = 'зълва'
+standard = 'сестра на съпруга'
+register = 'търновски/балкански диалект'
+ipa = 'ˈzɤl.vɐ'
+
+[[dialect_glossary]]
+term = 'етърва'
+standard = 'съпруга на девера'
+register = 'търновски/балкански диалект'
+ipa = 'i.ˈtɤr.vɐ'
+
+[[dialect_glossary]]
+term = 'шурей'
+standard = 'брат на съпругата'
+register = 'търновски/балкански диалект'
+ipa = 'ˈʃu.rij'
+
+[[dialect_glossary]]
+term = 'балдуза'
+standard = 'сестра на съпругата'
+register = 'търновски/балкански диалект'
+ipa = 'bɐl.ˈdu.zɐ'
+
+[[dialect_glossary]]
+term = 'баджанак'
+standard = 'съпруг на балдъзата'
+register = 'търновски/балкански диалект'
+ipa = 'bɐ.d͡ʒɐ.ˈnak'
+
+[[dialect_glossary]]
+term = 'ергенин'
+standard = 'неженен млад мъж'
+register = 'търновски/балкански диалект'
+ipa = 'ir.ˈɡɛ.nin'
+
+[[dialect_glossary]]
+term = 'мумиче'
+standard = 'момиче'
+register = 'търновски/балкански диалект'
+ipa = 'mu.ˈmi.t͡ʃi'
+
+[[dialect_glossary]]
+term = 'лапе'
+standard = 'дете / хлапе'
+register = 'търновски/балкански диалект'
+ipa = 'ˈla.pi'
+
+[[dialect_glossary]]
+term = 'лапетия'
+standard = 'деца / дечурлига'
+register = 'търновски/балкански диалект'
+ipa = 'lɐ.pi.ˈti.jɐ'
+
+[[dialect_glossary]]
+term = 'дица'
+standard = 'деца'
+register = 'търновски/балкански диалект'
+ipa = 'di.ˈt͡sa'
+
+[[dialect_glossary]]
+term = 'дите'
+standard = 'дете'
+register = 'търновски/балкански диалект'
+ipa = 'di.ˈtɛ'
+
+[[dialect_glossary]]
+term = 'копеле'
+standard = 'момче / хлапе'
+register = 'търновски/балкански диалект'
+ipa = 'ˈkɔ.pi.li'
+
+[[dialect_glossary]]
+term = 'пеленаче'
+standard = 'кърмаче'
+register = 'търновски/балкански диалект'
+ipa = 'pi.li.ˈna.t͡ʃi'
+
+[[dialect_glossary]]
+term = 'чуляк'
+standard = 'човек'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃu.ˈlʲak'
+
+[[dialect_glossary]]
+term = 'чиляк'
+standard = 'човек'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃi.ˈlʲak'
+
+[[dialect_glossary]]
+term = 'мъш'
+standard = 'мъж'
+register = 'търновски/балкански диалект'
+ipa = 'mɤʃ'
+
+[[dialect_glossary]]
+term = 'жина'
+standard = 'жена'
+register = 'търновски/балкански диалект'
+ipa = 'ʒi.ˈna'
+
+[[dialect_glossary]]
+term = 'бабичка'
+standard = 'старица'
+register = 'търновски/балкански диалект'
+ipa = 'ˈba.bit͡ʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'дядка'
+standard = 'старец'
+register = 'търновски/балкански диалект'
+ipa = 'ˈdʲat.kɐ'
+
+[[dialect_glossary]]
+term = 'комшия'
+standard = 'съсед'
+register = 'търновски/балкански диалект'
+ipa = 'kum.ˈʃi.jɐ'
+
+[[dialect_glossary]]
+term = 'комшийка'
+standard = 'съседка'
+register = 'търновски/балкански диалект'
+ipa = 'kum.ˈʃij.kɐ'
+
+[[dialect_glossary]]
+term = 'авер'
+standard = 'приятел'
+register = 'търновски/балкански диалект'
+ipa = 'ɐ.ˈvɛr'
+
+[[dialect_glossary]]
+term = 'дост'
+standard = 'приятел'
+register = 'търновски/балкански диалект'
+ipa = 'dɔst'
+
+[[dialect_glossary]]
+term = 'ортак'
+standard = 'съдружник'
+register = 'търновски/балкански диалект'
+ipa = 'ur.ˈtak'
+
+[[dialect_glossary]]
+term = 'душманин'
+standard = 'враг'
+register = 'търновски/балкански диалект'
+ipa = 'duʃ.ˈma.nin'
+
+[[dialect_glossary]]
+term = 'хайдутин'
+standard = 'крадец / бунтовник'
+register = 'търновски/балкански диалект'
+ipa = 'xɐj.ˈdu.tin'
+
+[[dialect_glossary]]
+term = 'калпазанин'
+standard = 'мързеливец / немирник'
+register = 'търновски/балкански диалект'
+ipa = 'kɐl.pɐ.ˈza.nin'
+
+[[dialect_glossary]]
+term = 'шашкънин'
+standard = 'немирник / хитрец'
+register = 'търновски/балкански диалект'
+ipa = 'ʃɐʃ.ˈkɤ.nin'
+
+[[dialect_glossary]]
+term = 'тарикът'
+standard = 'хитрец'
+register = 'търновски/балкански диалект'
+ipa = 'tɐ.ri.ˈkɤt'
+
+[[dialect_glossary]]
+term = 'чешит'
+standard = 'странен човек /собственик на особен нрав'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃi.ˈʃit'
+
+[[dialect_glossary]]
+term = 'терсене'
+standard = 'опак / труден човек'
+register = 'търновски/балкански диалект'
+ipa = 'tir.si.ˈnɛ'
+
+[[dialect_glossary]]
+term = 'кавгаджия'
+standard = 'любител на спорове'
+register = 'търновски/балкански диалект'
+ipa = 'kɐv.ɡɐ.ˈd͡ʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'пияндурник'
+standard = 'пияница'
+register = 'търновски/балкански диалект'
+ipa = 'pi.ˈjan.dur.nik'
+
+[[dialect_glossary]]
+term = 'скръндза'
+standard = 'скъперник'
+register = 'търновски/балкански диалект'
+ipa = 'ˈskrɤn.d͡zɐ'
+
+[[dialect_glossary]]
+term = 'циция'
+standard = 'скъперник'
+register = 'търновски/балкански диалект'
+ipa = 't͡si.ˈt͡si.jɐ'
+
+[[dialect_glossary]]
+term = 'ларж'
+standard = 'щедър човек'
+register = 'търновски/балкански диалект'
+ipa = 'larʃ'
+
+[[dialect_glossary]]
+term = 'сеирджия'
+standard = 'зяпач'
+register = 'търновски/балкански диалект'
+ipa = 'si.ir.ˈd͡ʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'махаленка'
+standard = 'жена от квартала / клюкарка'
+register = 'търновски/балкански диалект'
+ipa = 'mɐ.xɐ.ˈlɛn.kɐ'
+
+[[dialect_glossary]]
+term = 'кокона'
+standard = 'суетна градска дама'
+register = 'търновски/балкански диалект'
+ipa = 'ku.ˈkɔ.nɐ'
+
+[[dialect_glossary]]
+term = 'фръцла'
+standard = 'кокетка'
+register = 'търновски/балкански диалект'
+ipa = 'ˈfrɤt͡s.lɐ'
+
+[[dialect_glossary]]
+term = 'уруспия'
+standard = 'лека жена / злобна жена'
+register = 'търновски/балкански диалект'
+ipa = 'u.rus.ˈpi.jɐ'
+
+[[dialect_glossary]]
+term = 'келяв'
+standard = 'крастав / слаб / некачествен'
+register = 'търновски/балкански диалект'
+ipa = 'ˈkɛ.lʲɐf'
+
+[[dialect_glossary]]
+term = 'шугав'
+standard = 'крастав / болнав'
+register = 'търновски/балкански диалект'
+ipa = 'ˈʃu.ɡɐf'
+
+[[dialect_glossary]]
+term = 'хърбав'
+standard = 'много слаб / мършав'
+register = 'търновски/балкански диалект'
+ipa = 'ˈxɤr.bɐf'
+
+[[dialect_glossary]]
+term = 'шишкав'
+standard = 'дебел'
+register = 'търновски/балкански диалект'
+ipa = 'ˈʃiʃ.kɐf'
+
+[[dialect_glossary]]
+term = 'чило'
+standard = 'чело'
+register = 'търновски/балкански диалект'
+ipa = 't͡ʃi.ˈlɔ'
+
+[[dialect_glossary]]
+term = 'учи'
+standard = 'очи'
+register = 'търновски/балкански диалект'
+ipa = 'u.ˈt͡ʃi'
+
 [[acronyms]]
 abbr = 'ДДС'
 expansion = 'Данък върху добавената стойност'
