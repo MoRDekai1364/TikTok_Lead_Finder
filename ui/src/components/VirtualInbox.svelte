@@ -61,8 +61,11 @@
 
   const filteredCards = $derived.by(() => {
     let list = cards.filter((c: LeadCard) => {
+      if (activeLane === 'pasted') {
+        return c.lane === 'pasted' || (c.reason_flagged && c.reason_flagged.includes('paste'));
+      }
       if (activeLane === 'leads') {
-        return c.lane === 'leads' || c.lane === 'leads_queued' || !c.lane;
+        return c.lane === 'leads' || c.lane === 'pasted' || c.lane === 'leads_queued' || !c.lane;
       }
       return c.lane === activeLane;
     });
@@ -124,6 +127,18 @@
 <div class="inbox-container">
   <div class="inbox-subbar">
     <div class="lane-tabs" role="tablist">
+      <button
+        class="lane-tab"
+        class:active={activeLane === 'pasted'}
+        onclick={() => onChangeLane('pasted')}
+        role="tab"
+        aria-selected={activeLane === 'pasted'}
+      >
+        {t.lanePasted || (currentLang === 'bg' ? '📌 Ръчно добавени' : '📌 Pasted Links')}
+        {#if laneCounts?.pasted}
+          <span class="tab-badge">{laneCounts.pasted}</span>
+        {/if}
+      </button>
       <button
         class="lane-tab"
         class:active={activeLane === 'leads'}

@@ -358,7 +358,11 @@ pub fn assign_lanes(
             .iter()
             .any(|c| c.claim_type != "opinion" && c.checkworthiness >= ranking.checkworthy_threshold);
 
-        let (lane, reason) = if v.failed {
+        let is_pasted = v.discovered_via.starts_with("paste");
+
+        let (lane, reason) = if is_pasted {
+            ("pasted", "user_pasted")
+        } else if v.failed {
             ("failed", "pipeline_failed")
         } else if already_checked {
             ("already_checked", "existing_fact_check")
@@ -376,7 +380,7 @@ pub fn assign_lanes(
         ranked.push(RankedVideo {
             id: v.id.clone(),
             lane: lane.to_string(),
-            lead_score: if lane == "already_checked" { 0.0 } else { score },
+            lead_score: if is_pasted { score.max(100.0) } else if lane == "already_checked" { 0.0 } else { score },
             cluster_id,
             cluster_size: 1,
             cluster_total_views: v.views,

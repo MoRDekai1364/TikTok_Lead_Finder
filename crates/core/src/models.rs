@@ -120,6 +120,7 @@ pub enum Lane {
     AlreadyChecked,
     LowQuality,
     Failed,
+    Pasted,
 }
 
 impl Lane {
@@ -129,6 +130,7 @@ impl Lane {
             Self::AlreadyChecked => "already_checked",
             Self::LowQuality => "low_quality",
             Self::Failed => "failed",
+            Self::Pasted => "pasted",
         }
     }
 
@@ -138,6 +140,7 @@ impl Lane {
             "already_checked" => Some(Self::AlreadyChecked),
             "low_quality" => Some(Self::LowQuality),
             "failed" => Some(Self::Failed),
+            "pasted" => Some(Self::Pasted),
             _ => None,
         }
     }
@@ -475,6 +478,12 @@ pub struct LeadCardSummary {
     pub cluster_total_views: i64,
     pub research_running: bool,
     pub reason_flagged: String,
+    #[serde(default)]
+    pub progress_pct: Option<i64>,
+    #[serde(default)]
+    pub etr_seconds: Option<i64>,
+    #[serde(default)]
+    pub stage_desc: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

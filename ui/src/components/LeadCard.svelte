@@ -104,6 +104,10 @@
       </div>
 
       <div class="badges-row">
+        {#if card.lane === 'pasted' || (card.reason_flagged && card.reason_flagged.includes('paste'))}
+          <span class="badge badge-pasted" title="Ръчно добавено видео">📌 Pasted</span>
+        {/if}
+
         {#if card.transcript_source === 'found'}
           <span class="badge badge-found" title={t.transcriptBadgeFound}>found</span>
         {:else if card.transcript_source === 'generated'}
@@ -133,6 +137,18 @@
     <div class="top-claim-text" title={card.top_claim_text || ''}>
       {card.top_claim_text || (currentLang === 'bg' ? 'Няма намерени проверими фактически твърдения.' : 'No factual claims found.')}
     </div>
+
+    {#if card.progress_pct !== null && card.progress_pct !== undefined && card.progress_pct < 100}
+      <div class="card-progress-track" title={`${card.stage_desc || ''} - ${card.progress_pct}%`}>
+        <div class="card-progress-fill" style="width: {card.progress_pct}%"></div>
+        <span class="card-progress-label">
+          {card.stage_desc || 'В обработка...'} ({card.progress_pct}%)
+          {#if card.etr_seconds !== null && card.etr_seconds !== undefined && card.etr_seconds > 0}
+            • ~{card.etr_seconds}s
+          {/if}
+        </span>
+      </div>
+    {/if}
 
     <div class="card-footer">
       <div class="meters-row">
@@ -463,5 +479,42 @@
   .btn-research {
     background: rgba(59, 130, 246, 0.2);
     color: #3b82f6;
+  }
+
+  .badge-pasted {
+    background: rgba(99, 102, 241, 0.2);
+    color: var(--primary-accent);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+  }
+
+  .card-progress-track {
+    position: relative;
+    width: 100%;
+    height: 14px;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 1px 0;
+  }
+
+  .card-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, #6366f1, #06b6d4);
+    transition: width 0.3s ease;
+  }
+
+  .card-progress-label {
+    position: relative;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    z-index: 1;
+    line-height: 1;
   }
 </style>

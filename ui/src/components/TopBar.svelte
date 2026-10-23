@@ -12,6 +12,7 @@
     scaleStatus,
     onNavigate,
     onPasteUrls,
+    onJumpToVideo,
     onToggleTheme,
     onToggleLang,
   }: {
@@ -22,7 +23,8 @@
     capacityPerDay: number | null;
     scaleStatus: ScaleStatus | null;
     onNavigate: (s: Screen) => void;
-    onPasteUrls: (text: string) => Promise<void>;
+    onPasteUrls: (text: string) => Promise<any>;
+    onJumpToVideo?: (id: string) => void;
     onToggleTheme: () => void;
     onToggleLang: () => void;
   } = $props();
@@ -31,6 +33,15 @@
   let isPasting = $state(false);
   let toastMessage = $state<string | null>(null);
   let toastIsError = $state(false);
+  let lastPasted = $state<{
+    id: string;
+    url?: string;
+    creator_handle?: string | null;
+    caption?: string | null;
+    state?: string | null;
+    progress_pct?: number | null;
+    etr_seconds?: number | null;
+  } | null>(null);
 
   const t = $derived(translations[currentLang]);
 
@@ -40,8 +51,11 @@
     toastMessage = currentLang === 'bg' ? 'Добавяне на линк...' : 'Adding link...';
     toastIsError = false;
     try {
-      await onPasteUrls(pasteText);
+      const res = await onPasteUrls(pasteText);
       pasteText = '';
+      if (res) {
+        lastPasted = res;
+      }
       toastMessage = currentLang === 'bg' ? '✓ Линкът е добавен в опашката!' : '✓ Added to processing queue!';
       setTimeout(() => { toastMessage = null; }, 3500);
     } catch (e: any) {
@@ -134,6 +148,30 @@
       </button>
     </div>
   </div>
+
+  {#if lastPasted}
+    <div class="pasted-preview-bar">
+      <div class="preview-badge">📌 {t.previewCardTitle}</div>
+      <div class="preview-author">@{lastPasted.creator_handle || 'tiktok_user'}</div>
+      <div class="preview-title" title={lastPasted.caption || lastPasted.id}>{lastPasted.caption || lastPasted.id}</div>
+      <div class="preview-status">
+        {#if lastPasted.progress_pct !== undefined && lastPasted.progress_pct !== null && lastPasted.progress_pct < 100}
+          <div class="preview-progress-box">
+            <div class="preview-progress-fill" style="width: {lastPasted.progress_pct}%"></div>
+            <span class="preview-progress-text">⏳ {lastPasted.progress_pct}% {#if lastPasted.etr_seconds}(~{lastPasted.etr_seconds}s ETR){/if}</span>
+          </div>
+        {:else}
+          <span class="preview-ready-badge">✓ {t.processingBadge}</span>
+        {/if}
+      </div>
+      {#if onJumpToVideo}
+        <button class="btn-jump" onclick={() => onJumpToVideo?.(lastPasted!.id)}>
+          🔍 {t.jumpToVideo}
+        </button>
+      {/if}
+      <button class="preview-dismiss" onclick={() => (lastPasted = null)} aria-label="Close">✕</button>
+    </div>
+  {/if}
 
   <nav class="nav-tabs" aria-label="Основна навигация">
     <button class="nav-tab" class:active={activeScreen === 'inbox'} onclick={() => onNavigate('inbox')}>
@@ -311,5 +349,113 @@
   .nav-tab.active {
     color: var(--primary-accent);
     border-bottom-color: var(--primary-accent);
+  }
+
+  .pasted-preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    margin: 0.4rem 0 0.2rem 0;
+    border-radius: 6px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    font-size: 0.82rem;
+  }
+
+  .preview-badge {
+    font-weight: 700;
+    color: var(--primary-accent);
+    white-space: nowrap;
+  }
+
+  .preview-author {
+    font-weight: 600;
+    color: var(--text-heading);
+    white-space: nowrap;
+  }
+
+  .preview-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+  }
+
+  .preview-status {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .preview-progress-box {
+    position: relative;
+    width: 140px;
+    height: 18px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, #6366f1, #10b981);
+    transition: width 0.3s ease;
+  }
+
+  .preview-progress-text {
+    position: relative;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+
+  .preview-ready-badge {
+    font-weight: 600;
+    color: var(--verdict-supported);
+  }
+
+  .btn-jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 4px;
+    background: var(--primary-accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+  }
+
+  .btn-jump:hover {
+    opacity: 0.9;
+  }
+
+  .preview-dismiss {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    padding: 0 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-dismiss:hover {
+    color: var(--text-heading);
   }
 </style>

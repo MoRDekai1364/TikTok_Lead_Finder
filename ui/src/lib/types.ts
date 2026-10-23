@@ -1,4 +1,4 @@
-export type Lane = 'leads' | 'already_checked' | 'low_quality' | 'failed' | 'screened_out';
+export type Lane = 'leads' | 'already_checked' | 'low_quality' | 'failed' | 'screened_out' | 'pasted';
 
 export type Screen = 'inbox' | 'creators' | 'seeds' | 'calibration' | 'settings' | 'export';
 
@@ -23,6 +23,9 @@ export interface LeadCard {
   cluster_total_views: number;
   research_running: boolean;
   reason_flagged: string;
+  progress_pct?: number | null;
+  etr_seconds?: number | null;
+  stage_desc?: string | null;
 }
 
 export interface AttributionItem {

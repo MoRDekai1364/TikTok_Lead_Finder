@@ -123,8 +123,8 @@ impl Database {
         let hashtags_json = serde_json::to_string(&vref.hashtags)?;
 
         if let Some(prev) = existing {
-            let promoted_lane = if vref.discovered_via.starts_with("paste") && prev.lane.is_none() {
-                Some("leads")
+            let promoted_lane = if vref.discovered_via.starts_with("paste") {
+                Some("pasted")
             } else {
                 prev.lane.as_deref()
             };
@@ -139,7 +139,7 @@ impl Database {
                    shares = COALESCE(?8, shares),
                    comments = COALESCE(?9, comments),
                    duration_s = COALESCE(?10, duration_s),
-                   lane = COALESCE(lane, ?11)
+                   lane = COALESCE(?11, lane)
                  WHERE id = ?1",
             )
             .bind(&vref.id)
@@ -161,7 +161,7 @@ impl Database {
         }
 
         let initial_lane = if vref.discovered_via.starts_with("paste") {
-            Some("leads")
+            Some("pasted")
         } else {
             None
         };
@@ -298,7 +298,7 @@ impl Database {
         sqlx::query(
             "UPDATE videos SET
                lead_score = ?2,
-               lane = ?3,
+               lane = CASE WHEN discovered_via LIKE 'paste%' THEN 'pasted' ELSE ?3 END,
                cluster_id = COALESCE(?4, cluster_id),
                state = ?5,
                state_reason = ?6
@@ -322,7 +322,10 @@ impl Database {
             "SELECT v.*, c.handle AS creator_handle, c.display_name AS creator_display_name
              FROM videos v
              LEFT JOIN creators c ON c.id = v.creator_id
-             WHERE (?1 IS NULL OR v.lane = ?1 OR (v.lane IS NULL AND ?1 = 'leads'))
+             WHERE (?1 IS NULL
+                    OR (?1 = 'pasted' AND (v.discovered_via LIKE 'paste%' OR v.lane = 'pasted'))
+                    OR (?1 = 'leads' AND (v.lane = 'leads' OR v.lane = 'pasted' OR v.lane IS NULL))
+                    OR v.lane = ?1)
                AND (?2 IS NULL OR v.state = ?2)
                AND (?3 IS NULL OR v.creator_id = ?3)
                AND (?4 IS NULL OR COALESCE(v.lead_score, 0.0) >= ?4)
@@ -332,7 +335,11 @@ impl Database {
                     OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND LOWER(cl.text_bg) LIKE '%' || LOWER(?6) || '%'))
                AND (?7 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.verdict = ?7))
                AND (?8 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.label = ?8))
-             ORDER BY CASE WHEN v.lane IS NULL OR v.state != 'VERIFIED' THEN 999.0 ELSE COALESCE(v.lead_score, -1.0) END DESC, v.discovered_at DESC
+             ORDER BY
+                CASE WHEN v.discovered_via LIKE 'paste%' OR v.lane = 'pasted' THEN 1000.0 ELSE 0.0 END +
+                CASE WHEN v.lane IS NULL OR v.state != 'VERIFIED' THEN 500.0 ELSE 0.0 END +
+                COALESCE(v.lead_score, -1.0) DESC,
+                v.discovered_at DESC
              LIMIT ?9 OFFSET ?10",
         )
         .bind(&filter.lane)
@@ -365,6 +372,13 @@ impl Database {
             let c: i64 = r.get("cnt");
             map.insert(k, c);
         }
+        let pasted_cnt_row = sqlx::query(
+            "SELECT COUNT(*) AS cnt FROM videos WHERE lane = 'pasted' OR discovered_via LIKE 'paste%'",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        let pasted_cnt: i64 = pasted_cnt_row.get("cnt");
+        map.insert("pasted".to_string(), pasted_cnt);
         Ok(map)
     }
 
@@ -463,6 +477,42 @@ impl Database {
                 .or_else(|| top_claim_bg_final.clone())
                 .unwrap_or_else(|| video.discovered_via.clone());
 
+            let latest_job = sqlx::query(
+                "SELECT stage, status FROM jobs WHERE video_id = ?1 ORDER BY id DESC LIMIT 1",
+            )
+            .bind(&video.id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+            let (progress_pct, etr_seconds, stage_desc) = match video.state.as_str() {
+                "VERIFIED" | "READY" | "KEPT" => (Some(100), Some(0), Some("Готово (Проверено)".to_string())),
+                "FAILED" => (Some(100), Some(0), Some("Грешка при обработка".to_string())),
+                "SCREENED_OUT" => (Some(100), Some(0), Some("Филтрирано".to_string())),
+                "DISCARDED" => (Some(100), Some(0), Some("Отхвърлено".to_string())),
+                _ => match latest_job.as_ref().and_then(|r| r.try_get::<String, _>("stage").ok()).as_deref() {
+                    Some("DISCOVER") => (Some(15), Some(25), Some("Откриване...".to_string())),
+                    Some("SCREEN_CHEAP") => (Some(30), Some(20), Some("Предварителен преглед...".to_string())),
+                    Some("ACQUIRE") => (Some(50), Some(15), Some("Сваляне на съдържание...".to_string())),
+                    Some("EXTRACT") => (Some(70), Some(10), Some("Whisper ASR + OCR...".to_string())),
+                    Some("CLAIMS") | Some("CHECKWORTHY") => (Some(85), Some(5), Some("BgGPT анализ на твърдения...".to_string())),
+                    Some("VERIFY") => (Some(95), Some(2), Some("Финален факт-чек...".to_string())),
+                    Some("RANK") => (Some(98), Some(1), Some("Класиране...".to_string())),
+                    _ => {
+                        if video.state == "ACQUIRED" {
+                            (Some(50), Some(15), Some("Свалено съдържание...".to_string()))
+                        } else if video.state == "EXTRACTED" {
+                            (Some(70), Some(10), Some("Извлечен говор...".to_string()))
+                        } else if video.state == "CLAIMS_DONE" {
+                            (Some(85), Some(5), Some("Извлечени твърдения...".to_string()))
+                        } else if research_running {
+                            (Some(50), Some(15), Some("В обработка...".to_string()))
+                        } else {
+                            (Some(20), Some(20), Some("В опашка...".to_string()))
+                        }
+                    }
+                },
+            };
+
             cards.push(LeadCardSummary {
                 video,
                 top_claim_bg: top_claim_bg_final,
@@ -476,6 +526,9 @@ impl Database {
                 cluster_total_views,
                 research_running,
                 reason_flagged,
+                progress_pct,
+                etr_seconds,
+                stage_desc,
             });
         }
 
@@ -1148,11 +1201,12 @@ impl Database {
 
         let candidate = if let Some(st) = stage_filter {
             sqlx::query(
-                "SELECT * FROM jobs
-                 WHERE status IN ('queued', 'deferred')
-                   AND stage = ?1
-                   AND (run_after IS NULL OR run_after <= ?2)
-                 ORDER BY id ASC
+                "SELECT j.* FROM jobs j
+                 LEFT JOIN videos v ON v.id = j.video_id
+                 WHERE j.status IN ('queued', 'deferred')
+                   AND j.stage = ?1
+                   AND (j.run_after IS NULL OR j.run_after <= ?2)
+                 ORDER BY CASE WHEN v.discovered_via LIKE 'paste%' OR v.lane = 'pasted' THEN 0 ELSE 1 END, j.id ASC
                  LIMIT 1",
             )
             .bind(st.as_str())
@@ -1161,10 +1215,11 @@ impl Database {
             .await?
         } else {
             sqlx::query(
-                "SELECT * FROM jobs
-                 WHERE status IN ('queued', 'deferred')
-                   AND (run_after IS NULL OR run_after <= ?1)
-                 ORDER BY id ASC
+                "SELECT j.* FROM jobs j
+                 LEFT JOIN videos v ON v.id = j.video_id
+                 WHERE j.status IN ('queued', 'deferred')
+                   AND (j.run_after IS NULL OR j.run_after <= ?1)
+                 ORDER BY CASE WHEN v.discovered_via LIKE 'paste%' OR v.lane = 'pasted' THEN 0 ELSE 1 END, j.id ASC
                  LIMIT 1",
             )
             .bind(&now)

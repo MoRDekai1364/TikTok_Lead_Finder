@@ -30,6 +30,26 @@ if (-not $core -or -not $desktop) {
     exit 1
 }
 
+$existingDesktop = Get-Process -Name 'leadfinder-desktop' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($existingDesktop) {
+    Add-Type -TypeDefinition @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class Win32Focus {
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")]
+        public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+    }
+"@
+    $hwnd = $existingDesktop.MainWindowHandle
+    if ($hwnd -ne [IntPtr]::Zero) {
+        [Win32Focus]::ShowWindowAsync($hwnd, 9) | Out-Null
+        [Win32Focus]::SetForegroundWindow($hwnd) | Out-Null
+    }
+    exit 0
+}
+
 $env:PATH = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:PATH
 
 $coreProcess = $null

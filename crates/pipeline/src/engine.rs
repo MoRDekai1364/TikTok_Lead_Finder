@@ -660,6 +660,15 @@ impl PipelineContext {
                                     stage: job.stage,
                                     status: "succeeded".to_string(),
                                 });
+                                if let Some(vid) = &job.video_id {
+                                    if let Ok(Some(v)) = self.db.get_video(vid).await {
+                                        self.emit(CoreEvent::VideoUpdated {
+                                            video_id: vid.clone(),
+                                            state: v.state,
+                                            lane: v.lane,
+                                        });
+                                    }
+                                }
                             }
                             Err(err) => {
                                 permit.finish(false).await;

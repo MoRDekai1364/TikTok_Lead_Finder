@@ -91,6 +91,9 @@ function mapSummaryToCard(raw: any): LeadCard {
     cluster_total_views: raw?.cluster_total_views ?? (typeof v.views === 'number' ? v.views : 0),
     research_running: Boolean(raw?.research_running),
     reason_flagged: raw?.reason_flagged ?? '',
+    progress_pct: typeof raw?.progress_pct === 'number' ? raw.progress_pct : null,
+    etr_seconds: typeof raw?.etr_seconds === 'number' ? raw.etr_seconds : null,
+    stage_desc: raw?.stage_desc ?? null,
   };
 }
 

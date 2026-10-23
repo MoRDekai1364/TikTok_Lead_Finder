@@ -112,12 +112,26 @@
     localStorage.setItem('leadfinder_lang', currentLang);
   }
 
-  async function handlePasteUrls(text: string) {
+  async function handlePasteUrls(text: string): Promise<any> {
     const res = await pasteLinks(text);
     if (res && typeof res.ingested === 'number' && res.ingested === 0) {
       throw new Error('No valid TikTok links found');
     }
     await loadInitialData();
+    if (res?.videos && res.videos.length > 0) {
+      const vid = res.videos[0];
+      activeLane = 'pasted';
+      selectedId = vid.id;
+      return vid;
+    }
+    return null;
+  }
+
+  function handleJumpToVideo(id: string) {
+    activeScreen = 'inbox';
+    activeLane = 'pasted';
+    selectedId = id;
+    drawerVideoId = id;
   }
 
   async function handlePullMore() {
@@ -270,6 +284,7 @@
     {scaleStatus}
     onNavigate={(s: Screen) => (activeScreen = s)}
     onPasteUrls={handlePasteUrls}
+    onJumpToVideo={handleJumpToVideo}
     onToggleTheme={toggleTheme}
     onToggleLang={toggleLang}
   />

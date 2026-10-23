@@ -465,6 +465,13 @@ impl PipelineContext {
             self.db
                 .set_video_state(video_id, VideoState::Verified, None)
                 .await?;
+            if let Ok(Some(v)) = self.db.get_video(video_id).await {
+                self.emit(CoreEvent::VideoUpdated {
+                    video_id: video_id.to_string(),
+                    state: v.state,
+                    lane: v.lane,
+                });
+            }
             return Ok(());
         }
         for claim in claims {
@@ -473,6 +480,13 @@ impl PipelineContext {
             }
         }
         let _ = self.rank_all().await;
+        if let Ok(Some(v)) = self.db.get_video(video_id).await {
+            self.emit(CoreEvent::VideoUpdated {
+                video_id: video_id.to_string(),
+                state: v.state,
+                lane: v.lane,
+            });
+        }
         Ok(())
     }
 
