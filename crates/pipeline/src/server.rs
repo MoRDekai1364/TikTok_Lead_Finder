@@ -693,34 +693,42 @@ async fn handle_ai_check_transcript(
 }
 
 fn resolve_default_browser_path() -> Option<String> {
-    if let Ok(out) = std::process::Command::new("reg")
-        .args(["query", r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice", "/v", "ProgId"])
-        .output()
-    {
-        if out.status.success() {
-            let s = String::from_utf8_lossy(&out.stdout);
-            for line in s.lines() {
-                if line.contains("ProgId") {
-                    let prog_id = line.split_whitespace().last().unwrap_or("");
-                    if !prog_id.is_empty() {
-                        let subkey = format!(r"HKCR\{}\shell\open\command", prog_id);
-                        if let Ok(c_out) = std::process::Command::new("reg")
-                            .args(["query", &subkey, "/ve"])
-                            .output()
-                        {
-                            if c_out.status.success() {
-                                let cs = String::from_utf8_lossy(&c_out.stdout);
-                                for cline in cs.lines() {
-                                    if cline.contains("REG_SZ") {
-                                        if let Some(cmd) = cline.split("REG_SZ").nth(1) {
-                                            let trimmed = cmd.trim();
-                                            let exe = if trimmed.starts_with('"') {
-                                                trimmed.split('"').nth(1).unwrap_or("").to_string()
-                                            } else {
-                                                trimmed.split_whitespace().next().unwrap_or("").to_string()
-                                            };
-                                            if !exe.is_empty() && std::path::Path::new(&exe).exists() {
-                                                return Some(exe);
+    if cfg!(target_os = "windows") {
+        let subkeys = [
+            r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
+            r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+        ];
+        for sk in subkeys {
+            if let Ok(out) = std::process::Command::new("reg")
+                .args(["query", sk, "/v", "ProgId"])
+                .output()
+            {
+                if out.status.success() {
+                    let s = String::from_utf8_lossy(&out.stdout);
+                    for line in s.lines() {
+                        if line.contains("ProgId") {
+                            let prog_id = line.split_whitespace().last().unwrap_or("");
+                            if !prog_id.is_empty() {
+                                let subkey = format!(r"HKCR\{}\shell\open\command", prog_id);
+                                if let Ok(c_out) = std::process::Command::new("reg")
+                                    .args(["query", &subkey, "/ve"])
+                                    .output()
+                                {
+                                    if c_out.status.success() {
+                                        let cs = String::from_utf8_lossy(&c_out.stdout);
+                                        for cline in cs.lines() {
+                                            if cline.contains("REG_SZ") {
+                                                if let Some(cmd) = cline.split("REG_SZ").nth(1) {
+                                                    let trimmed = cmd.trim();
+                                                    let exe = if trimmed.starts_with('"') {
+                                                        trimmed.split('"').nth(1).unwrap_or("").to_string()
+                                                    } else {
+                                                        trimmed.split_whitespace().next().unwrap_or("").to_string()
+                                                    };
+                                                    if !exe.is_empty() && std::path::Path::new(&exe).exists() {
+                                                        return Some(exe);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -731,21 +739,56 @@ fn resolve_default_browser_path() -> Option<String> {
                 }
             }
         }
-    }
 
-    let cand_paths = [
-        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-    ];
-    for p in &cand_paths {
-        if std::path::Path::new(p).exists() {
-            return Some((*p).to_string());
+        let generic_keys = [
+            r"HKCR\https\shell\open\command",
+            r"HKCR\http\shell\open\command",
+        ];
+        for gk in generic_keys {
+            if let Ok(c_out) = std::process::Command::new("reg")
+                .args(["query", gk, "/ve"])
+                .output()
+            {
+                if c_out.status.success() {
+                    let cs = String::from_utf8_lossy(&c_out.stdout);
+                    for cline in cs.lines() {
+                        if cline.contains("REG_SZ") {
+                            if let Some(cmd) = cline.split("REG_SZ").nth(1) {
+                                let trimmed = cmd.trim();
+                                let exe = if trimmed.starts_with('"') {
+                                    trimmed.split('"').nth(1).unwrap_or("").to_string()
+                                } else {
+                                    trimmed.split_whitespace().next().unwrap_or("").to_string()
+                                };
+                                if !exe.is_empty() && std::path::Path::new(&exe).exists() {
+                                    return Some(exe);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else if cfg!(target_os = "linux") {
+        if let Ok(out) = std::process::Command::new("xdg-settings")
+            .args(["get", "default-web-browser"])
+            .output()
+        {
+            if out.status.success() {
+                let desktop = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let bin_name = desktop.replace(".desktop", "");
+                if let Ok(w_out) = std::process::Command::new("which").arg(&bin_name).output() {
+                    if w_out.status.success() {
+                        let path = String::from_utf8_lossy(&w_out.stdout).trim().to_string();
+                        if !path.is_empty() && std::path::Path::new(&path).exists() {
+                            return Some(path);
+                        }
+                    }
+                }
+            }
         }
     }
+
     None
 }
 

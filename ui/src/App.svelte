@@ -35,6 +35,13 @@
   let checkedIds = $state<Set<string>>(new Set());
 
   let drawerVideoId = $state<string | null>(null);
+  let isVideoFeedOpen = $state<boolean>(
+    typeof localStorage !== 'undefined' ? localStorage.getItem('leadfinder_video_feed') !== 'false' : true
+  );
+
+  const activeDrawerId = $derived(
+    drawerVideoId || (activeScreen === 'inbox' && isVideoFeedOpen ? (selectedId || cards[0]?.id || null) : null)
+  );
 
   let queueCounts = $state<QueueCounts>({ queued: 0, running: 0, succeeded: 0, failed: 0 });
   let capacityPerDay = $state<number | null>(null);
@@ -51,6 +58,11 @@
 
     const savedLang = localStorage.getItem('leadfinder_lang') as Language | null;
     if (savedLang) currentLang = savedLang;
+
+    const savedFeed = localStorage.getItem('leadfinder_video_feed');
+    if (savedFeed !== null) {
+      isVideoFeedOpen = savedFeed !== 'false';
+    }
 
     let unsub: () => void = () => {};
     let disposed = false;
@@ -90,6 +102,9 @@
 
       if (cards.length > 0 && !selectedId) {
         selectedId = cards[0].id;
+      }
+      if (isVideoFeedOpen && !drawerVideoId && cards.length > 0) {
+        drawerVideoId = cards[0].id;
       }
     } catch {}
   }
@@ -210,11 +225,27 @@
     cards = await fetchVideos(activeLane);
   }
 
+  function toggleVideoFeed() {
+    isVideoFeedOpen = !isVideoFeedOpen;
+    localStorage.setItem('leadfinder_video_feed', String(isVideoFeedOpen));
+    if (isVideoFeedOpen) {
+      drawerVideoId = selectedId || cards[0]?.id || null;
+    } else {
+      drawerVideoId = null;
+    }
+  }
+
+  function handleCloseDrawer() {
+    isVideoFeedOpen = false;
+    localStorage.setItem('leadfinder_video_feed', 'false');
+    drawerVideoId = null;
+  }
+
   function advanceSelectionAfterRemoval(prevIdx: number) {
     if (cards.length > 0) {
       const nextIdx = Math.max(0, Math.min(prevIdx, cards.length - 1));
       selectedId = cards[nextIdx].id;
-      if (drawerVideoId) {
+      if (drawerVideoId || isVideoFeedOpen) {
         drawerVideoId = cards[nextIdx].id;
       }
     } else {
@@ -237,9 +268,7 @@
       moveSelection(-1);
     } else if (e.key === ' ') {
       e.preventDefault();
-      if (selectedId) {
-        drawerVideoId = drawerVideoId === selectedId ? null : selectedId;
-      }
+      toggleVideoFeed();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (selectedId) handleKeep(selectedId);
@@ -256,9 +285,7 @@
       e.preventDefault();
       if (inboxRef) inboxRef.focusSearch();
     } else if (e.key === 'Escape') {
-      if (drawerVideoId) {
-        drawerVideoId = null;
-      }
+      handleCloseDrawer();
     }
   }
 
@@ -269,7 +296,7 @@
     if (nextIdx < 0) nextIdx = 0;
     if (nextIdx >= cards.length) nextIdx = cards.length - 1;
     selectedId = cards[nextIdx].id;
-    if (drawerVideoId) {
+    if (isVideoFeedOpen) {
       drawerVideoId = cards[nextIdx].id;
     }
   }
@@ -277,6 +304,10 @@
   function handleSelectCard(id: string) {
     selectedId = id;
     drawerVideoId = id;
+    if (!isVideoFeedOpen) {
+      isVideoFeedOpen = true;
+      localStorage.setItem('leadfinder_video_feed', 'true');
+    }
   }
 
   function handleToggleCheck(id: string) {
@@ -293,6 +324,9 @@
     checkedIds = new Set();
     cards = await fetchVideos(lane);
     selectedId = cards[0]?.id || null;
+    if (isVideoFeedOpen) {
+      drawerVideoId = cards[0]?.id || null;
+    }
   }
 </script>
 
@@ -321,6 +355,8 @@
           {selectedId}
           {checkedIds}
           {currentLang}
+          {isVideoFeedOpen}
+          onToggleVideoFeed={toggleVideoFeed}
           laneCounts={queueCounts.lane_counts}
           onSelectCard={handleSelectCard}
           onToggleCheck={handleToggleCheck}
@@ -347,13 +383,16 @@
       {/if}
     </div>
 
-    {#if drawerVideoId}
-      {#key drawerVideoId}
+    {#if activeDrawerId}
+      {#key activeDrawerId}
         <DetailDrawer
-          videoId={drawerVideoId}
+          videoId={activeDrawerId}
           {currentLang}
-          onClose={() => (drawerVideoId = null)}
-          onSelectVideo={(id) => (drawerVideoId = id)}
+          onClose={handleCloseDrawer}
+          onSelectVideo={(id) => {
+            selectedId = id;
+            drawerVideoId = id;
+          }}
           onDiscard={handleDiscard}
           onDeleteVideo={handleDeleteVideo}
         />

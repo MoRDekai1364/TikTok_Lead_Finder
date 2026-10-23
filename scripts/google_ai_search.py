@@ -8,35 +8,53 @@ import urllib.parse
 from playwright.async_api import async_playwright
 
 def get_user_default_browser_exe():
-    if sys.platform != "win32":
-        return None
-    try:
+    if sys.platform == "win32":
         import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice") as key:
-            prog_id, _ = winreg.QueryValueEx(key, "ProgId")
-        for root in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+        subkeys_to_check = [
+            r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
+            r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
+        ]
+        for subkey in subkeys_to_check:
             try:
-                with winreg.OpenKey(root, rf"Software\Classes\{prog_id}\shell\open\command") as key:
-                    cmd, _ = winreg.QueryValueEx(key, "")
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as key:
+                    prog_id, _ = winreg.QueryValueEx(key, "ProgId")
+                for root in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+                    try:
+                        with winreg.OpenKey(root, rf"Software\Classes\{prog_id}\shell\open\command") as cmd_key:
+                            cmd, _ = winreg.QueryValueEx(cmd_key, "")
+                            m = re.match(r'"([^"]+)"', cmd) or re.match(r'([^\s]+)', cmd)
+                            if m and os.path.exists(m.group(1)):
+                                return m.group(1)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        generic_keys = [
+            r"https\shell\open\command",
+            r"http\shell\open\command"
+        ]
+        for gk in generic_keys:
+            try:
+                with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, gk) as gkey:
+                    cmd, _ = winreg.QueryValueEx(gkey, "")
                     m = re.match(r'"([^"]+)"', cmd) or re.match(r'([^\s]+)', cmd)
                     if m and os.path.exists(m.group(1)):
                         return m.group(1)
             except Exception:
                 pass
-    except Exception:
-        pass
 
-    candidates = [
-        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-    ]
-    for p in candidates:
-        if os.path.exists(p):
-            return p
+    elif sys.platform.startswith("linux"):
+        import subprocess
+        try:
+            out = subprocess.check_output(["xdg-settings", "get", "default-web-browser"], text=True).strip()
+            if out:
+                cmd = subprocess.check_output(["which", out.replace(".desktop", "")], text=True).strip()
+                if cmd and os.path.exists(cmd):
+                    return cmd
+        except Exception:
+            pass
+
     return None
 
 def parse_citations(page_content, inner_text):
@@ -84,7 +102,8 @@ async def fetch_ai_mode(query, mode, session_dir, headless, json_output, wait_se
         browser = None
         if default_exe and os.path.exists(default_exe):
             try:
-                browser = await p.chromium.launch_persistent_context(
+                browser_engine = p.firefox if "firefox" in default_exe.lower() else p.chromium
+                browser = await browser_engine.launch_persistent_context(
                     user_data_dir=os.path.abspath(session_dir),
                     executable_path=default_exe,
                     headless=headless,
