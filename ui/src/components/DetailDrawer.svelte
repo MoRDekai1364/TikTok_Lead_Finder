@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { aiCheckTranscript, fetchVideoDetail, getCoreUrl, updateTranscript } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
@@ -28,17 +27,40 @@
   let currentTimeMs = $state(0);
   let metadataOpen = $state(false);
 
-  onMount(async () => {
-    isLoading = true;
-    try {
-      detail = await fetchVideoDetail(videoId);
-      if (detail?.transcript) {
-        editedText = detail.transcript.edited_text || detail.transcript.text;
-      }
-    } finally {
-      isLoading = false;
+  let activeLoadId = '';
+
+  $effect(() => {
+    const id = videoId;
+    if (id) {
+      activeLoadId = id;
+      loadDetail(id);
     }
   });
+
+  async function loadDetail(id: string) {
+    isLoading = true;
+    isEditingTranscript = false;
+    currentTimeMs = 0;
+    try {
+      const res = await fetchVideoDetail(id);
+      if (activeLoadId === id) {
+        detail = res;
+        if (res?.transcript) {
+          editedText = res.transcript.edited_text || res.transcript.text;
+        } else {
+          editedText = '';
+        }
+      }
+    } catch {
+      if (activeLoadId === id) {
+        detail = null;
+      }
+    } finally {
+      if (activeLoadId === id) {
+        isLoading = false;
+      }
+    }
+  }
 
   function handleTimeUpdate() {
     if (videoElement) {

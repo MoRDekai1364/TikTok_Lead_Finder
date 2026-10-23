@@ -200,8 +200,12 @@
     if (cards.length > 0) {
       const nextIdx = Math.min(idx, cards.length - 1);
       selectedId = cards[nextIdx].id;
+      if (drawerVideoId) {
+        drawerVideoId = cards[nextIdx].id;
+      }
     } else {
       selectedId = null;
+      drawerVideoId = null;
     }
   }
 
@@ -251,6 +255,9 @@
     if (nextIdx < 0) nextIdx = 0;
     if (nextIdx >= cards.length) nextIdx = cards.length - 1;
     selectedId = cards[nextIdx].id;
+    if (drawerVideoId) {
+      drawerVideoId = cards[nextIdx].id;
+    }
   }
 
   function handleSelectCard(id: string) {
@@ -327,7 +334,9 @@
     </div>
 
     {#if drawerVideoId}
-      <DetailDrawer videoId={drawerVideoId} {currentLang} onClose={() => (drawerVideoId = null)} />
+      {#key drawerVideoId}
+        <DetailDrawer videoId={drawerVideoId} {currentLang} onClose={() => (drawerVideoId = null)} />
+      {/key}
     {/if}
   </main>
 </div>
