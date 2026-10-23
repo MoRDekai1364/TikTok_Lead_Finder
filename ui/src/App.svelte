@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    initDesktopConnection,
     fetchProfile,
     fetchQueueStatus,
     fetchScaleStatus,
@@ -49,15 +50,21 @@
     const savedLang = localStorage.getItem('leadfinder_lang') as Language | null;
     if (savedLang) currentLang = savedLang;
 
-    loadInitialData();
+    let unsub: () => void = () => {};
+    let disposed = false;
 
-    const unsub = subscribeSse((event) => {
-      handleLiveEvent(event);
+    initDesktopConnection().then(() => {
+      if (disposed) return;
+      loadInitialData();
+      unsub = subscribeSse((event) => {
+        handleLiveEvent(event);
+      });
     });
 
     window.addEventListener('keydown', handleGlobalKeydown);
 
     return () => {
+      disposed = true;
       unsub();
       window.removeEventListener('keydown', handleGlobalKeydown);
     };

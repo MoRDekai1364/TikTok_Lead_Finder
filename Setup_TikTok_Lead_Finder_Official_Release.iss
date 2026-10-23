@@ -1,4 +1,4 @@
-#define MyAppName "TikTok Lead Finder"
+﻿#define MyAppName "TikTok Lead Finder"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "LeadFinder Bulgaria"
 #define MyAppURL "https://github.com/MoRDekai1364/TikTok_Scan"
@@ -48,10 +48,11 @@ Name: "{localappdata}\TikTok_Lead_Finder\tools"
 Name: "{localappdata}\TikTok_Lead_Finder\models"
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\Start_TikTok_Lead_Finder.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\Start_TikTok_Lead_Finder.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyCoreExeName}"; Parameters: "setup-deps --non-interactive --ensure-webview2"; StatusMsg: "Verifying and installing required local tools..."; Flags: runhidden waituntilterminated; Tasks: bootstrapdeps
 Filename: "{app}\{#MyCoreExeName}"; Parameters: "setup-deps --non-interactive --with-models --calibrate"; StatusMsg: "Downloading speech/LLM models and calibrating hardware..."; Flags: runhidden waituntilterminated; Tasks: downloadmodels
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\Start_TikTok_Lead_Finder.ps1"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent runhidden
+

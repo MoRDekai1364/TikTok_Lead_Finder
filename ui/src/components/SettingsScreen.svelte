@@ -62,7 +62,7 @@
       <div class="form-group">
         <label>
           <span class="input-label">Core API URL:</span>
-          <input type="text" bind:value={coreUrl} placeholder="http://127.0.0.1:41777" />
+          <input type="text" bind:value={coreUrl} placeholder="http://127.0.0.1:17420" />
         </label>
 
         <label>

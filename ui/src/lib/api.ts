@@ -8,8 +8,25 @@ import type {
   VideoDetail,
 } from './types';
 
-let cachedBaseUrl = localStorage.getItem('leadfinder_core_url') || 'http://127.0.0.1:41777';
+let cachedBaseUrl = localStorage.getItem('leadfinder_core_url') || 'http://127.0.0.1:17420';
 let cachedToken = localStorage.getItem('leadfinder_api_token') || '';
+
+export async function initDesktopConnection(): Promise<void> {
+  if (!('__TAURI_INTERNALS__' in window)) {
+    return;
+  }
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const conn = await invoke<{ url: string; token: string }>('core_connection');
+    if (conn.token) {
+      cachedToken = conn.token;
+      localStorage.setItem('leadfinder_api_token', cachedToken);
+    }
+    if (conn.url && !localStorage.getItem('leadfinder_core_url')) {
+      cachedBaseUrl = conn.url.replace(/\/+$/, '');
+    }
+  } catch {}
+}
 
 export function getCoreUrl(): string {
   return cachedBaseUrl;
