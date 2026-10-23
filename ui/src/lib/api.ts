@@ -187,6 +187,26 @@ export async function googleAiFixTranscript(id: string): Promise<{ ok: boolean; 
   });
 }
 
+export interface GoogleAiQueryResult {
+  ok: boolean;
+  query: string;
+  mode: string;
+  text: string;
+  citations: Array<{ title: string; url: string }>;
+  source?: string;
+  error?: string;
+}
+
+export async function queryGoogleAi(
+  query: string,
+  mode: 'research' | 'refine' | 'factcheck' | 'raw' = 'research'
+): Promise<GoogleAiQueryResult> {
+  return fetchJson<GoogleAiQueryResult>('/api/google-ai/query', {
+    method: 'POST',
+    body: JSON.stringify({ query, mode }),
+  });
+}
+
 export async function deleteVideo(id: string): Promise<{ ok: boolean }> {
   return fetchJson<{ ok: boolean }>(`/api/videos/${encodeURIComponent(id)}`, {
     method: 'DELETE',

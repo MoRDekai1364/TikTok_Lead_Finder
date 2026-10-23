@@ -8,11 +8,13 @@
     getCoreUrl,
     googleAiFixTranscript,
     logDecision,
+    queryGoogleAi,
     researchPerson,
     retranscribeVideo,
     setCreatorWatchlist,
     updateTranscript,
   } from '../lib/api';
+  import type { GoogleAiQueryResult } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { ClaimWithEvidence, LeadCard, Person, VideoDetail } from '../lib/types';
@@ -53,6 +55,8 @@
   let isLoadingCreatorVideos = $state(false);
   let isTogglingWatchlist = $state(false);
   let previewModalData = $state<{ url: string; title: string; text: string; domain: string } | null>(null);
+  let googleAiModalData = $state<GoogleAiQueryResult | null>(null);
+  let isGoogleAiQuerying = $state(false);
   let isLoadingPreview = $state(false);
   let isResearchingPersonId = $state<number | null>(null);
   let expandedEvidenceId = $state<number | null>(null);
@@ -342,6 +346,30 @@
     }
   }
 
+  async function handleOpenGoogleAiResearch(query: string, mode: 'research' | 'refine' | 'factcheck' = 'research') {
+    if (!query.trim() || isGoogleAiQuerying) return;
+    isGoogleAiQuerying = true;
+    copyToast = currentLang === 'bg' ? '🌐 Google AI проучване...' : '🌐 Running Google AI research...';
+    try {
+      const res = await queryGoogleAi(query, mode);
+      googleAiModalData = res;
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при Google AI проучване' : 'Google AI research error';
+    } finally {
+      isGoogleAiQuerying = false;
+      setTimeout(() => (copyToast = null), 3000);
+    }
+  }
+
+  function handleApplyGoogleAiRefinedText(text: string) {
+    if (!detail?.transcript) return;
+    detail.transcript.edited_text = text;
+    editedText = text;
+    googleAiModalData = null;
+    copyToast = currentLang === 'bg' ? '✓ Текстът е приложен!' : '✓ Text applied!';
+    setTimeout(() => (copyToast = null), 2500);
+  }
+
   async function handleTriggerClaimVerify(claimText: string) {
     if (!detail) return;
     copyToast = currentLang === 'bg' ? '🔍 Проверка в мрежата...' : '🔍 Searching online...';
@@ -573,24 +601,14 @@
             >
               {isGoogleAiFixing ? '...' : '🌐 Google AI Fix'}
             </button>
-            <a
-              href="https://google.com/ai"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
               class="btn btn-secondary btn-sm"
-              title="google.com/ai"
+              onclick={() => handleOpenGoogleAiResearch(editedText || detail?.transcript?.text || '', 'refine')}
+              disabled={isGoogleAiQuerying}
+              title={currentLang === 'bg' ? 'Прецизиране и стилистично изчистване на текста с Google AI' : 'Refine text with Google AI Mode'}
             >
-              ↗ google.com/ai
-            </a>
-            <a
-              href={`https://www.google.com/search?udm=50&q=${encodeURIComponent(' what would the fixed text look like?\n' + (editedText || detail.transcript?.text || ''))}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-secondary btn-sm google-sge-btn"
-              title={currentLang === 'bg' ? 'Отвори външен AI Overview инструмент в Google за поправка на стенограмата' : 'Open external Google AI Overview tool for transcription fix'}
-            >
-              🔎 Google AI Overview ↗
-            </a>
+              {isGoogleAiQuerying ? '...' : '✨ ' + (currentLang === 'bg' ? 'Прецизирай' : 'Refine')}
+            </button>
             {#if !isEditingTranscript}
               <button class="btn btn-secondary btn-sm" onclick={() => (isEditingTranscript = true)}>
                 ✏️ {t.transcriptEditBtn}
@@ -780,6 +798,14 @@
                   >
                     ⚡ {currentLang === 'bg' ? 'Провери онлайн (AI & Web)' : 'Online Verify'}
                   </button>
+                  <button
+                    class="btn btn-secondary btn-sm factcheck-verify-btn"
+                    onclick={() => handleOpenGoogleAiResearch(claim.text_bg, 'factcheck')}
+                    disabled={isGoogleAiQuerying}
+                    title="Задълбочено проучване на твърдението с Google AI Mode"
+                  >
+                    🌐 {currentLang === 'bg' ? 'Google AI Deep Research' : 'Google AI Deep Research'}
+                  </button>
                 </div>
               </div>
 
@@ -911,6 +937,14 @@
                     title="Стартирай автоматично проучване, скрапване и профилиране на лицето с AI"
                   >
                     {isResearchingPersonId === person.id ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи в мрежата с AI' : 'AI Web Research')}
+                  </button>
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    onclick={() => handleOpenGoogleAiResearch(person.canonical_name, 'research')}
+                    disabled={isGoogleAiQuerying}
+                    title="Задълбочено проучване на лицето с Google AI Mode"
+                  >
+                    🌐 Google AI
                   </button>
                   <a
                     href={`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg "' + person.canonical_name + '"')}`}
@@ -1125,6 +1159,71 @@
             Отвори оригиналната страница ↗
           </a>
           <button class="btn btn-secondary btn-sm" onclick={() => (previewModalData = null)}>
+            Затвори
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if googleAiModalData}
+    <div class="modal-backdrop" onclick={() => (googleAiModalData = null)} role="presentation">
+      <div class="preview-modal google-ai-modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+        <div class="preview-modal-header">
+          <div>
+            <span class="preview-domain-pill">{googleAiModalData.source === 'google_ai_mode' ? 'Google AI Mode (udm=50)' : 'AI Синтез & Проучване'}</span>
+            <h3 class="preview-modal-title">{googleAiModalData.mode === 'refine' ? 'Прецизиран текст' : googleAiModalData.query}</h3>
+          </div>
+          <button class="close-btn" onclick={() => (googleAiModalData = null)}>✕</button>
+        </div>
+        <div class="preview-modal-body">
+          {#if googleAiModalData.text}
+            {#each googleAiModalData.text.split('\n\n') as para}
+              {#if para.trim()}
+                <p class="preview-paragraph">{para.trim()}</p>
+              {/if}
+            {/each}
+          {:else}
+            <p class="empty-hint">Няма извлечен отговор.</p>
+          {/if}
+
+          {#if googleAiModalData.citations && googleAiModalData.citations.length > 0}
+            <div class="google-ai-citations-box">
+              <h4 class="citations-title">Намерени първични източници и цитати ({googleAiModalData.citations.length})</h4>
+              <ul class="citations-list">
+                {#each googleAiModalData.citations as c}
+                  <li class="citation-entry">
+                    <a href={c.url} target="_blank" rel="noopener noreferrer" class="citation-link">
+                      ↗ {c.title || c.url}
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+        </div>
+        <div class="preview-modal-footer">
+          {#if googleAiModalData.mode === 'refine'}
+            <button
+              class="btn btn-primary btn-sm"
+              onclick={() => handleApplyGoogleAiRefinedText(googleAiModalData?.text || '')}
+            >
+              💾 Приложи в стенограмата
+            </button>
+          {/if}
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick={() => {
+              if (googleAiModalData?.text) {
+                navigator.clipboard.writeText(googleAiModalData.text);
+                copyToast = '✓ Копирано в клипборда!';
+                setTimeout(() => (copyToast = null), 2500);
+              }
+            }}
+          >
+            📋 Копирай
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick={() => (googleAiModalData = null)}>
             Затвори
           </button>
         </div>
@@ -2135,5 +2234,37 @@
     padding: 0.85rem 1.25rem;
     border-top: 1px solid var(--border-color, #333);
     background: rgba(0, 0, 0, 0.15);
+  }
+
+  .google-ai-citations-box {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color, #333);
+  }
+
+  .citations-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .citations-list {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .citation-link {
+    color: var(--primary-accent, #3b82f6);
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .citation-link:hover {
+    text-decoration: underline;
   }
 </style>

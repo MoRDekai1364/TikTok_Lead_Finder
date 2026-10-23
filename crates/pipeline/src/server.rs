@@ -153,6 +153,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id/retranscribe", post(handle_retranscribe))
         .route("/api/videos/:id/ai-check", post(handle_ai_check_transcript))
         .route("/api/videos/:id/google-ai-fix", post(handle_google_ai_fix))
+        .route("/api/google-ai/query", post(handle_google_ai_query))
         .route("/api/evidence/preview", get(handle_evidence_preview))
         .route("/api/people/:id/research", post(handle_research_person))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
@@ -706,6 +707,8 @@ async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
         if let Ok(py_out) = tokio::process::Command::new("python")
             .arg(script_path)
             .arg("--json")
+            .arg("--mode")
+            .arg("refine")
             .arg(&prompt)
             .output()
             .await
@@ -870,6 +873,158 @@ async fn handle_google_ai_fix(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct GoogleAiQueryRequest {
+    pub query: String,
+    pub mode: Option<String>,
+}
+
+async fn handle_google_ai_query(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<GoogleAiQueryRequest>,
+) -> Response {
+    let mode = body.mode.unwrap_or_else(|| "research".to_string());
+    let query = body.query.trim().to_string();
+    if query.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Query cannot be empty" })),
+        )
+            .into_response();
+    }
+
+    let py_script = if std::path::Path::new("scripts/google_ai_search.py").exists() {
+        Some("scripts/google_ai_search.py")
+    } else if std::path::Path::new("tools/google_ai_search.py").exists() {
+        Some("tools/google_ai_search.py")
+    } else {
+        None
+    };
+
+    if let Some(script_path) = py_script {
+        if let Ok(py_out) = tokio::process::Command::new("python")
+            .arg(script_path)
+            .arg("--json")
+            .arg("--mode")
+            .arg(&mode)
+            .arg(&query)
+            .output()
+            .await
+        {
+            if py_out.status.success() {
+                if let Ok(mut val) = serde_json::from_slice::<serde_json::Value>(&py_out.stdout) {
+                    if val.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                        if let Some(obj) = val.as_object_mut() {
+                            obj.insert("source".to_string(), serde_json::json!("google_ai_mode"));
+                        }
+                        return Json(val).into_response();
+                    }
+                }
+            }
+        }
+    }
+
+    let cfg = ctx.config.read().await.clone();
+    let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+
+    if mode == "refine" {
+        let lex = leadfinder_providers::global_lexicon(
+            &ctx.paths,
+            &cfg.normalisation.lexicon_config_file,
+        );
+        let stage1 = lex.normalize_text(&query);
+        let schema_val = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "corrected_text": { "type": "string" }
+            },
+            "required": ["corrected_text"]
+        });
+        let llm_req = leadfinder_core::LlmJsonRequest {
+            system_prompt: "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string(),
+            user_prompt: format!(" what would the fixed text look like?\n{stage1}"),
+            json_schema: Some(schema_val),
+            max_tokens: 1024,
+            temperature: 0.1,
+        };
+        let fixed = match runner.complete_validated(&llm_req, &ctx.db).await {
+            Ok(v) => v.response.parsed_json.get("corrected_text").and_then(|s| s.as_str()).map(|s| s.to_string()).unwrap_or(stage1),
+            Err(_) => stage1,
+        };
+        return Json(serde_json::json!({
+            "ok": true,
+            "query": query,
+            "mode": mode,
+            "text": fixed,
+            "citations": [],
+            "source": "local_llm_fallback"
+        })).into_response();
+    }
+
+    let primary_entries = leadfinder_core::load_primary_sources(&ctx.paths.config_dir).unwrap_or_default();
+    let search_engine = leadfinder_providers::WebAndPrimarySearch::new(
+        &cfg.providers.searxng_url,
+        primary_entries,
+        cfg.factcheck_archives.clone(),
+        cfg.verification.news_domains.clone(),
+        ctx.guard.clone(),
+    );
+    let lex = leadfinder_providers::global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
+    let ranker = leadfinder_providers::PassageExtractorAndRanker::new(ctx.guard.clone(), lex);
+    let search_q = leadfinder_core::SearchQuery {
+        query: format!("{} факти новини проверка източници", query),
+        restrict_domains: Vec::new(),
+        date_from: None,
+        date_to: None,
+        max_results: 5,
+    };
+    let mut citations = Vec::new();
+    let mut text_snippets = Vec::new();
+    if let Ok(hits) = search_engine.search(&search_q).await {
+        for hit in hits {
+            citations.push(serde_json::json!({ "title": hit.title, "url": hit.url }));
+            let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+            let txt = ranker.extract_main_text(&html);
+            if !txt.is_empty() {
+                text_snippets.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(600).collect::<String>()));
+            }
+        }
+    }
+
+    let prompt_research = format!(
+        "Тема за проучване: {}\n\nНамерени първични източници:\n{}\n\nСинтезирай изчерпателен обективен аналитичен конспект на български език с цитиране на източниците.",
+        query,
+        text_snippets.join("\n\n")
+    );
+    let schema_val = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "summary": { "type": "string" }
+        },
+        "required": ["summary"]
+    });
+    let llm_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: "Ти си обективен журналистически анализатор и фактчекинг изследовател. Синтезирай точен конспект с факти, контекст и източници.".to_string(),
+        user_prompt: prompt_research,
+        json_schema: Some(schema_val),
+        max_tokens: 1500,
+        temperature: 0.1,
+    };
+    let summary = match runner.complete_validated(&llm_req, &ctx.db).await {
+        Ok(v) => v.response.parsed_json.get("summary").and_then(|s| s.as_str()).map(|s| s.to_string()).unwrap_or_else(|| "Няма допълнителни данни.".to_string()),
+        Err(_) => "Няма допълнителни данни.".to_string(),
+    };
+
+    Json(serde_json::json!({
+        "ok": true,
+        "query": query,
+        "mode": mode,
+        "text": summary,
+        "citations": citations,
+        "source": "searxng_llm_fallback"
+    })).into_response()
+}
+
+#[derive(Debug, Deserialize)]
 pub struct EvidencePreviewQuery {
     pub url: String,
 }
@@ -937,6 +1092,38 @@ async fn handle_research_person(
     );
     let ranker = leadfinder_providers::PassageExtractorAndRanker::new(ctx.guard.clone(), lex);
     let mut hits_text = Vec::new();
+
+    let py_script = if std::path::Path::new("scripts/google_ai_search.py").exists() {
+        Some("scripts/google_ai_search.py")
+    } else if std::path::Path::new("tools/google_ai_search.py").exists() {
+        Some("tools/google_ai_search.py")
+    } else {
+        None
+    };
+
+    if let Some(script_path) = py_script {
+        if let Ok(py_out) = tokio::process::Command::new("python")
+            .arg(script_path)
+            .arg("--json")
+            .arg("--mode")
+            .arg("research")
+            .arg(&name)
+            .output()
+            .await
+        {
+            if py_out.status.success() {
+                if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&py_out.stdout) {
+                    if let Some(ai_txt) = val.get("text").and_then(|v| v.as_str()) {
+                        let clean = ai_txt.trim();
+                        if !clean.is_empty() {
+                            hits_text.push(format!("Google AI Mode конспект:\n{}", clean));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if let Ok(hits) = search_engine.search(&search_q).await {
         for hit in hits.into_iter().take(3) {
             let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();

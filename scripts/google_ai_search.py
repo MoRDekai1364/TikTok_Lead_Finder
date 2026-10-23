@@ -31,8 +31,22 @@ def extract_clean_text(inner_text):
         cleaned.append(line)
     return "\n".join(cleaned)
 
-async def fetch_ai_mode(query, session_dir, headless, json_output, wait_seconds):
+def format_prompt(query, mode):
+    q = query.strip()
+    if mode == "refine":
+        if "what would the fixed text look like?" in q:
+            return q
+        return f" what would the fixed text look like?\n{q}"
+    elif mode == "research":
+        return f"Направи задълбочено проучване с факти, контекст и източници за следната тема или лице: {q}"
+    elif mode == "factcheck":
+        return f"Провери истинността на следното твърдение, анализирай надеждни източници и изведи факти и заключение:\n{q}"
+    return q
+
+async def fetch_ai_mode(query, mode, session_dir, headless, json_output, wait_seconds):
     os.makedirs(session_dir, exist_ok=True)
+    prompt = format_prompt(query, mode)
+
     async with async_playwright() as p:
         try:
             browser = await p.chromium.launch_persistent_context(
@@ -57,7 +71,7 @@ async def fetch_ai_mode(query, session_dir, headless, json_output, wait_seconds)
             )
 
         page = await browser.new_page()
-        encoded = urllib.parse.quote(query)
+        encoded = urllib.parse.quote(prompt)
         url = f"https://www.google.com/search?udm=50&q={encoded}"
 
         await page.goto(url, wait_until="domcontentloaded")
@@ -95,7 +109,8 @@ async def fetch_ai_mode(query, session_dir, headless, json_output, wait_seconds)
                     "ok": False,
                     "error": "captcha_required",
                     "message": "Google CAPTCHA detected. Run with --login or --headful to solve it in the session context.",
-                    "query": query
+                    "query": query,
+                    "mode": mode
                 }
                 if json_output:
                     print(json.dumps(res, ensure_ascii=False))
@@ -133,6 +148,7 @@ async def fetch_ai_mode(query, session_dir, headless, json_output, wait_seconds)
         res = {
             "ok": True,
             "query": query,
+            "mode": mode,
             "text": extracted,
             "citations": citations
         }
@@ -152,6 +168,7 @@ def main():
     parser = argparse.ArgumentParser(description="Query Google AI Mode search (udm=50) via terminal")
     parser.add_argument("query", nargs="?", default="", help="Query or text to process")
     parser.add_argument("--query", "-q", dest="opt_query", default="", help="Query or text to process")
+    parser.add_argument("--mode", choices=["refine", "research", "factcheck", "raw"], default="raw", help="Processing mode")
     parser.add_argument("--login", "--headful", dest="headful", action="store_true", help="Launch visible browser to login or solve CAPTCHA")
     parser.add_argument("--session-dir", default="data/google_session", help="Path to persistent browser profile")
     parser.add_argument("--json", action="store_true", help="Output JSON format")
@@ -168,6 +185,7 @@ def main():
 
     asyncio.run(fetch_ai_mode(
         query=q,
+        mode=args.mode,
         session_dir=args.session_dir,
         headless=not args.headful,
         json_output=args.json,
