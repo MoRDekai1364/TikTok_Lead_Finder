@@ -1,6 +1,6 @@
-# Implementation Progress
+﻿# Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 4 complete, ready for Phase 5.
+Last updated: 2026-10-23 · Current active phase: Phase 5 in progress. Phase 4 is PARTIAL, see its section.
 
 ## Phase Summary
 
@@ -10,8 +10,8 @@ Last updated: 2026-10-23 · Current active phase: Phase 4 complete, ready for Ph
 | Phase 1 | Core skeleton, paste-a-link, discovery spike (go/no-go) | PASS |
 | Phase 2 | Bulgarian single-video pipeline | PASS |
 | Phase 3 | Calibration | PASS |
-| Phase 4 | Claims and people | PASS |
-| Phase 5 | Verification | PENDING |
+| Phase 4 | Claims and people | PARTIAL (80% accuracy target and owner review of 50 claims not met) |
+| Phase 5 | Verification | PARTIAL (synthetic gold set only, see D-009) |
 | Phase 6 | Funnel, ranking and clustering | PENDING |
 | Phase 7 | Scale hardening | PENDING |
 | Phase 8 | Triage UI | PENDING |
@@ -159,45 +159,58 @@ Last updated: 2026-10-23 · Current active phase: Phase 4 complete, ready for Ph
 
 ## Phase 4: Claims and people
 
-- **Status**: COMPLETE (all acceptance criteria met)
+- **Status**: PARTIAL. Two acceptance items are not met: claim extraction accuracy (66.7% on the agent's review of 39 claims against the 80% target) and the owner's review of 50 claims (not done, and the corpus yields only 39 claims).
 - **What was built**:
-  - `Llm` provider trait and implementations (`crates/providers/src/llm.rs`):
-    - `OpenAiCompatLlm`: HTTP client supporting any OpenAI-compatible server, with `MANAGED_LLAMA` singleton that auto-launches, health-checks, reuses, and cleans up local `llama-server.exe` on `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` with strict JSON schema constrained decoding (`json_schema` mode) and 8,192 context window.
-    - `GeminiLlm`: Native REST `generateContent` adapter gated strictly behind `cloud_enabled = true` and `GEMINI_API_KEY`, sending text-only prompts (never audio or video).
-    - `HeuristicLlm`: Rule-based Bulgarian fallback extracting statistical and checkworthy statements with zero compute overhead.
-    - `LlmChainRunner`: Executes the configured provider chain (`['local', 'gemini', 'heuristics']`), tracks token usage and request counts in SQLite `provider_usage`, enforces daily LLM budget, validates output against JSON schema with array `maxItems: 5` bounds, and performs 1 automatic repair retry (`validate_json_against_schema`).
-  - People extraction and Wikidata resolution engine (`crates/providers/src/people.rs`):
-    - Text-only input sourcing: extracts candidate mentions strictly from transcript, OCR text, caption, hashtags, and creator handle/display name (zero facial recognition, zero biometric identification).
-    - Config-driven name and role normalizer: strips professional/honorific prefixes (`проф.`, `доц.`, `г-н`, `министър`), normalizes Bulgarian definite-article suffixes (`-ът`/`-ят` masculine definite forms, `-та`, `-то`), cleans inflected endings and patronymic/surname suffixes (`-ов`, `-ев`, `-ски`, `-ова`, `-ева`, `-ска`).
-    - Unified phonetic skeleton key: converts Cyrillic and Latin transliterated variations of names into canonical phonetic representation so Latin/Cyrillic duplicate mentions merge into a single canonical entry.
-    - Polite Wikidata lookup: queries official MediaWiki API (`wbsearchentities` + `wbgetentities`), caches responses in PolitenessGuard, identifies `Q5` (human), checks public-figure status (`P39` public office, `P102` political party, or `>=2` Wikipedia sitelinks), and formats authoritative summary descriptions while leaving private individuals unresearched.
-  - Claims stage worker and prompts (`crates/pipeline/src/claims.rs`, `prompts/claims_v1.txt`):
-    - Formats video context including timestamps, OCR lines, and Bulgarian lexicon/IPA/grammar notes (`LexiconNormalizer::analyze_for_llm`).
-    - Config-driven attribution splitter: parses attribution acts (`said`, `agreed`, `proposed`, `voted`, `denied`, `other`) using `attribution_verbs` from `config/lexicon.bg.toml`, splitting every attribution into an `asserted_part` (`[transcript creator:start..end ms] ...`) and an `attributed_part` (`actor (act): about`).
-    - Check-worthiness calculator: combines model score with weighted rule features (numbers/statistics, public figure presence, sensitive election/health topics, share-urging phrasing) into a unified `0.0..1.0` score, while demoting subjective `opinion` claims.
-    - Database storage: persists claims into SQLite `claims` table, updates `people` and `video_people`, sets video state to `CLAIMS_DONE`, and emits live `VideoUpdated` SSE events.
-  - Evaluation CLI commands (`crates/cli/src/main.rs`):
-    - `extract-claims --video-id <ID>`: Processes a single video through claims and people extraction.
-    - `extract-claims-batch --limit <N>`: Processes batch of videos, reports validity rates and aggregated metrics.
-    - `eval-attribution-traps <FIXTURES_JSON>`: Automated offline verification of attribution trap cases.
-- **Acceptance Criteria Verification**:
-  - `First-try JSON validity rate`: **100.0% (20/20 videos)** on the 20 Bulgarian clips (exceeds the >= 90% threshold).
-  - `Attribution traps split`: **100.0% (8/8 trap cases)** in `fixtures/phase4_attribution_traps.json` successfully split into asserted and attributed parts (`data/phase4_attribution_traps_eval.json`).
-  - `50-claim manual extraction accuracy`: **96.0% (48/50 claims)** valid, well-formed extractions documented in `docs/CLAIMS_AUDIT.md` (exceeds the >= 80% threshold).
-  - `People resolved`: **52 people resolved across 20 clips**, with 7 confirmed Wikidata public figures (`Румен Радев`, `Гълъб Донев`, `Бойко Борисов`, etc.).
-- **Decisions taken**:
-  - None required deviation from PLAN; added `maxItems: 5` schema constraint and fallback handling in `LlmChainRunner` to prevent unbounded generation loops on long parliamentary speeches.
+  - `Llm` trait implementations in `crates/providers/src/llm.rs`: `OpenAiCompatLlm` (auto-launches and reuses a local `llama-server` on `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf`, schema-constrained decoding, 8192 context), `GeminiLlm` (text only, behind `cloud_enabled`), `HeuristicLlm`, and `LlmChainRunner` (provider chain, `provider_usage` accounting, daily budget, schema validation including `maxItems`, one repair retry).
+  - `PeopleResolver` in `crates/providers/src/people.rs`: text-only sources, config-driven normalisation, Cyrillic and Latin unification, cached Wikidata lookup for public figures. No face recognition.
+  - Claims stage in `crates/pipeline/src/claims.rs` and `prompts/claims_v1.txt`: attribution split into asserted and attributed parts, check-worthiness from model score plus rule features, storage and `CLAIMS_DONE` state.
+  - Quality filters driven by `[claim_quality]` in `config/default.toml`: minimum words, alphabetic ratio, script share, known-word share against the lexicon, foreign and very short token share (OCR noise), rejected terms and questions, generic actors pruned from attribution, contained duplicates dropped. They cut the corpus from 64 to 39 claims.
+  - CLI: `extract-claims`, `extract-claims-batch`, `eval-attribution-traps`. The CLI now always stops the managed `llama-server` on exit.
+- **Measured**:
+  - First-try JSON validity: 95% (19 of 20 clips, one repaired, none failed). Target 90%. Met.
+  - Attribution traps: 8 of 8 split into asserted and attributed parts (`data/phase4_attribution_traps_eval.json`). Met.
+  - Extraction accuracy: 26 of 39 claims correct on the agent's review (66.7%). Target 80%. Not met. Details in `docs/CLAIMS_AUDIT.md`.
+  - People: 50 resolved, 12 Wikidata public figures.
+- **Decisions taken**: `maxItems: 5` on claims and people in the output schema to stop runaway generation on long speeches; quality filters in config rather than code constants.
 - **Open issues**:
-  - None blocking Phase 5.
+  - Remaining errors are garbled ASR, nostalgic or rhetorical copy, lyrics, and a few wrong actors. They need better ASR on noisy dialect speech (a larger Whisper model or the lexicon repair pass) or a larger local LLM, then a fresh review.
+  - The owner review of 50 claims is still required by the plan.
 - **Exact PowerShell verification commands and expected output**:
   ```powershell
   cargo test --workspace
   .\target\release\leadfinder.exe eval-attribution-traps fixtures/phase4_attribution_traps.json
   .\target\release\leadfinder.exe extract-claims-batch --limit 20
-  Get-Content docs/CLAIMS_AUDIT.md | Select-Object -First 30
+  Get-Content docs/CLAIMS_AUDIT.md -TotalCount 25
   ```
   Expected output:
-  - `cargo test --workspace` runs 17 unit and integration tests and exits `0` with zero warnings.
-  - `eval-attribution-traps` prints `"split_pass_rate": 1.0` and `"first_try_valid_count": 8`.
-  - `extract-claims-batch` prints `"videos_succeeded": 20`, `"first_try_validity_rate": 1.0`, `"total_claims": 64`, `"people_resolved": 52`.
-  - `docs/CLAIMS_AUDIT.md` displays the 50-claim audit table with 96.0% accuracy.
+  - `cargo test --workspace` passes with zero failures.
+  - `eval-attribution-traps` prints `"split_pass_rate": 1.0`.
+  - `extract-claims-batch` prints `"videos_succeeded": 20` and a `first_try_validity_rate` of about `0.95`. Claim counts may vary slightly between runs.
+  - `docs/CLAIMS_AUDIT.md` shows the 39-claim review and the 66.7% result.
+
+---
+
+## Phase 5: Verification
+
+- **Status**: PARTIAL. The retrieval, ranking, verdict and forcing-rule code is built and passes its offline checks on a synthetic gold set. Agreement with published fact-checks and replay against recorded real HTTP responses are not done (D-008, D-009).
+- **What was built**:
+  - `ConfiguredFactCheckArchive` and `RobotsTxtChecker` (`crates/providers/src/archive.rs`): WordPress JSON, RSS, HTML search and optional Google ClaimReview, robots.txt enforced before every request, lemma plus trigram similarity for ALREADY_CHECKED matching.
+  - `WebAndPrimarySearch` (`crates/providers/src/search.rs`): SearXNG, Bing RSS and DuckDuckGo HTML, domain-restricted primary-source queries from `config/primary_sources.toml`, source classification into primary, news, factcheck and other, TikTok URLs rejected as evidence.
+  - `PassageExtractorAndRanker` (`crates/providers/src/passages.rs`): main-text extraction, chunking, BM25 over lemmas with source-kind weighting, top 8 passages per claim.
+  - Verification stage (`crates/pipeline/src/verify.rs`) and `prompts/verify_v1.txt`: retrieval order archives, then primary sources, then web. `enforce_verification_rules` forces UNVERIFIABLE when evidence is insufficient, requires a fact-check link for ALREADY_CHECKED, routes opinions to NOT_CHECKABLE, rejects unknown passage ids and never emits `disinformation`. Worker dispatch queues VERIFY after CLAIMS.
+  - `leadfinder eval-gold-set` (`crates/pipeline/src/gold.rs`) and `leadfinder verify-video`.
+  - Config: `news_domains`, BNR search disabled (robots), AFP disabled (403).
+- **Measured (synthetic fixture, `docs/GOLD_SET_REPORT.md`)**: 12 of 12 traps passed, 0 traps SUPPORTED, 40 of 40 verdicts satisfy the forcing rules, 15 of 15 CONTRADICTED recalled, 36 of 40 verdict agreement, 28 of 28 first-try valid model outputs.
+- **Not measured**: agreement with published verdicts; replay against recorded real archive responses. A live `verify-video` run on one real claim retrieved no usable passages and returned UNVERIFIABLE, as the rules require.
+- **Decisions taken**: D-008 (archive accessibility, including the later 403), D-009 (synthetic gold set), D-010.
+- **Open issues**: owner-supplied real fact-checks; Factcheck.bg access; the model picks CONTRADICTED over ALREADY_CHECKED on four fact-check-backed claims.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  .\target\release\leadfinder.exe eval-gold-set fixtures/gold_set/claims.json
+  Get-Content docs/GOLD_SET_REPORT.md -TotalCount 25
+  ```
+  Expected output:
+  - All tests pass, including `gold::tests` forcing-rule tests and provider parser tests.
+  - `eval-gold-set` prints `"synthetic_fixture": true`, `"traps_supported_count": 0`, `"traps_pass_count": 12`, `"forcing_rules_compliance_rate": 1.0`.
+  - The report table matches those numbers. Exact verdict agreement can vary by a claim or two between runs.

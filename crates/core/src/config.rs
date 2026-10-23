@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+﻿use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,74 @@ pub struct AppConfig {
     pub providers: ProvidersConfig,
     pub verification: VerificationConfig,
     #[serde(default)]
+    pub claim_quality: ClaimQualityConfig,
+    #[serde(default)]
     pub factcheck_archives: Vec<ArchiveEndpointConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimQualityConfig {
+    #[serde(default = "default_min_words")]
+    pub min_words: usize,
+    #[serde(default = "default_min_alpha_ratio")]
+    pub min_alpha_ratio: f64,
+    #[serde(default = "default_min_script_share")]
+    pub min_script_share: f64,
+    #[serde(default)]
+    pub script_ranges: Vec<[u32; 2]>,
+    #[serde(default)]
+    pub generic_actor_terms: Vec<String>,
+    #[serde(default = "default_min_known_word_share")]
+    pub min_known_word_share: f64,
+    #[serde(default = "default_max_foreign_token_share")]
+    pub max_foreign_token_share: f64,
+    #[serde(default = "default_max_short_token_share")]
+    pub max_short_token_share: f64,
+    #[serde(default)]
+    pub reject_questions: bool,
+    #[serde(default)]
+    pub rejected_terms: Vec<String>,
+}
+
+impl Default for ClaimQualityConfig {
+    fn default() -> Self {
+        Self {
+            min_words: default_min_words(),
+            min_alpha_ratio: default_min_alpha_ratio(),
+            min_script_share: default_min_script_share(),
+            script_ranges: Vec::new(),
+            generic_actor_terms: Vec::new(),
+            min_known_word_share: default_min_known_word_share(),
+            max_foreign_token_share: default_max_foreign_token_share(),
+            max_short_token_share: default_max_short_token_share(),
+            reject_questions: false,
+            rejected_terms: Vec::new(),
+        }
+    }
+}
+
+fn default_min_words() -> usize {
+    4
+}
+
+fn default_min_alpha_ratio() -> f64 {
+    0.75
+}
+
+fn default_max_foreign_token_share() -> f64 {
+    1.0
+}
+
+fn default_max_short_token_share() -> f64 {
+    1.0
+}
+
+fn default_min_known_word_share() -> f64 {
+    0.0
+}
+
+fn default_min_script_share() -> f64 {
+    0.6
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,6 +247,8 @@ pub struct VerificationConfig {
     pub retrieval_window_days: i64,
     #[serde(default = "default_already_checked_sim")]
     pub already_checked_similarity: f64,
+    #[serde(default)]
+    pub news_domains: Vec<String>,
 }
 
 fn default_already_checked_sim() -> f64 {

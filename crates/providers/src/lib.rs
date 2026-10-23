@@ -1,20 +1,26 @@
+pub mod archive;
 pub mod bootstrap;
 pub mod discovery;
 pub mod lexicon;
 pub mod llm;
 pub mod media;
 pub mod ocr;
+pub mod passages;
 pub mod people;
+pub mod search;
 pub mod transcriber;
 pub mod ytdlp;
 
+pub use archive::*;
 pub use bootstrap::*;
 pub use discovery::*;
 pub use lexicon::*;
 pub use llm::*;
 pub use media::*;
 pub use ocr::*;
+pub use passages::*;
 pub use people::*;
+pub use search::*;
 pub use transcriber::*;
 pub use ytdlp::*;
 

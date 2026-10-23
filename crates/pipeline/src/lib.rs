@@ -1,14 +1,18 @@
-pub mod claims;
+﻿pub mod claims;
 pub mod engine;
+pub mod gold;
 pub mod janitor;
 pub mod server;
 pub mod spike;
+pub mod verify;
 
 pub use claims::*;
 pub use engine::*;
+pub use gold::*;
 pub use janitor::*;
 pub use server::*;
 pub use spike::*;
+pub use verify::*;
 
 pub fn crate_ready() -> &'static str {
     leadfinder_probe::crate_ready()

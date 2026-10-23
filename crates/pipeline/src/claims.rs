@@ -1,8 +1,8 @@
-use anyhow::Result;
+﻿use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use leadfinder_core::{
-    AppConfig, AttributionAct, Claim, ClaimInput, ClaimsOutput, CoreEvent, LlmJsonRequest,
+    AppConfig, AttributionAct, Claim, ClaimInput, ClaimQualityConfig, ClaimsOutput, CoreEvent, LlmJsonRequest,
     RankingConfig, Transcript, Video, VideoState,
 };
 use leadfinder_providers::{
@@ -145,6 +145,171 @@ pub fn compute_combined_checkworthiness(
     ((raw.clamp(0.0, 1.0)) * 1000.0).round() / 1000.0
 }
 
+pub fn claim_text_passes_quality(
+    text: &str,
+    quality: &ClaimQualityConfig,
+    is_known_word: &dyn Fn(&str) -> bool,
+) -> bool {
+    let trimmed = text.trim();
+    if quality.reject_questions && trimmed.ends_with('?') {
+        return false;
+    }
+    let low_text = trimmed.to_lowercase();
+    if quality
+        .rejected_terms
+        .iter()
+        .any(|t| !t.trim().is_empty() && low_text.contains(&t.trim().to_lowercase()))
+    {
+        return false;
+    }
+    let chars: Vec<char> = trimmed.chars().collect();
+    if chars.is_empty() {
+        return false;
+    }
+    let words = trimmed.split_whitespace().count();
+    if words < quality.min_words {
+        return false;
+    }
+    let non_space = chars.iter().filter(|c| !c.is_whitespace()).count().max(1);
+    let letters = chars.iter().filter(|c| c.is_alphabetic()).count();
+    let digits = chars.iter().filter(|c| c.is_ascii_digit()).count();
+    if ((letters + digits) as f64) / (non_space as f64) < quality.min_alpha_ratio {
+        return false;
+    }
+    if !quality.script_ranges.is_empty() && letters > 0 {
+        let in_script = chars
+            .iter()
+            .filter(|c| c.is_alphabetic())
+            .filter(|c| {
+                let cp = **c as u32;
+                quality.script_ranges.iter().any(|r| cp >= r[0] && cp <= r[1])
+            })
+            .count();
+        if (in_script as f64) / (letters as f64) < quality.min_script_share {
+            return false;
+        }
+    }
+    if !quality.script_ranges.is_empty() {
+        let in_script = |ch: char| {
+            let cp = ch as u32;
+            quality.script_ranges.iter().any(|r| cp >= r[0] && cp <= r[1])
+        };
+        let tokens: Vec<&str> = trimmed
+            .split_whitespace()
+            .filter(|t| t.chars().any(|c| c.is_alphabetic()))
+            .collect();
+        if !tokens.is_empty() {
+            let mut foreign = 0usize;
+            let mut short = 0usize;
+            for t in &tokens {
+                let alpha: Vec<char> = t.chars().filter(|c| c.is_alphabetic()).collect();
+                let native = alpha.iter().filter(|c| in_script(**c)).count();
+                if native == 0 || native < alpha.len() {
+                    foreign += 1;
+                }
+                if alpha.len() <= 2 {
+                    short += 1;
+                }
+            }
+            if (foreign as f64) / (tokens.len() as f64) > quality.max_foreign_token_share {
+                return false;
+            }
+            if tokens.len() >= 4
+                && (short as f64) / (tokens.len() as f64) > quality.max_short_token_share
+            {
+                return false;
+            }
+        }
+    }
+    if quality.min_known_word_share > 0.0 {
+        let candidates: Vec<&str> = trimmed
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| {
+                w.chars().count() >= 3
+                    && !w.chars().any(|c| c.is_ascii_digit())
+                    && w.chars().next().map(|c| !c.is_uppercase()).unwrap_or(false)
+            })
+            .collect();
+        if candidates.len() >= 2 {
+            let known = candidates.iter().filter(|w| is_known_word(w)).count();
+            if (known as f64) / (candidates.len() as f64) < quality.min_known_word_share {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn actor_is_generic(actor: &str, quality: &ClaimQualityConfig) -> bool {
+    let low = actor.trim().to_lowercase();
+    if low.chars().count() < 2 {
+        return true;
+    }
+    quality.generic_actor_terms.iter().any(|term| {
+        let t = term.trim().to_lowercase();
+        if t.is_empty() {
+            return false;
+        }
+        low == t
+            || low
+                .split(|c: char| !c.is_alphanumeric())
+                .any(|w| !w.is_empty() && w == t)
+            || (t.contains(' ') && low.contains(&t))
+    })
+}
+
+pub fn prune_generic_attributions(input: &mut ClaimInput, quality: &ClaimQualityConfig) {
+    input
+        .attribution
+        .retain(|a| !actor_is_generic(&a.actor, quality));
+    let mut seen: Vec<(String, String, String)> = Vec::new();
+    input.attribution.retain(|a| {
+        let key = (
+            a.actor.trim().to_lowercase(),
+            a.act.clone(),
+            a.about.trim().to_lowercase(),
+        );
+        if seen.contains(&key) {
+            false
+        } else {
+            seen.push(key);
+            true
+        }
+    });
+    if input.attribution.is_empty() && input.claim_type.as_str() == "attribution" {
+        input.claim_type = leadfinder_core::ClaimType::Factual;
+    }
+}
+
+pub fn drop_contained_duplicates(texts: &[String]) -> Vec<bool> {
+    let norm: Vec<String> = texts
+        .iter()
+        .map(|t| {
+            t.to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+                .collect::<String>()
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    let mut keep = vec![true; texts.len()];
+    for i in 0..norm.len() {
+        for j in 0..norm.len() {
+            if i == j || !keep[j] {
+                continue;
+            }
+            let contained = norm[j].contains(&norm[i]);
+            let longer = norm[j].len() > norm[i].len() || (norm[j].len() == norm[i].len() && j < i);
+            if contained && longer {
+                keep[i] = false;
+                break;
+            }
+        }
+    }
+    keep
+}
 pub fn split_and_normalize_attribution(
     input: &mut ClaimInput,
     speaker_fallback: Option<&str>,
@@ -475,11 +640,16 @@ impl PipelineContext {
                 item.start_ms = 0;
             }
 
+            if !claim_text_passes_quality(&item.text_bg, &cfg.claim_quality, &|w: &str| lex.is_known_word(w)) {
+                continue;
+            }
+
             split_and_normalize_attribution(
                 item,
                 video.creator_handle.as_deref(),
                 &attr_verbs,
             );
+            prune_generic_attributions(item, &cfg.claim_quality);
 
             let claim_low = item.text_bg.to_lowercase();
             let mentions_pub_fig = resolved_people.iter().any(|p| {
@@ -517,6 +687,15 @@ impl PipelineContext {
                 cluster_id: None,
             });
         }
+
+        let keep_flags = drop_contained_duplicates(
+            &claims_to_save
+                .iter()
+                .map(|c| c.text_bg.clone())
+                .collect::<Vec<_>>(),
+        );
+        let mut keep_iter = keep_flags.into_iter();
+        claims_to_save.retain(|_| keep_iter.next().unwrap_or(true));
 
         let saved_claims = self
             .db
@@ -564,5 +743,61 @@ impl PipelineContext {
             claims: saved_claims,
             people: resolved_people,
         })
+    }
+}
+
+#[cfg(test)]
+mod quality_tests {
+    use super::*;
+
+    fn quality() -> ClaimQualityConfig {
+        ClaimQualityConfig {
+            min_words: 4,
+            max_foreign_token_share: 0.15,
+            max_short_token_share: 0.45,
+            min_alpha_ratio: 0.75,
+            min_script_share: 0.6,
+            script_ranges: vec![[1024, 1279]],
+            generic_actor_terms: vec!["някой".to_string(), "хората".to_string(), "неизвестен".to_string()],
+            min_known_word_share: 0.75,
+            reject_questions: true,
+            rejected_terms: vec!["сподели".to_string(), "#".to_string()],
+        }
+    }
+
+    fn known(w: &str) -> bool {
+        ["цените", "на", "тока", "са", "се", "увеличили", "миналата", "година", "процента"].contains(&w.to_lowercase().as_str())
+    }
+
+    #[test]
+    fn accepts_clean_claim_and_rejects_noise_questions_fragments_and_foreign_lyrics() {
+        let q = quality();
+        assert!(claim_text_passes_quality("Цените на тока са се увеличили миналата година.", &q, &known));
+        assert!(!claim_text_passes_quality("Еврото без референдум нормално ли е това?", &q, &known));
+        assert!(!claim_text_passes_quality("до кога", &q, &known));
+        assert!(!claim_text_passes_quality("Baby bring it up inside tonight", &q, &known));
+        assert!(!claim_text_passes_quality("Български г? дон aon !! ??", &q, &known));
+        assert!(!claim_text_passes_quality("Български JIEBb! at 4 N 9! 1 Фа я", &q, &known));
+        assert!(!claim_text_passes_quality("Български ЛЕВЬ! до Е е", &q, &known));
+        assert!(!claim_text_passes_quality("Цените на тока са се увеличили #протест", &q, &known));
+        assert!(!claim_text_passes_quality("Олю захарсът дигнахът сътсемно пълно мнозинство", &q, &known));
+    }
+
+    #[test]
+    fn generic_actors_are_pruned_and_claim_reverts_from_attribution() {
+        let q = quality();
+        assert!(actor_is_generic("някой", &q));
+        assert!(actor_is_generic("Неизвестен", &q));
+        assert!(!actor_is_generic("Кристин Лагард", &q));
+    }
+
+    #[test]
+    fn contained_duplicates_keep_only_the_longer_claim() {
+        let keep = drop_contained_duplicates(&[
+            "Не, защото тази инфлация е фомента.".to_string(),
+            "Не, защото тази инфлация е фомента. Ние говорим за закръглението.".to_string(),
+            "Съвсем различно твърдение за бюджета.".to_string(),
+        ]);
+        assert_eq!(keep, vec![false, true, true]);
     }
 }

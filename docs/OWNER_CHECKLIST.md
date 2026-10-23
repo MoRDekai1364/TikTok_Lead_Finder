@@ -11,3 +11,9 @@ This checklist tracks items requiring confirmation, sign-off, or ongoing curatio
 | 5 | 30–50 Bulgarian seed keywords/hashtags & creator watchlist | Answered with Starter Set (Owner Editable) | 40 Bulgarian public-interest keywords and hashtags across elections, economy, health, institutions, energy, security, and viral-claim markers are preloaded in `config/seeds.bg.toml`. Creator watchlist starts empty and is editable in UI and CLI. | Review `config/seeds.bg.toml` (or the Seeds & Creators screens in the UI) and add/remove team-specific topics and watched accounts. |
 | 6 | Create Git repository | Completed | Initialized Git repository at workspace root with `.gitignore` excluding secrets, `.env`, databases, media, caches, models, and build artifacts. | Optionally add a private remote (`git remote add origin <url>`). |
 | 7 | Install Rust, Node, `ffmpeg`, and `yt-dlp` | Completed | Verified on Windows host: `rustc 1.99.1`, `cargo 1.99.1`, `node v26.8.1`, `npm 11.19.0`, `yt-dlp 2026.10.21`, `ffmpeg 9.0.1` / `ffprobe`. | None. |
+
+## Open items from Phases 4 and 5
+
+- [ ] Review 50 extracted claims from your own clips (`leadfinder extract-claims-batch`, then `docs/CLAIMS_AUDIT.md` as the template). The plan requires at least 80% correct. The current agent review is 66.7% on 39 claims.
+- [ ] Supply real fact-checks (claim text, published verdict, link) for the gold set so `leadfinder eval-gold-set` can report agreement with published verdicts. The bundled `fixtures/gold_set/claims.json` is synthetic and flagged as such.
+- [ ] Tell us whether Factcheck.bg access is permitted for automated lookups. Its feed and API returned `403 Forbidden` on re-test while `robots.txt` allows crawling.

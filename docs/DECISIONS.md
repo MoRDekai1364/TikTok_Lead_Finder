@@ -1,4 +1,4 @@
-# Architecture & Implementation Decisions Log
+﻿# Architecture & Implementation Decisions Log
 
 Every deviation from `docs/PLAN.md` and every resolution of a deferred decision (Section 18) is recorded here with its rationale.
 
@@ -67,3 +67,36 @@ Every deviation from `docs/PLAN.md` and every resolution of a deferred decision 
   - **Redistributable Calibration Audio**: Bundled `assets/calibration/sample_bg_30s.wav` (`30.0 s`, `16 kHz` mono PCM WAV) compiled from Wikimedia Commons Lingua Libre native Bulgarian recordings (`CC BY-SA 4.0`, attribution in `assets/calibration/ATTRIBUTION.md`).
 - **Decision**: Default local LLM bootstrapper and config to `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` (while supporting larger `9B`/`12B`/`27B` GGUFs when present in `models/llm/` and falling back to CPU or heuristics-only banner mode on low-power machines).
 - **Reason**: `BgGPT-Gemma-3-4B-IT-Q4_K_M` is un-gated, fits comfortably in 4–12 GB VRAM or 8+ GB RAM, and achieves 100% first-try JSON validity on Bulgarian claim extraction.
+
+---
+
+## D-008: Bulgarian Fact-Check Archives Accessibility, robots.txt Rules, and WAF Findings
+- **Date**: 2026-10-23
+- **Phase**: 5
+- **Context**: Section 8, Section 13 (Phase 5), and Section 18 require auditing Bulgarian fact-check archives (Factcheck.bg, AFP's Bulgarian fact-check section, the BROD database, BNR and BNT fact-check sections) through official search, feeds, or sitemaps, respecting `robots.txt` and terms, and recording which archives are actually accessible.
+- **Empirical Findings**:
+  - `Factcheck.bg` (`https://factcheck.bg`): `robots.txt` returns `200 OK` with full public crawl allowance (`User-agent: *`, `Allow: /`). The WordPress REST API (`/wp-json/wp/v2/posts?per_page=8&search={query}`) is live and returns structured JSON with titles, excerpts, links, and dates without rate-walling. The RSS feed (`/feed/`) is live and returns full recent articles (`268 KB`). HTML search (`/?s={query}`) is also functional. -> accessible at first audit. Re-test later the same day: after a burst of larger requests (per_page=100), the WordPress REST API and RSS feed both returned 403 Forbidden for the project's honest user-agent while obots.txt still returned 200. Treated as a temporary rate or WAF block; no retry loop, no user-agent spoofing. The circuit breaker in PolitenessGuard opens after 5 failures and verification degrades to primary-source and web search.
+  - `BNT` (`https://bntnews.bg`): `robots.txt` returns `200 OK` (`User-agent: *`, `Disallow:` none). Public search endpoint (`/search?q={query}`) returns `200 OK` with structured news and fact-check results. Sitemap is available at `/sitemap.xml`. -> **Accessible Archive**.
+  - `BNR` (`https://bnr.bg`): `robots.txt` returns `200 OK`, but contains explicit disallow rules: `Disallow: /*/search` and `Disallow: /*/find`, while exposing `Sitemap: https://bnr.bg/sitemap.xml`. To maintain strict compliance with `robots.txt`, Lead Finder's `RobotsTxtChecker` blocks dynamic query dispatch to `/search` on `bnr.bg`; archival access operates via allowed RSS category feeds and sitemaps only.
+  - `BROD` (`https://brodhub.eu`): Central European EDMO fact-checking hub; `robots.txt` disallows `/XWiki/*/Main/Search` and `/XWiki/*/rest/` while providing `Sitemap: https://brodhub.eu/XWiki/EDMO/Hub/SiteMap?xpage=plain&outputSyntax=plain`. Feeds and sitemaps are used.
+  - `AFP Провери` (`https://proveri.afp.com`): Unauthenticated HTTP/HTTPS GET requests from local machines (including `/robots.txt` and `/rss.xml`) return `403 Forbidden` due to automated edge bot protection / Cloudflare WAF. Section 2 and Section 5 explicitly forbid user-agent spoofing, CAPTCHA solving, or IP proxy rotation.
+- **Decision**:
+  - Set `factcheck_bg` and `bnt_news` as active archives (`enabled = true`) in `config/default.toml`.
+  - Disable `afp_proveri` by default (`enabled = false`) in `config/default.toml` to avoid unnecessary 403 request overhead.
+  - Enforce automated `RobotsTxtChecker` checks in `ConfiguredFactCheckArchive` and `WebAndPrimarySearch` to guarantee that all archive and search queries respect `robots.txt` disallows dynamically.
+- **Reason**: Strictly honors Section 0 Rule 7, Section 2 hard boundaries, and Section 8 retrieval compliance rules.
+
+
+## D-009: Gold Set Is a Synthetic Offline Fixture, Not Published Fact-Checks
+- **Date**: 2026-10-23
+- **Phase**: 5
+- **Context**: Section 14 asks for 30 to 50 Bulgarian claims drawn from published fact-checks with recorded HTTP responses. The owner has not yet supplied the team's fact-checks, and Factcheck.bg returned 403 Forbidden on re-test (see D-008), so real archive pages could not be recorded.
+- **Decision**: ixtures/gold_set/claims.json (40 claims, 12 traps covering all 6 Section 14 categories, flagged "synthetic": true) is authored test data. People, institutions, passages and URLs are fictional (*.test.invalid) so that no invented statement is attributed to a real person or outlet. It exercises the code-enforced forcing rules and the model's passage-grounded reasoning offline through leadfinder eval-gold-set. The loader accepts the same schema for real claims.
+- **Consequence**: docs/GOLD_SET_REPORT.md reports trap pass rate, forcing-rule compliance and CONTRADICTED recall on this synthetic fixture only. It does not measure agreement with published verdicts. That metric is open until the owner supplies real fact-checks (or archive access recovers) and is listed in docs/OWNER_CHECKLIST.md.
+- **Reason**: Honest reporting. A synthetic pass must not be presented as validation on real fact-checks.
+## D-010: Proceeding to Phase 5 With Phase 4 Marked PARTIAL
+- **Date**: 2026-10-23
+- **Phase**: 4 and 5
+- **Context**: Phase 4 acceptance asks for 80% correct extractions on an owner review of 50 claims. The corpus yields 39 claims after filtering and the agent's review scored 66.7%. The owner review cannot be done by the agent.
+- **Decision**: Record Phase 4 as PARTIAL in `docs/PROGRESS.md` and continue to Phase 5, whose verification stage depends only on claim text and the forcing rules. Do not report Phase 4 as passed.
+- **Reason**: Section 0 rule 9 lets the agent continue when blocked on an owner-only item. The deviation from strict phase sequencing is logged here.

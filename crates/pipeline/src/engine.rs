@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+﻿use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -497,7 +497,14 @@ impl PipelineContext {
                             }
                             Some(Stage::Claims) | Some(Stage::Checkworthy) => {
                                 if let Some(vid) = &job.video_id {
-                                    self.extract_claims_for_video(vid).await.map(|_| ())
+                                    self.run_claims_job(vid).await
+                                } else {
+                                    Ok(())
+                                }
+                            }
+                            Some(Stage::Verify) => {
+                                if let Some(vid) = &job.video_id {
+                                    self.run_verify_job(vid).await
                                 } else {
                                     Ok(())
                                 }

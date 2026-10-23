@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+﻿use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use anyhow::Result;
@@ -119,6 +119,14 @@ enum Commands {
     EvalAttributionTraps {
         #[arg(required = true)]
         fixtures_json: PathBuf,
+    },
+    EvalGoldSet {
+        #[arg(required = true)]
+        fixtures_json: PathBuf,
+    },
+    VerifyVideo {
+        #[arg(required = true)]
+        video_id: String,
     },
 }
 
@@ -405,6 +413,15 @@ async fn main() -> Result<()> {
                 }))?
             );
         }
+        Commands::EvalGoldSet { fixtures_json } => {
+            let result = leadfinder_pipeline::run_gold_set_eval(&ctx, &fixtures_json).await?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Commands::VerifyVideo { video_id } => {
+            ctx.run_verify_job(&video_id).await?;
+            let claims = ctx.db.get_claims_for_video(&video_id).await?;
+            println!("{}", serde_json::to_string_pretty(&claims)?);
+        }
         Commands::EvalAttributionTraps { fixtures_json } => {
             #[derive(serde::Deserialize)]
             struct TrapCase {
@@ -489,5 +506,6 @@ async fn main() -> Result<()> {
         }
     }
 
+    stop_managed_llama_server().await;
     Ok(())
 }

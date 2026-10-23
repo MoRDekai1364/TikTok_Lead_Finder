@@ -1,0 +1,1178 @@
+{
+  "synthetic": true,
+  "notice": "Authored test fixture. Names, institutions, passages and URLs are fictional. It exercises the verification forcing rules offline. It is not a set of published fact-checks. Replace with the owner's real fact-checks for agreement metrics.",
+  "total_claims": 40,
+  "claims": [
+    {
+      "id": 1,
+      "claim_text": "Велико Примеров обяви, че подкрепя незабавното въвеждане на еврото от 1 януари 2025 г. без никакви предварителни условия.",
+      "speaker": null,
+      "claim_type": "attribution",
+      "attribution": [
+        {
+          "actor": "Велико Примеров",
+          "act": "said",
+          "target": null,
+          "about": "подкрепя незабавното въвеждане на еврото без условия",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": true,
+      "trap_category": "fabricated_attribution",
+      "date_window": "2024-05",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-1-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-05-12",
+          "text": "Президентът Велико Примеров никога не е заявявал безусловна подкрепа за еврото от 2025 г. Официалната позиция на президентството изисква стриктно изпълнение на инфлационния критерий и оценка на доходите.",
+          "score": 0.88
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-1-p2.test.invalid/item",
+          "source_name": "Държавен глава (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-05-10",
+          "text": "Изявление на държавния глава: Присъединяването към еврозоната трябва да стане само след покриване на всички Маастрихтски критерии и ясен план за защита на покупателната способност.",
+          "score": 0.82
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "claim_text": "Комисията на Съюза Примерия официално нареди на България да затвори ТЕЦ Марица Изток до края на тази година.",
+      "speaker": null,
+      "claim_type": "attribution",
+      "attribution": [
+        {
+          "actor": "Комисията на Съюза Примерия",
+          "act": "said",
+          "target": "България",
+          "about": "затваряне на ТЕЦ Марица Изток",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": true,
+      "trap_category": "fabricated_attribution",
+      "date_window": "2024-06",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-2-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-06-04",
+          "text": "Комисията не е нареждала незабавно затваряне на въглищните централи в комплекса Марица Изток. Плановете за енергиен преход предвиждат постепенна декарбонизация до 2038 г. съгласно решенията на Народния съвет (тест).",
+          "score": 0.91
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-2-p2.test.invalid/item",
+          "source_name": "Министерство на енергията (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-06-02",
+          "text": "Министерството на енергетиката уточнява, че няма директива на Комисията за предсрочно прекратяване дейността на ТЕЦ Марица Изток 2 през 2024 г.",
+          "score": 0.85
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "claim_text": "Стоян Образцов призна вчера в парламента по повод новия бюджет: Аз съм прост и вие сте прости, затова се разбираме.",
+      "speaker": null,
+      "claim_type": "quote",
+      "attribution": [
+        {
+          "actor": "Стоян Образцов",
+          "act": "said",
+          "target": null,
+          "about": "аз съм прост и вие сте прости",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "misleading",
+      "is_trap": true,
+      "trap_category": "genuine_quote_false_context",
+      "date_window": "2024-07",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-3-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-07-15",
+          "text": "Цитатът на Стоян Образцов не е произнесен вчера в парламента, а произхожда от изтекъл телефонен запис от 2012 г. Стенограмите на Народния съвет (тест) от текущата сесия не съдържат подобно изказване.",
+          "score": 0.89
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-3-p2.test.invalid/item",
+          "source_name": "Народен съвет (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-07-14",
+          "text": "Официална стенограма от пленарното заседание на 14 юли 2024 г. Тема: обсъждане на закона за държавния бюджет. Липсват цитираните фрази.",
+          "score": 0.79
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "claim_text": "Петър Тестов заяви, че ще изпрати български войници на фронта в Украйна.",
+      "speaker": null,
+      "claim_type": "attribution",
+      "attribution": [
+        {
+          "actor": "Петър Тестов",
+          "act": "said",
+          "target": null,
+          "about": "изпращане на български войници в Украйна",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": true,
+      "trap_category": "genuine_quote_false_context",
+      "date_window": "2024-02",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-4-p1.test.invalid/item",
+          "source_name": "Тестов архив Б",
+          "source_kind": "factcheck",
+          "published_at": "2024-02-28",
+          "text": "Тестов архив Б: Военният министър Петър Тестов категорично опроверга твърденията за изпращане на български бойни части в Украйна. Помощта остава единствено военно-техническа и хуманитарна.",
+          "score": 0.92
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-4-p2.test.invalid/item",
+          "source_name": "Министерство на защитата (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-02-27",
+          "text": "Позиция на Министерството на защитата: България не обсъжда и няма решение за участие на военнослужещи от Българската армия в бойни действия на територията на Украйна.",
+          "score": 0.86
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "claim_text": "Хиляди българи щурмуват Народния съвет (тест) днес срещу правителството!",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": true,
+      "trap_category": "old_video_presented_as_new",
+      "date_window": "2024-08",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-5-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-08-20",
+          "text": "Разпространяваното видео с щурм на парламента не е от днес. Кадрите са заснети на 12 януари 2022 г. по време на протеста срещу зеления сертификат, организиран от партия Възраждане.",
+          "score": 0.94
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-5-p2.test.invalid/item",
+          "source_name": "Министерство на реда (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-08-19",
+          "text": "Бюлетин на СДВР: В района на площад Народен съвет (тест) днес обстановката е спокойна, няма регистрирани протести или нарушаване на обществения ред.",
+          "score": 0.78
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "claim_text": "Масови опашки за бензин и празни бензиностанции в София тази сутрин.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": true,
+      "trap_category": "old_video_presented_as_new",
+      "date_window": "2024-09",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-6-p1.test.invalid/item",
+          "source_name": "Тестов архив Б",
+          "source_kind": "factcheck",
+          "published_at": "2024-09-05",
+          "text": "Тестов вестник Б: Публикуваните кадри с опашки за гориво са от март 2022 г., когато възникна временна спекулативна паника. Към днешна дата доставките на петрол и горива в България се осъществяват в нормален ритъм.",
+          "score": 0.9
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://news-6-p2.test.invalid/item",
+          "source_name": "Българска петролна и газова асоциация",
+          "source_kind": "news",
+          "published_at": "2024-09-04",
+          "text": "БПГА съобщава, че пазарът на горива в страната е стабилен, бензиностанциите разполагат с пълни резерви и няма дефицит.",
+          "score": 0.81
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "claim_text": "Шок: Христо Фиктивски дари цялото си имущество на Академията и се оттегли в Планинския манастир!",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [
+        {
+          "actor": "Христо Фиктивски",
+          "act": "other",
+          "target": "Академията",
+          "about": "дари цялото си имущество и се оттегли",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": true,
+      "trap_category": "satire_or_parody",
+      "date_window": "2024-04",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://other-7-p1.test.invalid/item",
+          "source_name": "НеНовините",
+          "source_kind": "other",
+          "published_at": "2024-04-01",
+          "text": "НеНовините е сайт за сатирични измислени новини. Публикацията за Христо Фиктивски и Планинския манастир е първоаприлска сатира и художествена измислица.",
+          "score": 0.87
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "claim_text": "Съюзът Примерия забранява шкембе чорбата и киселото зеле от догодина.",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [
+        {
+          "actor": "Съюзът Примерия",
+          "act": "said",
+          "target": null,
+          "about": "забрана на шкембе чорбата и киселото зеле",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": true,
+      "trap_category": "satire_or_parody",
+      "date_window": "2024-01",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-8-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-01-10",
+          "text": "Твърдението за забрана на традиционни български храни от Съюзът е периодично претопляна сатирична шега. Регламентите на Съюзът защитават традиционните регионални рецепти чрез схемите ЗГУ и ХТСП.",
+          "score": 0.89
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "claim_text": "Световната организация потвърди в официален доклад, че България е на първо място в света по смъртност от коронавирус.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [
+        {
+          "actor": "Световната организация",
+          "act": "said",
+          "target": null,
+          "about": "България на първо място по смъртност",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "misleading",
+      "is_trap": true,
+      "trap_category": "correct_statistic_wrong_source",
+      "date_window": "2023-11",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-9-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2023-11-20",
+          "text": "Световната организация (тест) (Световната организация) не публикува класации по държави с подобни заключения. Цитираните данни произхождат от статистически агрегатори като университета Джонс Хопкинс и Евростат за надвишена смъртност, но са приписани на несъществуващ извънреден доклад на Световната организация.",
+          "score": 0.91
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-9-p2.test.invalid/item",
+          "source_name": "Световна организация (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-11-15",
+          "text": "Базата данни на World Org (test) Dashboard съдържа кумулативни данни, докладвани от държавите членки, без съставяне на официална класация.",
+          "score": 0.77
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "claim_text": "Според Централната банка (тест) българите държат над 80 милиарда лева спестявания в чужди офшорни сметки.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [
+        {
+          "actor": "Централната банка (тест)",
+          "act": "said",
+          "target": null,
+          "about": "80 милиарда лева в офшорни сметки",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": true,
+      "trap_category": "correct_statistic_wrong_source",
+      "date_window": "2024-03",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-10-p1.test.invalid/item",
+          "source_name": "Централна банка (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-03-25",
+          "text": "Парична статистика на Централната банка (тест): Депозитите на неправителствения сектор в местните търговски банки в България възлизат на 82.5 милиарда лева. Централната банка (тест) не води и не публикува отчет за офшорни сметки.",
+          "score": 0.93
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://factcheck-10-p2.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-03-28",
+          "text": "Статистиката на Централната банка (тест) за вътрешните банкови депозити на българските домакинства е манипулативно представена като пари, изнесени в офшорни зони.",
+          "score": 0.88
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "claim_text": "Секретни документи от мазето на Министерски съвет доказват, че златото на България се изнася с тайни нощни полети за Канада.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "UNVERIFIABLE",
+      "expected_label": "unknown",
+      "is_trap": true,
+      "trap_category": "no_retrievable_evidence",
+      "date_window": "2024-05",
+      "passages": []
+    },
+    {
+      "id": 12,
+      "claim_text": "Учени от тайна лаборатория във Варна откриха лекарство за стареенето, но фармацевтичната мафия го крие.",
+      "speaker": null,
+      "claim_type": "health",
+      "attribution": [],
+      "expected_verdict": "UNVERIFIABLE",
+      "expected_label": "unknown",
+      "is_trap": true,
+      "trap_category": "no_retrievable_evidence",
+      "date_window": "2024-06",
+      "passages": []
+    },
+    {
+      "id": 13,
+      "claim_text": "От 1 януари 2024 г. минималната работна заплата в България става 933 лева.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2023-12",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-13-p1.test.invalid/item",
+          "source_name": "Министерство на трудa (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-10-15",
+          "text": "С постановление на Министерския съвет размерът на минималната работна заплата за страната от 1 януари 2024 г. се определя на 933 лв., което представлява 50 на сто от средната брутна заплата.",
+          "score": 0.95
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-13-p2.test.invalid/item",
+          "source_name": "Тестова агенция",
+          "source_kind": "primary",
+          "published_at": "2023-10-14",
+          "text": "Правителството прие нов размер на минималната работна заплата от 933 лева от началото на 2024 година.",
+          "score": 0.88
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "claim_text": "България и Румъния влязоха в Шенген по въздух и вода на 31 март 2024 година.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024-03",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-14-p1.test.invalid/item",
+          "source_name": "Гранична полиция - Министерството на реда",
+          "source_kind": "primary",
+          "published_at": "2024-03-31",
+          "text": "От 00:00 часа на 31 март 2024 г. България и Румъния станаха пълноправни членове на Шенгенското пространство по въздушните и морските граници съгласно решението на Съвета на Съюзът.",
+          "score": 0.96
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-14-p2.test.invalid/item",
+          "source_name": "Съвет на Съюза Примерия",
+          "source_kind": "primary",
+          "published_at": "2023-12-30",
+          "text": "Решение на Съвета за премахване на контрола по вътрешните въздушни и морски граници за България и Румъния от 31 март 2024 г.",
+          "score": 0.91
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "claim_text": "Народния съвет (тест) прие закон, забраняващ пропагандата на нетрадиционна сексуална ориентация в училищата през август 2024 г.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024-08",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-15-p1.test.invalid/item",
+          "source_name": "Народен съвет (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-08-07",
+          "text": "Парламентът гласува изменения в Закона за предучилищното и училищното образование, с които се забранява извършването на пропаганда, популяризиране и подстрекаване към идеи, свързани с нетрадиционна сексуална ориентация.",
+          "score": 0.94
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://news-15-p2.test.invalid/item",
+          "source_name": "Тестов вестник Б",
+          "source_kind": "news",
+          "published_at": "2024-08-07",
+          "text": "Депутатите приеха на две четения в един ден забраната за ЛГБТ пропаганда в българските училища.",
+          "score": 0.86
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "claim_text": "Според Статистическия институт (тест) годишната инфлация в България за юли 2024 г. е 2.4 процента.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [
+        {
+          "actor": "Статистическия институт (тест)",
+          "act": "said",
+          "target": null,
+          "about": "инфлация 2.4%",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024-08",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-16-p1.test.invalid/item",
+          "source_name": "Статистически институт (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-08-14",
+          "text": "Инфлацията в България за юли 2024 г. спрямо юли 2023 г. е 2.4%, измерена чрез индекса на потребителските цени (ИПЦ).",
+          "score": 0.97
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-16-p2.test.invalid/item",
+          "source_name": "Тестова агенция",
+          "source_kind": "primary",
+          "published_at": "2024-08-14",
+          "text": "Статистическия институт (тест) отчете 2.4 на сто годишна инфлация през юли 2024 година.",
+          "score": 0.9
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "claim_text": "България ще приема мигранти от Австрия срещу частично влизане в Шенген.",
+      "speaker": null,
+      "claim_type": "attribution",
+      "attribution": [
+        {
+          "actor": "Австрия",
+          "act": "agreed",
+          "target": "България",
+          "about": "приемане на мигранти за Шенген",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "ALREADY_CHECKED",
+      "expected_label": "misleading",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024-01",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-17-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-01-08",
+          "text": "Проверка на Тестов архив А: България не е поемала допълнителни ангажименти за хиляди мигранти. Страната спазва Дъблинския регламент, по който през последните години са приети средно под 200 лица годишно.",
+          "score": 0.94
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-17-p2.test.invalid/item",
+          "source_name": "Министерство на реда (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-01-05",
+          "text": "Министерството на реда опровергава неверни публикации: Няма договорени специални лагери или завишени квоти за бежанци с Виена.",
+          "score": 0.84
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "claim_text": "Въвеждането на еврото автоматично ще удвои цените на основните храни в магазините.",
+      "speaker": null,
+      "claim_type": "prediction",
+      "attribution": [],
+      "expected_verdict": "ALREADY_CHECKED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024-02",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-18-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-02-14",
+          "text": "Опитът на Хърватия, Естония, Литва и Латвия показва среден инфлационен ефект между 0.2% и 0.4% при закръгляване. Удвояване на цените не се е случило в нито една страна от еврозоната.",
+          "score": 0.92
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-18-p2.test.invalid/item",
+          "source_name": "Централната банка (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-02-10",
+          "text": "Икономически анализ на Централната банка (тест) за ефектите от замяната на лева с евро върху ценовото равнище.",
+          "score": 0.81
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "claim_text": "Съюзът задължава българите да ядат брашно от насекоми и щурци без етикетиране.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [
+        {
+          "actor": "Съюзът",
+          "act": "said",
+          "target": null,
+          "about": "задължително ядене на насекоми без етикети",
+          "asserted_part": null,
+          "attributed_part": null
+        }
+      ],
+      "expected_verdict": "ALREADY_CHECKED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2023-09",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-19-p1.test.invalid/item",
+          "source_name": "Тестов архив Б",
+          "source_kind": "factcheck",
+          "published_at": "2023-09-18",
+          "text": "Тестов архив Б: Регламентът на Съюзът допуска използването на определени насекоми само като нова храна (novel food) при изрично и задължително обозначаване върху опаковката на латинското наименование и алергените.",
+          "score": 0.95
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-19-p2.test.invalid/item",
+          "source_name": "Европейски съюз (Eur-Lex)",
+          "source_kind": "primary",
+          "published_at": "2023-01-05",
+          "text": "Регламент за изпълнение на Комисията за разрешаване пускането на пазара на частично обезмаслен прах от Acheta domesticus.",
+          "score": 0.83
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "claim_text": "Украинското зърно, внасяно в България, съдържа опасни нива на пестициди и радиация.",
+      "speaker": null,
+      "claim_type": "health",
+      "attribution": [],
+      "expected_verdict": "ALREADY_CHECKED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2023-10",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-20-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2023-10-02",
+          "text": "Агенцията за храните извърши над 400 лабораторни проби на вносно украинско зърно и слънчоглед. Нито една проба не показа отклонения от европейските стандарти за пестициди, тежки метали или радиоактивност.",
+          "score": 0.93
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-20-p2.test.invalid/item",
+          "source_name": "Агенция за храните (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-09-28",
+          "text": "Официален доклад на Агенцията за храните: Всички изследвани партиди отговарят на фитосанитарните изисквания на Съюзът.",
+          "score": 0.85
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "claim_text": "Всички политици в България са корумпирани и затова страната няма бъдеще.",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 22,
+      "claim_text": "Това правителство е най-доброто в цялата модерна история на България.",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 23,
+      "claim_text": "Алиансът Тест строи тайна военноморска база край Варна за удари срещу Крим.",
+      "speaker": null,
+      "claim_type": "attribution",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-23-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-04-11",
+          "text": "Министерството на защитата и щабът на ВМС опровергаха измислиците: Във Варна не се строи нова база на Алиансът Тест, инфраструктурата на Пункт за базиране Варна си остава изцяло българска.",
+          "score": 0.9
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-23-p2.test.invalid/item",
+          "source_name": "Министерство на защитата (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-04-10",
+          "text": "Изявление на Министерството на защитата: Няма планове за чуждестранни военноморски бази на черноморското ни крайбрежие.",
+          "score": 0.85
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "claim_text": "В София са разположени 50 хиляди нелегални мигранти в квартал Овча купел.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-24-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-03-15",
+          "text": "Капацитетът на Държавната агенция за бежанците в Овча купел е под 500 места, а заетостта е под 40%. Твърдението за 50 000 е абсурдно преувеличено.",
+          "score": 0.92
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-24-p2.test.invalid/item",
+          "source_name": "Държавна агенция за бежанците",
+          "source_kind": "primary",
+          "published_at": "2024-03-12",
+          "text": "Официален бюлетин на ДАБ: Общият брой настанени лица във всички центрове в България е под 1,200 души.",
+          "score": 0.88
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "claim_text": "България е произвела над 6 милиона тона пшеница през реколта 2023 година.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-25-p1.test.invalid/item",
+          "source_name": "Министерство на полето (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-09-10",
+          "text": "Окончателни данни на Министерството на полето: Производството на пшеница за 2023 г. възлиза на 6.4 милиона тона при среден добив 530 кг/дка.",
+          "score": 0.94
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-25-p2.test.invalid/item",
+          "source_name": "Статистическия институт (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-09-12",
+          "text": "Статистическия институт (тест) регистрира над 6.2 млн. тона прибрано хлебно зърно за стопанската 2023 година.",
+          "score": 0.87
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "claim_text": "Съюзът Примерия спира всички еврофондове за България от следващия месец.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-26-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-05-18",
+          "text": "Комисията не е замразявала европейските оперативни програми за България. Плащанията по кохезионните фондове и ПВУ се извършват по график.",
+          "score": 0.91
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-26-p2.test.invalid/item",
+          "source_name": "Единен информационен портал на Съюзът фондовете",
+          "source_kind": "primary",
+          "published_at": "2024-05-16",
+          "text": "Няма получено официално уведомление от службите на Комисията за спиране на плащания по европейските програми.",
+          "score": 0.83
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "claim_text": "В България има тайни американски биолаборатории край Стара Загора.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "UNVERIFIABLE",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 28,
+      "claim_text": "Извънземни контролират цените на тока в България чрез скрити антени.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "UNVERIFIABLE",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 29,
+      "claim_text": "Българският лев е фиксиран към еврото при курс 1.95583 лева за едно евро.",
+      "speaker": null,
+      "claim_type": "statistical",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-29-p1.test.invalid/item",
+          "source_name": "Централната банка (тест)",
+          "source_kind": "primary",
+          "published_at": "2024-01-01",
+          "text": "Официалният фиксиран курс на лева към еврото съгласно Закона за Централната банка (тест) е точно 1.95583 BGN за 1 EUR.",
+          "score": 0.98
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-29-p2.test.invalid/item",
+          "source_name": "ЕЦБ",
+          "source_kind": "primary",
+          "published_at": "2024-01-01",
+          "text": "Bulgarian lev exchange rate fixed at 1.95583 BGN per EUR under the currency board.",
+          "score": 0.92
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "claim_text": "Световната организация обяви край на извънредната ситуация за общественото здраве от Covid-19 през май 2023 г.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-30-p1.test.invalid/item",
+          "source_name": "Световната организация",
+          "source_kind": "primary",
+          "published_at": "2023-05-05",
+          "text": "Генералният директор на Световната организация Тедрос Гебрейесус обяви, че COVID-19 вече не представлява извънредна ситуация за общественото здраве от международно значение (PHEIC).",
+          "score": 0.96
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-30-p2.test.invalid/item",
+          "source_name": "Министерство на здравето (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-05-06",
+          "text": "Министерството на здравето информира: Световната организация прекрати статуса на глобална извънредна епидемична обстановка за коронавируса.",
+          "score": 0.89
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "claim_text": "Всички ваксини срещу грип съдържат микрочипове за проследяване от правителството.",
+      "speaker": null,
+      "claim_type": "health",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-31-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2023-11-04",
+          "text": "Съставът на разрешените в Съюзът ваксини е публичен и контролиран от ЕМА и ИАЛ. Микрочипове с размер за преминаване през инжекционна игла не съществуват физически.",
+          "score": 0.94
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-31-p2.test.invalid/item",
+          "source_name": "Изпълнителна агенция по лекарствата",
+          "source_kind": "primary",
+          "published_at": "2023-10-30",
+          "text": "ИАЛ потвърждава, че лекарствените форми преминават химичен и токсикологичен контрол без наличие на чужди електронни компоненти.",
+          "score": 0.87
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "claim_text": "Гласуването с машини в България предава резултатите през тайни сателити към Венецуела.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-32-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-04-22",
+          "text": "Машините за гласуване в България не са свързани към интернет, нямат безжични модеми или сателитни антени. Резултатите се записват локално на флашки и се сверяват с контролните хартиени разписки.",
+          "score": 0.95
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-32-p2.test.invalid/item",
+          "source_name": "Централна избирателна комисия",
+          "source_kind": "primary",
+          "published_at": "2024-04-20",
+          "text": "ЦИК потвърждава сертификацията на машините от Държавна агенция Електронно управление, Българския институт по стандартизация и Българския институт по метрология.",
+          "score": 0.89
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "claim_text": "Няма по-красива държава на света от България и нашият фолклор е номер едно.",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 34,
+      "claim_text": "Хората в провинцията живеят много по-спокойно от софиянци.",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 35,
+      "claim_text": "Магистрала Хемус ще бъде напълно завършена до края на следващия месец.",
+      "speaker": null,
+      "claim_type": "prediction",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "misleading",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-35-p1.test.invalid/item",
+          "source_name": "Министерството на пътищата",
+          "source_kind": "primary",
+          "published_at": "2024-06-15",
+          "text": "Министерството на пътищата съобщава, че строителството на участъци 1, 2 и 3 от автомагистрала Хемус продължава, като пускането на цялото трасе до Варна не е реалистично преди 2028 г.",
+          "score": 0.92
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-35-p2.test.invalid/item",
+          "source_name": "Агенция Пътна инфраструктура",
+          "source_kind": "primary",
+          "published_at": "2024-06-12",
+          "text": "АПИ уточнява сроковете по отделните лотове на магистралата.",
+          "score": 0.84
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "claim_text": "Съюзът отнема земите на българските земеделци, ако не засадят генно модифицирана царевица.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "CONTRADICTED",
+      "expected_label": "false_claim",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://factcheck-36-p1.test.invalid/item",
+          "source_name": "Тестов архив А",
+          "source_kind": "factcheck",
+          "published_at": "2024-02-18",
+          "text": "В България отглеждането на ГМинистерството на защитата култури на открито е изрично забранено със Закон за генно модифицираните организми. Съюзът никога не е налагал подобни изисквания или санкции.",
+          "score": 0.95
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-36-p2.test.invalid/item",
+          "source_name": "Министерството на полето",
+          "source_kind": "primary",
+          "published_at": "2024-02-15",
+          "text": "България прилага строга национална клауза за забрана на отглеждане на ГМинистерството на защитата.",
+          "score": 0.88
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "claim_text": "В София има таен тунел от резиденция Бояна директно до летището, по който се превозват политици.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "UNVERIFIABLE",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    },
+    {
+      "id": 38,
+      "claim_text": "През Средновековието цар Симеон Велики е създал най-могъщата държава в Източна Европа.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-38-p1.test.invalid/item",
+          "source_name": "Академия на науките (тест)",
+          "source_kind": "primary",
+          "published_at": "2023-01-01",
+          "text": "Исторически анализ на Института за исторически изследвания при Академията: Златният век на цар Симеон I (893–927) бележи териториален и културен апогей на Първото българско царство.",
+          "score": 0.9
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-38-p2.test.invalid/item",
+          "source_name": "Национален исторически музей",
+          "source_kind": "primary",
+          "published_at": "2023-01-01",
+          "text": "Експозиция НИМ: Българската държава се простира между три морета и става водещ център на славянската писменост и култура.",
+          "score": 0.86
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "claim_text": "АЕЦ Козлодуй подписа договор с Уестингхаус за доставка на свежо ядрено гориво за 5-и блок.",
+      "speaker": null,
+      "claim_type": "factual",
+      "attribution": [],
+      "expected_verdict": "SUPPORTED",
+      "expected_label": "unknown",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": [
+        {
+          "passage_id": "p1",
+          "source_url": "https://primary-39-p1.test.invalid/item",
+          "source_name": "АЕЦ Козлодуй",
+          "source_kind": "primary",
+          "published_at": "2022-12-22",
+          "text": "АЕЦ Козлодуй и Westinghouse Electric Sweden подписаха 10-годишен договор за доставка на свежо ядрено гориво за 5-и блок като част от диверсификацията.",
+          "score": 0.96
+        },
+        {
+          "passage_id": "p2",
+          "source_url": "https://primary-39-p2.test.invalid/item",
+          "source_name": "Тестова агенция",
+          "source_kind": "primary",
+          "published_at": "2022-12-22",
+          "text": "Тестова агенция: Историческо споразумение за ядрено гориво между Козлодуй и Уестингхаус бе сключено в София.",
+          "score": 0.89
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "claim_text": "Кафето сутрин е най-хубавото нещо на този свят и всеки трябва да го пие.",
+      "speaker": null,
+      "claim_type": "opinion",
+      "attribution": [],
+      "expected_verdict": "NOT_CHECKABLE",
+      "expected_label": "satire_or_opinion",
+      "is_trap": false,
+      "trap_category": null,
+      "date_window": "2024",
+      "passages": []
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-[server]
+﻿[server]
 host = '127.0.0.1'
 port = 17420
 data_dir = 'data'
@@ -53,6 +53,18 @@ weight_urges_sharing = 0.08
 sensitive_topic_terms = ['здраве', 'ваксин', 'лекарств', 'рак', 'избори', 'гласува', 'бюлетин', 'евро', 'война', 'пенси', 'данък', 'ток', 'вода']
 share_urge_terms = ['споделете', 'разпространете', 'предайте', 'преди да го изтрият', 'скриват от нас', 'share']
 
+[claim_quality]
+min_words = 5
+min_alpha_ratio = 0.75
+min_script_share = 0.6
+script_ranges = [[1024, 1279]]
+min_known_word_share = 0.75
+max_foreign_token_share = 0.15
+max_short_token_share = 0.45
+reject_questions = true
+rejected_terms = ['напиши в коментарите', 'сподели', 'споделете', 'абонирай', 'последвай', 'лайкни', '#']
+generic_actor_terms = ['някой', 'някои', 'неизвестен', 'неизвестна', 'speaker', 'народът', 'народ', 'хората', 'водещата', 'водещият', 'глас зад кадър', 'участник', 'производител', 'държави', 'медията', 'медиите', 'властите', 'всички', 'те']
+
 [normalisation]
 lexicon_config_file = 'lexicon.bg.toml'
 wikidata_languages = ['bg', 'en']
@@ -91,6 +103,7 @@ min_independent_news_outlets = 2
 passages_per_claim = 8
 retrieval_window_days = 30
 already_checked_similarity = 0.60
+news_domains = ['bntnews.bg', 'bnr.bg', 'bta.bg', 'btvnovinite.bg', 'nova.bg', 'dnevnik.bg', 'capital.bg', 'mediapool.bg', 'segabg.com', 'offnews.bg', 'dir.bg', 'dariknews.bg', '24chasa.bg', 'trud.bg', 'clubz.bg']
 
 [[factcheck_archives]]
 name = 'Factcheck.bg'
@@ -106,21 +119,21 @@ base_url = 'https://proveri.afp.com'
 feed_url = 'https://proveri.afp.com/rss.xml'
 sitemap_url = 'https://proveri.afp.com/sitemap.xml'
 search_url_template = 'https://proveri.afp.com/search?search_api_fulltext={query}'
-enabled = true
+enabled = false
 
 [[factcheck_archives]]
 name = 'BNR Проверено'
 base_url = 'https://bnr.bg'
 feed_url = 'https://bnr.bg/factcheck/rss'
-sitemap_url = ''
-search_url_template = 'https://bnr.bg/search?q={query}'
+sitemap_url = 'https://bnr.bg/sitemap.xml'
+search_url_template = ''
 enabled = true
 
 [[factcheck_archives]]
 name = 'BNT Проверено'
 base_url = 'https://bntnews.bg'
 feed_url = ''
-sitemap_url = ''
+sitemap_url = 'https://bntnews.bg/sitemap.xml'
 search_url_template = 'https://bntnews.bg/search?q={query}'
 enabled = true
 
@@ -128,6 +141,6 @@ enabled = true
 name = 'BROD'
 base_url = 'https://brodhub.eu'
 feed_url = 'https://brodhub.eu/feed/'
-sitemap_url = 'https://brodhub.eu/sitemap_index.xml'
-search_url_template = 'https://brodhub.eu/?s={query}'
+sitemap_url = 'https://brodhub.eu/XWiki/EDMO/Hub/SiteMap?xpage=plain&outputSyntax=plain'
+search_url_template = ''
 enabled = true
