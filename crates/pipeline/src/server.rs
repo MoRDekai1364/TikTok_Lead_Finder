@@ -693,6 +693,38 @@ async fn handle_ai_check_transcript(
 
 async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
     let prompt = format!(" what would the fixed text look like?\n{}", raw_text.trim());
+
+    let py_script = if std::path::Path::new("scripts/google_ai_search.py").exists() {
+        Some("scripts/google_ai_search.py")
+    } else if std::path::Path::new("tools/google_ai_search.py").exists() {
+        Some("tools/google_ai_search.py")
+    } else {
+        None
+    };
+
+    if let Some(script_path) = py_script {
+        if let Ok(py_out) = tokio::process::Command::new("python")
+            .arg(script_path)
+            .arg("--json")
+            .arg(&prompt)
+            .output()
+            .await
+        {
+            if py_out.status.success() {
+                if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&py_out.stdout) {
+                    if val.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                        if let Some(t) = val.get("text").and_then(|v| v.as_str()) {
+                            let clean = t.trim();
+                            if !clean.is_empty() {
+                                return Some(clean.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let encoded_query: String = url::form_urlencoded::byte_serialize(prompt.as_bytes()).collect();
     let url = format!("https://www.google.com/search?udm=50&q={}", encoded_query);
 
@@ -714,9 +746,15 @@ async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
         return None;
     };
 
+    let session_dir = std::path::PathBuf::from("data/google_session");
+    let _ = std::fs::create_dir_all(&session_dir);
+    let session_arg = format!("--user-data-dir={}", session_dir.display());
+
     let output = tokio::process::Command::new(bin)
         .arg("--headless=new")
         .arg("--disable-gpu")
+        .arg("--disable-blink-features=AutomationControlled")
+        .arg(&session_arg)
         .arg("--virtual-time-budget=10000")
         .arg("--dump-dom")
         .arg(&url)
