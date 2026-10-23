@@ -692,6 +692,63 @@ async fn handle_ai_check_transcript(
     .into_response()
 }
 
+fn resolve_default_browser_path() -> Option<String> {
+    if let Ok(out) = std::process::Command::new("reg")
+        .args(["query", r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice", "/v", "ProgId"])
+        .output()
+    {
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout);
+            for line in s.lines() {
+                if line.contains("ProgId") {
+                    let prog_id = line.split_whitespace().last().unwrap_or("");
+                    if !prog_id.is_empty() {
+                        let subkey = format!(r"HKCR\{}\shell\open\command", prog_id);
+                        if let Ok(c_out) = std::process::Command::new("reg")
+                            .args(["query", &subkey, "/ve"])
+                            .output()
+                        {
+                            if c_out.status.success() {
+                                let cs = String::from_utf8_lossy(&c_out.stdout);
+                                for cline in cs.lines() {
+                                    if cline.contains("REG_SZ") {
+                                        if let Some(cmd) = cline.split("REG_SZ").nth(1) {
+                                            let trimmed = cmd.trim();
+                                            let exe = if trimmed.starts_with('"') {
+                                                trimmed.split('"').nth(1).unwrap_or("").to_string()
+                                            } else {
+                                                trimmed.split_whitespace().next().unwrap_or("").to_string()
+                                            };
+                                            if !exe.is_empty() && std::path::Path::new(&exe).exists() {
+                                                return Some(exe);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let cand_paths = [
+        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+        r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    ];
+    for p in &cand_paths {
+        if std::path::Path::new(p).exists() {
+            return Some((*p).to_string());
+        }
+    }
+    None
+}
+
 async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
     let prompt = format!(" what would the fixed text look like?\n{}", raw_text.trim());
 
@@ -731,21 +788,7 @@ async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
     let encoded_query: String = url::form_urlencoded::byte_serialize(prompt.as_bytes()).collect();
     let url = format!("https://www.google.com/search?udm=50&q={}", encoded_query);
 
-    let edge_paths = [
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-    ];
-
-    let mut browser_path = None;
-    for p in &edge_paths {
-        if std::path::Path::new(p).exists() {
-            browser_path = Some(*p);
-            break;
-        }
-    }
-
-    let Some(bin) = browser_path else {
+    let Some(bin) = resolve_default_browser_path() else {
         return None;
     };
 
@@ -753,7 +796,7 @@ async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
     let _ = std::fs::create_dir_all(&session_dir);
     let session_arg = format!("--user-data-dir={}", session_dir.display());
 
-    let output = tokio::process::Command::new(bin)
+    let output = tokio::process::Command::new(&bin)
         .arg("--headless=new")
         .arg("--disable-gpu")
         .arg("--disable-blink-features=AutomationControlled")

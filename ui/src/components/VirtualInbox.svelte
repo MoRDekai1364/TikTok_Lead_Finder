@@ -43,7 +43,7 @@
   const t = $derived(translations[currentLang]);
   const coreUrl = getCoreUrl();
 
-  let isVideoFeedOpen = $state(false);
+  let isVideoFeedOpen = $state(typeof localStorage !== 'undefined' ? localStorage.getItem('leadfinder_video_feed') !== 'false' : true);
   let feedToast = $state<string | null>(null);
   let isAiCheckingFeed = $state(false);
   let searchQuery = $state('');
@@ -264,7 +264,10 @@
       <button
         class="btn btn-secondary btn-sm feed-toggle-btn"
         class:active={isVideoFeedOpen}
-        onclick={() => (isVideoFeedOpen = !isVideoFeedOpen)}
+        onclick={() => {
+          isVideoFeedOpen = !isVideoFeedOpen;
+          localStorage.setItem('leadfinder_video_feed', String(isVideoFeedOpen));
+        }}
         title={currentLang === 'bg' ? 'Включи/изключи видео фийд' : 'Toggle video feed'}
       >
         🎬 {t.toggleFeed}

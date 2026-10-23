@@ -1,4 +1,4 @@
-﻿#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::{Path, PathBuf};
 
@@ -48,7 +48,39 @@ fn core_connection() -> CoreConnection {
     CoreConnection { url, token }
 }
 
+fn ensure_core_running() {
+    use std::net::TcpStream;
+    use std::time::Duration;
+    if TcpStream::connect_timeout(&"127.0.0.1:17420".parse().unwrap(), Duration::from_millis(200)).is_ok() {
+        return;
+    }
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf));
+    let cwd = std::env::current_dir().ok();
+    for start in [cwd, exe_dir].into_iter().flatten() {
+        for ancestor in start.ancestors().take(5) {
+            let candidates = [
+                ancestor.join("leadfinder.exe"),
+                ancestor.join("release_stage").join("leadfinder.exe"),
+                ancestor.join("target").join("release").join("leadfinder.exe"),
+            ];
+            for cand in candidates {
+                if cand.exists() {
+                    let _ = std::process::Command::new(cand)
+                        .arg("serve")
+                        .current_dir(ancestor)
+                        .spawn();
+                    std::thread::sleep(Duration::from_millis(500));
+                    return;
+                }
+            }
+        }
+    }
+}
+
 fn main() {
+    ensure_core_running();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![core_connection])
         .run(tauri::generate_context!())

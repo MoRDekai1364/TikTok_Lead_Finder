@@ -7,6 +7,38 @@ import sys
 import urllib.parse
 from playwright.async_api import async_playwright
 
+def get_user_default_browser_exe():
+    if sys.platform != "win32":
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice") as key:
+            prog_id, _ = winreg.QueryValueEx(key, "ProgId")
+        for root in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
+            try:
+                with winreg.OpenKey(root, rf"Software\Classes\{prog_id}\shell\open\command") as key:
+                    cmd, _ = winreg.QueryValueEx(key, "")
+                    m = re.match(r'"([^"]+)"', cmd) or re.match(r'([^\s]+)', cmd)
+                    if m and os.path.exists(m.group(1)):
+                        return m.group(1)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    candidates = [
+        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+        r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
 def parse_citations(page_content, inner_text):
     citations = []
     seen = set()
@@ -46,20 +78,26 @@ def format_prompt(query, mode):
 async def fetch_ai_mode(query, mode, session_dir, headless, json_output, wait_seconds):
     os.makedirs(session_dir, exist_ok=True)
     prompt = format_prompt(query, mode)
+    default_exe = get_user_default_browser_exe()
 
     async with async_playwright() as p:
-        try:
-            browser = await p.chromium.launch_persistent_context(
-                user_data_dir=os.path.abspath(session_dir),
-                channel="msedge",
-                headless=headless,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox"
-                ],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-            )
-        except Exception:
+        browser = None
+        if default_exe and os.path.exists(default_exe):
+            try:
+                browser = await p.chromium.launch_persistent_context(
+                    user_data_dir=os.path.abspath(session_dir),
+                    executable_path=default_exe,
+                    headless=headless,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox"
+                    ],
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+                )
+            except Exception:
+                browser = None
+
+        if browser is None:
             browser = await p.chromium.launch_persistent_context(
                 user_data_dir=os.path.abspath(session_dir),
                 headless=headless,
