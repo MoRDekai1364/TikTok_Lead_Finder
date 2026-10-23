@@ -924,6 +924,1782 @@ standard = 'какво'
 register = 'разговорно'
 ipa = 'kvɔ'
 
+[[dialect_glossary]]
+term = 'Аскуу'
+standard = 'Хасково'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈas.ku.u'
+
+[[dialect_glossary]]
+term = 'аскулия'
+standard = 'жител на Хасково / хасковлия'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɐs.ku.ˈli.jɐ'
+
+[[dialect_glossary]]
+term = 'жа'
+standard = 'ще'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʒɐ'
+
+[[dialect_glossary]]
+term = 'уа'
+standard = 'бе / бре (обръщение)'
+register = 'хасковски/тракийски диалект'
+ipa = 'wa'
+
+[[dialect_glossary]]
+term = 'оть'
+standard = 'защото / защо'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɔtʲ'
+
+[[dialect_glossary]]
+term = 'дань'
+standard = 'да не'
+register = 'хасковски/тракийски диалект'
+ipa = 'dɐnʲ'
+
+[[dialect_glossary]]
+term = 'нимой'
+standard = 'недей'
+register = 'хасковски/тракийски диалект'
+ipa = 'ni.ˈmɔj'
+
+[[dialect_glossary]]
+term = 'нимойти'
+standard = 'недейте'
+register = 'хасковски/тракийски диалект'
+ipa = 'ni.ˈmɔj.ti'
+
+[[dialect_glossary]]
+term = 'днеска'
+standard = 'днес'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdnɛs.kɐ'
+
+[[dialect_glossary]]
+term = 'утрека'
+standard = 'утре'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈu.trɛ.kɐ'
+
+[[dialect_glossary]]
+term = 'оня'
+standard = 'онзи'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈɔ.nʲɐ'
+
+[[dialect_glossary]]
+term = 'тая'
+standard = 'тази'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈta.jɐ'
+
+[[dialect_glossary]]
+term = 'туй'
+standard = 'това'
+register = 'хасковски/тракийски диалект'
+ipa = 'tuj'
+
+[[dialect_glossary]]
+term = 'унуй'
+standard = 'онова'
+register = 'хасковски/тракийски диалект'
+ipa = 'u.ˈnuj'
+
+[[dialect_glossary]]
+term = 'инакъв'
+standard = 'такъв / особен'
+register = 'хасковски/тракийски диалект'
+ipa = 'i.ˈna.kɤf'
+
+[[dialect_glossary]]
+term = 'сякъв'
+standard = 'всякакъв'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈsʲa.kɤf'
+
+[[dialect_glossary]]
+term = 'нейде'
+standard = 'някъде'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈnɛj.dɛ'
+
+[[dialect_glossary]]
+term = 'никугиш'
+standard = 'никога'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈni.ku.ɡiʃ'
+
+[[dialect_glossary]]
+term = 'сегиз-тогиз'
+standard = 'понякога / от време на време'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛ.ˈɡis.tu.ˈɡis'
+
+[[dialect_glossary]]
+term = 'барабар'
+standard = 'заедно / наравно'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐ.rɐ.ˈbar'
+
+[[dialect_glossary]]
+term = 'баят'
+standard = 'доста / много / голям'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐ.ˈjat'
+
+[[dialect_glossary]]
+term = 'бая'
+standard = 'доста / много'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐ.ˈja'
+
+[[dialect_glossary]]
+term = 'карпуз'
+standard = 'диня'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐr.ˈpus'
+
+[[dialect_glossary]]
+term = 'карпуза'
+standard = 'диня'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐr.ˈpu.zɐ'
+
+[[dialect_glossary]]
+term = 'каунь'
+standard = 'пъпеш'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.ˈunʲ'
+
+[[dialect_glossary]]
+term = 'патладжан'
+standard = 'домат'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐt.lɐ.ˈdʒan'
+
+[[dialect_glossary]]
+term = 'цървен патладжан'
+standard = 'червен домат'
+register = 'хасковски/тракийски диалект'
+ipa = 't͡sɤr.ˈvɛn pɐt.lɐ.ˈdʒan'
+
+[[dialect_glossary]]
+term = 'синь патладжан'
+standard = 'патладжан'
+register = 'хасковски/тракийски диалект'
+ipa = 'sinʲ pɐt.lɐ.ˈdʒan'
+
+[[dialect_glossary]]
+term = 'пишкир'
+standard = 'хавлия / кърпа'
+register = 'хасковски/тракийски диалект'
+ipa = 'piʃ.ˈkir'
+
+[[dialect_glossary]]
+term = 'пишкирь'
+standard = 'хавлия / кърпа'
+register = 'хасковски/тракийски диалект'
+ipa = 'piʃ.ˈkirʲ'
+
+[[dialect_glossary]]
+term = 'бунела'
+standard = 'вилица'
+register = 'хасковски/тракийски диалект'
+ipa = 'bu.ˈnɛ.lɐ'
+
+[[dialect_glossary]]
+term = 'пенджера'
+standard = 'прозорец'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɛn.ˈdʒɛ.rɐ'
+
+[[dialect_glossary]]
+term = 'комшулук'
+standard = 'малка вратичка между съседни дворове'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɔm.ʃu.ˈluk'
+
+[[dialect_glossary]]
+term = 'гьол'
+standard = 'локва / водоем'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɡʲɔl'
+
+[[dialect_glossary]]
+term = 'лафя'
+standard = 'говоря / приказвам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈla.fʲɐ'
+
+[[dialect_glossary]]
+term = 'окам'
+standard = 'викам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈɔ.kɐm'
+
+[[dialect_glossary]]
+term = 'рукам'
+standard = 'викам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈru.kɐm'
+
+[[dialect_glossary]]
+term = 'худая'
+standard = 'стая'
+register = 'хасковски/тракийски диалект'
+ipa = 'xu.ˈda.jɐ'
+
+[[dialect_glossary]]
+term = 'удая'
+standard = 'стая'
+register = 'хасковски/тракийски диалект'
+ipa = 'u.ˈda.jɐ'
+
+[[dialect_glossary]]
+term = 'ханцунг'
+standard = 'анцуг'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈxan.t͡suŋk'
+
+[[dialect_glossary]]
+term = 'хасма'
+standard = 'асма / лозница'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈxas.mɐ'
+
+[[dialect_glossary]]
+term = 'хасфалт'
+standard = 'асфалт'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈxas.fɐlt'
+
+[[dialect_glossary]]
+term = 'хавтобус'
+standard = 'автобус'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɐf.ˈtɔ.bus'
+
+[[dialect_glossary]]
+term = 'хапарат'
+standard = 'апарат'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɐ.pɐ.ˈrat'
+
+[[dialect_glossary]]
+term = 'хаптека'
+standard = 'аптека'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɐp.ˈtɛ.kɐ'
+
+[[dialect_glossary]]
+term = 'херген'
+standard = 'ерген'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɛr.ˈɡɛn'
+
+[[dialect_glossary]]
+term = 'уда'
+standard = 'вода'
+register = 'хасковски/тракийски диалект'
+ipa = 'u.ˈda'
+
+[[dialect_glossary]]
+term = 'ляб'
+standard = 'хляб'
+register = 'хасковски/тракийски диалект'
+ipa = 'lʲap'
+
+[[dialect_glossary]]
+term = 'ляп'
+standard = 'хляб'
+register = 'хасковски/тракийски диалект'
+ipa = 'lʲap'
+
+[[dialect_glossary]]
+term = 'сугань'
+standard = 'лук'
+register = 'хасковски/тракийски диалект'
+ipa = 'su.ˈɡanʲ'
+
+[[dialect_glossary]]
+term = 'фитка'
+standard = 'пуйка'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈfit.kɐ'
+
+[[dialect_glossary]]
+term = 'фиток'
+standard = 'пуяк'
+register = 'хасковски/тракийски диалект'
+ipa = 'fi.ˈtɔk'
+
+[[dialect_glossary]]
+term = 'лахна'
+standard = 'зеле'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈlax.nɐ'
+
+[[dialect_glossary]]
+term = 'скокуть'
+standard = 'гъдел'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈskɔ.kutʲ'
+
+[[dialect_glossary]]
+term = 'соль'
+standard = 'сол'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɔlʲ'
+
+[[dialect_glossary]]
+term = 'пуперь'
+standard = 'пипер / чушка'
+register = 'хасковски/тракийски диалект'
+ipa = 'pu.ˈpɛrʲ'
+
+[[dialect_glossary]]
+term = 'пиперь'
+standard = 'пипер / чушка'
+register = 'хасковски/тракийски диалект'
+ipa = 'pi.ˈpɛrʲ'
+
+[[dialect_glossary]]
+term = 'фасулъ'
+standard = 'фасул / боб'
+register = 'хасковски/тракийски диалект'
+ipa = 'fɐ.ˈsulʲ'
+
+[[dialect_glossary]]
+term = 'картофь'
+standard = 'картоф'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐr.ˈtɔfʲ'
+
+[[dialect_glossary]]
+term = 'компирь'
+standard = 'картоф'
+register = 'хасковски/тракийски диалект'
+ipa = 'kum.ˈpirʲ'
+
+[[dialect_glossary]]
+term = 'мисирь'
+standard = 'царевица'
+register = 'хасковски/тракийски диалект'
+ipa = 'mi.ˈsirʲ'
+
+[[dialect_glossary]]
+term = 'кукуруз'
+standard = 'царевица'
+register = 'хасковски/тракийски диалект'
+ipa = 'ku.ku.ˈrus'
+
+[[dialect_glossary]]
+term = 'мамуль'
+standard = 'кочан царевица'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɐ.ˈmulʲ'
+
+[[dialect_glossary]]
+term = 'джурка'
+standard = 'устна'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdʒur.kɐ'
+
+[[dialect_glossary]]
+term = 'джуки'
+standard = 'устни'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdʒu.ki'
+
+[[dialect_glossary]]
+term = 'зурла'
+standard = 'муцуна / уста'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈzur.lɐ'
+
+[[dialect_glossary]]
+term = 'чутура'
+standard = 'глава'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtʃu.tu.rɐ'
+
+[[dialect_glossary]]
+term = 'кратуна'
+standard = 'тиква / глава'
+register = 'хасковски/тракийски диалект'
+ipa = 'krɐ.ˈtu.nɐ'
+
+[[dialect_glossary]]
+term = 'кокал'
+standard = 'кост'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkɔ.kɐl'
+
+[[dialect_glossary]]
+term = 'кокаль'
+standard = 'кост'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkɔ.kɐlʲ'
+
+[[dialect_glossary]]
+term = 'джигерь'
+standard = 'дроб'
+register = 'хасковски/тракийски диалект'
+ipa = 'dʒi.ˈɡɛrʲ'
+
+[[dialect_glossary]]
+term = 'шкембе'
+standard = 'корем'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʃkɛm.ˈbɛ'
+
+[[dialect_glossary]]
+term = 'търбух'
+standard = 'корем'
+register = 'хасковски/тракийски диалект'
+ipa = 'tɤr.ˈbux'
+
+[[dialect_glossary]]
+term = 'гръбнак'
+standard = 'гръб'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɡrɤb.ˈnak'
+
+[[dialect_glossary]]
+term = 'къч'
+standard = 'крак / ритник'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɤtʃ'
+
+[[dialect_glossary]]
+term = 'баджак'
+standard = 'бедро / крак'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐ.ˈdʒak'
+
+[[dialect_glossary]]
+term = 'кунки'
+standard = 'ръце / крака'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkun.ki'
+
+[[dialect_glossary]]
+term = 'сурат'
+standard = 'лице / физиономия'
+register = 'хасковски/тракийски диалект'
+ipa = 'su.ˈrat'
+
+[[dialect_glossary]]
+term = 'мутра'
+standard = 'лице'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈmu.trɐ'
+
+[[dialect_glossary]]
+term = 'кепазе'
+standard = 'за срам / за посмешище'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɛ.pɐ.ˈzɛ'
+
+[[dialect_glossary]]
+term = 'резил'
+standard = 'срам / позор'
+register = 'хасковски/тракийски диалект'
+ipa = 'rɛ.ˈzil'
+
+[[dialect_glossary]]
+term = 'сеир'
+standard = 'зрелище'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛ.ˈir'
+
+[[dialect_glossary]]
+term = 'сеирь'
+standard = 'зрелище'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛ.ˈirʲ'
+
+[[dialect_glossary]]
+term = 'калабалък'
+standard = 'тълпа / навалица'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.lɐ.bɐ.ˈlɤk'
+
+[[dialect_glossary]]
+term = 'гюрултия'
+standard = 'шум / врява'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɡʲu.rul.ˈti.jɐ'
+
+[[dialect_glossary]]
+term = 'патардия'
+standard = 'шумотевица / скандал'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐ.tɐr.ˈdi.jɐ'
+
+[[dialect_glossary]]
+term = 'кютек'
+standard = 'бой'
+register = 'хасковски/тракийски диалект'
+ipa = 'kʲu.ˈtɛk'
+
+[[dialect_glossary]]
+term = 'пердах'
+standard = 'бой'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɛr.ˈdax'
+
+[[dialect_glossary]]
+term = 'тупаник'
+standard = 'бой / удар'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtu.pɐ.nik'
+
+[[dialect_glossary]]
+term = 'шамар'
+standard = 'плесница'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʃɐ.ˈmar'
+
+[[dialect_glossary]]
+term = 'зулум'
+standard = 'пакост / беля'
+register = 'хасковски/тракийски диалект'
+ipa = 'zu.ˈlum'
+
+[[dialect_glossary]]
+term = 'сакън'
+standard = 'в никакъв случай / пази боже'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɐ.ˈkɤn'
+
+[[dialect_glossary]]
+term = 'чунким'
+standard = 'сякаш / нима'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtʃuŋ.kim'
+
+[[dialect_glossary]]
+term = 'санким'
+standard = 'сякаш / кажи-речи'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈsaŋ.kim'
+
+[[dialect_glossary]]
+term = 'белки'
+standard = 'дано / може би'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈbɛl.ki'
+
+[[dialect_glossary]]
+term = 'белким'
+standard = 'дано / може би'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈbɛl.kim'
+
+[[dialect_glossary]]
+term = 'харно'
+standard = 'хубаво / добре'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈxar.nu'
+
+[[dialect_glossary]]
+term = 'арно'
+standard = 'хубаво / добре'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈar.nu'
+
+[[dialect_glossary]]
+term = 'убау'
+standard = 'хубаво'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈu.bɐ.u'
+
+[[dialect_glossary]]
+term = 'лошу'
+standard = 'лошо'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈlɔ.ʃu'
+
+[[dialect_glossary]]
+term = 'студену'
+standard = 'студено'
+register = 'хасковски/тракийски диалект'
+ipa = 'stu.ˈdɛ.nu'
+
+[[dialect_glossary]]
+term = 'топлу'
+standard = 'топло'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtɔp.lu'
+
+[[dialect_glossary]]
+term = 'жежко'
+standard = 'горещо'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈʒɛʃ.ku'
+
+[[dialect_glossary]]
+term = 'жега'
+standard = 'горещина'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈʒɛ.ɡɐ'
+
+[[dialect_glossary]]
+term = 'задух'
+standard = 'задушно време'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈza.dux'
+
+[[dialect_glossary]]
+term = 'каль'
+standard = 'кал'
+register = 'хасковски/тракийски диалект'
+ipa = 'kalʲ'
+
+[[dialect_glossary]]
+term = 'прахоляк'
+standard = 'прах'
+register = 'хасковски/тракийски диалект'
+ipa = 'prɐ.xu.ˈlʲak'
+
+[[dialect_glossary]]
+term = 'пушилка'
+standard = 'прах / дим'
+register = 'хасковски/тракийски диалект'
+ipa = 'pu.ˈʃil.kɐ'
+
+[[dialect_glossary]]
+term = 'тупурдия'
+standard = 'тропот / шум'
+register = 'хасковски/тракийски диалект'
+ipa = 'tu.pur.ˈdi.jɐ'
+
+[[dialect_glossary]]
+term = 'барам'
+standard = 'пипам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈba.rɐm'
+
+[[dialect_glossary]]
+term = 'фащам'
+standard = 'хващам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈfa.ʃtɐm'
+
+[[dialect_glossary]]
+term = 'фана'
+standard = 'хвана'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈfa.nɐ'
+
+[[dialect_glossary]]
+term = 'фърлям'
+standard = 'хвърлям'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈfɤr.lʲɐm'
+
+[[dialect_glossary]]
+term = 'фъркам'
+standard = 'хвърча / летя'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈfɤr.kɐm'
+
+[[dialect_glossary]]
+term = 'врякам'
+standard = 'крещя / плача'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈvrʲa.kɐm'
+
+[[dialect_glossary]]
+term = 'цъкам'
+standard = 'щракам / чудя се'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈt͡sɤ.kɐm'
+
+[[dialect_glossary]]
+term = 'джуркам'
+standard = 'бъркам / разбърквам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdʒur.kɐm'
+
+[[dialect_glossary]]
+term = 'къркам'
+standard = 'пия (алкохол)'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkɤr.kɐm'
+
+[[dialect_glossary]]
+term = 'лоча'
+standard = 'пия лакомо'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈlɔ.tʃɐ'
+
+[[dialect_glossary]]
+term = 'плюскам'
+standard = 'ям лакомо'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈplʲus.kɐm'
+
+[[dialect_glossary]]
+term = 'нагъвам'
+standard = 'ям бързо'
+register = 'хасковски/тракийски диалект'
+ipa = 'nɐ.ˈɡɤ.vɐm'
+
+[[dialect_glossary]]
+term = 'мляскам'
+standard = 'дъвча шумно'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈmlʲas.kɐm'
+
+[[dialect_glossary]]
+term = 'дремя'
+standard = 'спя леко / чакам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdrɛ.mʲɐ'
+
+[[dialect_glossary]]
+term = 'къртя'
+standard = 'спя дълбоко / чупя'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkɤr.tʲɐ'
+
+[[dialect_glossary]]
+term = 'зяпам'
+standard = 'гледам с отворена уста'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈzʲa.pɐm'
+
+[[dialect_glossary]]
+term = 'пуля са'
+standard = 'ококорвам се / взирам се'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈpu.lʲɐ sɐ'
+
+[[dialect_glossary]]
+term = 'кьоравя'
+standard = 'виждам трудно / ослепявам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkʲɔ.rɐ.vʲɐ'
+
+[[dialect_glossary]]
+term = 'кьорав'
+standard = 'сляп'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkʲɔ.rɐf'
+
+[[dialect_glossary]]
+term = 'сакат'
+standard = 'куц / недъгав'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɐ.ˈkat'
+
+[[dialect_glossary]]
+term = 'кьопав'
+standard = 'несръчен'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkʲɔ.pɐf'
+
+[[dialect_glossary]]
+term = 'въртоглав'
+standard = 'шеметен / непостоянен'
+register = 'хасковски/тракийски диалект'
+ipa = 'vɤr.tu.ˈɡlaf'
+
+[[dialect_glossary]]
+term = 'шантав'
+standard = 'луд / странен'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈʃan.tɐf'
+
+[[dialect_glossary]]
+term = 'щур'
+standard = 'луд / буен'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʃtur'
+
+[[dialect_glossary]]
+term = 'серсем'
+standard = 'замаян / глупав човек'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛr.ˈsɛm'
+
+[[dialect_glossary]]
+term = 'серсемин'
+standard = 'глупак'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛr.ˈsɛ.min'
+
+[[dialect_glossary]]
+term = 'ахмак'
+standard = 'глупак / наивник'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɐx.ˈmak'
+
+[[dialect_glossary]]
+term = 'будала'
+standard = 'наивник / глупак'
+register = 'хасковски/тракийски диалект'
+ipa = 'bu.dɐ.ˈla'
+
+[[dialect_glossary]]
+term = 'хаймана'
+standard = 'скитник / безделник'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɐj.mɐ.ˈna'
+
+[[dialect_glossary]]
+term = 'айляк'
+standard = 'свободен / без работа'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɐj.ˈlʲak'
+
+[[dialect_glossary]]
+term = 'бича айляк'
+standard = 'безделнича / почивам си'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈbi.tʃɐ ɐj.ˈlʲak'
+
+[[dialect_glossary]]
+term = 'кеф'
+standard = 'удоволствие'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɛf'
+
+[[dialect_glossary]]
+term = 'кефя са'
+standard = 'радвам се / наслаждавам се'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkɛ.fʲɐ sɐ'
+
+[[dialect_glossary]]
+term = 'табиет'
+standard = 'навик / нрав'
+register = 'хасковски/тракийски диалект'
+ipa = 'tɐ.bi.ˈɛt'
+
+[[dialect_glossary]]
+term = 'табиетлия'
+standard = 'човек с изискани навици / мераклия'
+register = 'хасковски/тракийски диалект'
+ipa = 'tɐ.bi.ɛt.ˈli.jɐ'
+
+[[dialect_glossary]]
+term = 'мерак'
+standard = 'желание / страст'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɛ.ˈrak'
+
+[[dialect_glossary]]
+term = 'мераклия'
+standard = 'желаещ / ентусиаст'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɛ.rɐk.ˈli.jɐ'
+
+[[dialect_glossary]]
+term = 'зор'
+standard = 'трудност / усилие / нужда'
+register = 'хасковски/тракийски диалект'
+ipa = 'zɔr'
+
+[[dialect_glossary]]
+term = 'на зор'
+standard = 'в затруднение'
+register = 'хасковски/тракийски диалект'
+ipa = 'nɐ ˈzɔr'
+
+[[dialect_glossary]]
+term = 'рахат'
+standard = 'спокойствие / удобство'
+register = 'хасковски/тракийски диалект'
+ipa = 'rɐ.ˈxat'
+
+[[dialect_glossary]]
+term = 'рахатлък'
+standard = 'спокойствие / блаженство'
+register = 'хасковски/тракийски диалект'
+ipa = 'rɐ.xɐt.ˈlɤk'
+
+[[dialect_glossary]]
+term = 'каهر'
+standard = 'грижа / мъка'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.ˈxɤr'
+
+[[dialect_glossary]]
+term = 'кахър'
+standard = 'грижа / тревога'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.ˈxɤr'
+
+[[dialect_glossary]]
+term = 'беля'
+standard = 'неприятност / пакост'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɛ.ˈlʲa'
+
+[[dialect_glossary]]
+term = 'дерт'
+standard = 'мъка / болка / грижа'
+register = 'хасковски/тракийски диалект'
+ipa = 'dɛrt'
+
+[[dialect_glossary]]
+term = 'яд'
+standard = 'гняв'
+register = 'хасковски/тракийски диалект'
+ipa = 'jat'
+
+[[dialect_glossary]]
+term = 'ядосвам са'
+standard = 'гневя се'
+register = 'хасковски/тракийски диалект'
+ipa = 'jɐ.ˈdɔs.vɐm sɐ'
+
+[[dialect_glossary]]
+term = 'инат'
+standard = 'упорство / твърдоглавие'
+register = 'хасковски/тракийски диалект'
+ipa = 'i.ˈnat'
+
+[[dialect_glossary]]
+term = 'инатя са'
+standard = 'упорствам'
+register = 'хасковски/тракийски диалект'
+ipa = 'i.ˈna.tʲɐ sɐ'
+
+[[dialect_glossary]]
+term = 'пишман'
+standard = 'съжаляващ'
+register = 'хасковски/тракийски диалект'
+ipa = 'piʃ.ˈman'
+
+[[dialect_glossary]]
+term = 'кандърдисвам'
+standard = 'убеждавам / склонявам'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐn.dɤr.ˈdis.vɐm'
+
+[[dialect_glossary]]
+term = 'уйдисвам'
+standard = 'прилягам / съгласявам се'
+register = 'хасковски/тракийски диалект'
+ipa = 'uj.ˈdis.vɐm'
+
+[[dialect_glossary]]
+term = 'бактисвам'
+standard = 'омръзва ми / писва ми'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐk.ˈtis.vɐm'
+
+[[dialect_glossary]]
+term = 'втасвам'
+standard = 'свършвам работа (иронично) / бухвам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈftas.vɐm'
+
+[[dialect_glossary]]
+term = 'отасвам'
+standard = 'пропадам / закъсвам'
+register = 'хасковски/тракийски диалект'
+ipa = 'u.ˈtas.vɐm'
+
+[[dialect_glossary]]
+term = 'сколасвам'
+standard = 'успявам / намирам време'
+register = 'хасковски/тракийски диалект'
+ipa = 'sku.ˈlas.vɐm'
+
+[[dialect_glossary]]
+term = 'сварвам'
+standard = 'заварвам / успявам навреме'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈsvar.vɐm'
+
+[[dialect_glossary]]
+term = 'прайм'
+standard = 'правим'
+register = 'хасковски/тракийски диалект'
+ipa = 'prajm'
+
+[[dialect_glossary]]
+term = 'знайш'
+standard = 'знаеш'
+register = 'хасковски/тракийски диалект'
+ipa = 'znajʃ'
+
+[[dialect_glossary]]
+term = 'знайм'
+standard = 'знаем'
+register = 'хасковски/тракийски диалект'
+ipa = 'znajm'
+
+[[dialect_glossary]]
+term = 'мойш'
+standard = 'можеш'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɔjʃ'
+
+[[dialect_glossary]]
+term = 'мож'
+standard = 'може / можеш'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɔʃ'
+
+[[dialect_glossary]]
+term = 'ида'
+standard = 'отивам / идвам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈi.dɐ'
+
+[[dialect_glossary]]
+term = 'утивам'
+standard = 'отивам'
+register = 'хасковски/тракийски диалект'
+ipa = 'u.ˈti.vɐm'
+
+[[dialect_glossary]]
+term = 'дода'
+standard = 'дойда'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdɔ.dɐ'
+
+[[dialect_glossary]]
+term = 'зема'
+standard = 'взема'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈzɛ.mɐ'
+
+[[dialect_glossary]]
+term = 'зимам'
+standard = 'вземам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈzi.mɐm'
+
+[[dialect_glossary]]
+term = 'одя'
+standard = 'ходя'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈɔ.dʲɐ'
+
+[[dialect_glossary]]
+term = 'одим'
+standard = 'ходим'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈɔ.dim'
+
+[[dialect_glossary]]
+term = 'бягам'
+standard = 'тичам / тръгвам си'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈbʲa.ɡɐm'
+
+[[dialect_glossary]]
+term = 'търча'
+standard = 'тичам'
+register = 'хасковски/тракийски диалект'
+ipa = 'tɤr.ˈtʃa'
+
+[[dialect_glossary]]
+term = 'рипам'
+standard = 'скачам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈri.pɐm'
+
+[[dialect_glossary]]
+term = 'подрипвам'
+standard = 'подскачам'
+register = 'хасковски/тракийски диалект'
+ipa = 'pud.ˈrip.vɐm'
+
+[[dialect_glossary]]
+term = 'клякам'
+standard = 'присядам'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈklʲa.kɐm'
+
+[[dialect_glossary]]
+term = 'втасахме я'
+standard = 'закъсахме я / оплескахме я'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈfta.sɐx.mɛ jɐ'
+
+[[dialect_glossary]]
+term = 'дувар'
+standard = 'каменна ограда / стена'
+register = 'хасковски/тракийски диалект'
+ipa = 'du.ˈvar'
+
+[[dialect_glossary]]
+term = 'капия'
+standard = 'голяма порта / врата'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.ˈpi.jɐ'
+
+[[dialect_glossary]]
+term = 'порта'
+standard = 'дворна врата'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈpɔr.tɐ'
+
+[[dialect_glossary]]
+term = 'авлия'
+standard = 'двор / ограда'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɐv.ˈli.jɐ'
+
+[[dialect_glossary]]
+term = 'хавлия'
+standard = 'двор / кърпа'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɐv.ˈli.jɐ'
+
+[[dialect_glossary]]
+term = 'сайвант'
+standard = 'навес'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɐj.ˈvant'
+
+[[dialect_glossary]]
+term = 'сундурма'
+standard = 'навес пред къща / веранда'
+register = 'хасковски/тракийски диалект'
+ipa = 'sun.dur.ˈma'
+
+[[dialect_glossary]]
+term = 'чардак'
+standard = 'балкон / тераса'
+register = 'хасковски/тракийски диалект'
+ipa = 'tʃɐr.ˈdak'
+
+[[dialect_glossary]]
+term = 'таван'
+standard = 'подпокривно пространство'
+register = 'хасковски/тракийски диалект'
+ipa = 'tɐ.ˈvan'
+
+[[dialect_glossary]]
+term = 'изба'
+standard = 'мазе'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈiz.bɐ'
+
+[[dialect_glossary]]
+term = 'зимник'
+standard = 'мазе'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈzim.nik'
+
+[[dialect_glossary]]
+term = 'дам'
+standard = 'обор'
+register = 'хасковски/тракийски диалект'
+ipa = 'dam'
+
+[[dialect_glossary]]
+term = 'кочина'
+standard = 'свинарник / много мръсно място'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkɔ.tʃi.nɐ'
+
+[[dialect_glossary]]
+term = 'курник'
+standard = 'кокошарник'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈkur.nik'
+
+[[dialect_glossary]]
+term = 'геран'
+standard = 'кладенец'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɡɛ.ˈran'
+
+[[dialect_glossary]]
+term = 'бунар'
+standard = 'кладенец'
+register = 'хасковски/тракийски диалект'
+ipa = 'bu.ˈnar'
+
+[[dialect_glossary]]
+term = 'чучур'
+standard = 'кран на чешма'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtʃu.tʃur'
+
+[[dialect_glossary]]
+term = 'чешма'
+standard = 'водоизточник'
+register = 'хасковски/тракийски диалект'
+ipa = 'tʃɛʃ.ˈma'
+
+[[dialect_glossary]]
+term = 'корито'
+standard = 'съд за пране или водопой'
+register = 'хасковски/тракийски диалект'
+ipa = 'ku.ˈri.tu'
+
+[[dialect_glossary]]
+term = 'менче'
+standard = 'медно котле'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈmɛn.tʃɛ'
+
+[[dialect_glossary]]
+term = 'бакрач'
+standard = 'медно ведро / котел'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐ.ˈkratʃ'
+
+[[dialect_glossary]]
+term = 'гюм'
+standard = 'голям метален съд за вода или мляко'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɡʲum'
+
+[[dialect_glossary]]
+term = 'стомна'
+standard = 'глинен съд за вода'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈstɔm.nɐ'
+
+[[dialect_glossary]]
+term = 'шулец'
+standard = 'глинена кана с чучур'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʃu.ˈlɛt͡s'
+
+[[dialect_glossary]]
+term = 'паница'
+standard = 'дълбока чиния / купа'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐ.ˈni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'кутел'
+standard = 'дървен хаван'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈku.tɛl'
+
+[[dialect_glossary]]
+term = 'тепсия'
+standard = 'голяма плоска тава'
+register = 'хасковски/тракийски диалект'
+ipa = 'tɛp.ˈsi.jɐ'
+
+[[dialect_glossary]]
+term = 'тигань'
+standard = 'тиган'
+register = 'хасковски/тракийски диалект'
+ipa = 'ti.ˈɡanʲ'
+
+[[dialect_glossary]]
+term = 'похлупак'
+standard = 'капак'
+register = 'хасковски/тракийски диалект'
+ipa = 'pux.ˈlu.pɐk'
+
+[[dialect_glossary]]
+term = 'софра'
+standard = 'ниска кръгла маса / трапеза'
+register = 'хасковски/тракийски диалект'
+ipa = 'su.ˈfra'
+
+[[dialect_glossary]]
+term = 'синия'
+standard = 'ниска маса'
+register = 'хасковски/тракийски диалект'
+ipa = 'si.ˈni.jɐ'
+
+[[dialect_glossary]]
+term = 'мисал'
+standard = 'покривка за маса / кърпа за хляб'
+register = 'хасковски/тракийски диалект'
+ipa = 'mi.ˈsal'
+
+[[dialect_glossary]]
+term = 'месал'
+standard = 'кърпа за завиване на тесто'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɛ.ˈsal'
+
+[[dialect_glossary]]
+term = 'нощви'
+standard = 'дървено корито за месене на хляб'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈnɔʃt.vi'
+
+[[dialect_glossary]]
+term = 'точилка'
+standard = 'уред за точене на кори'
+register = 'хасковски/тракийски диалект'
+ipa = 'tu.ˈtʃil.kɐ'
+
+[[dialect_glossary]]
+term = 'оклагия'
+standard = 'дълга тънка точилка'
+register = 'хасковски/тракийски диалект'
+ipa = 'uk.lɐ.ˈɡi.jɐ'
+
+[[dialect_glossary]]
+term = 'сач'
+standard = 'глинена плоча за печене'
+register = 'хасковски/тракийски диалект'
+ipa = 'satʃ'
+
+[[dialect_glossary]]
+term = 'връшник'
+standard = 'железен капак за печене върху жар'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈvrɤʃ.nik'
+
+[[dialect_glossary]]
+term = 'пиростия'
+standard = 'железен триножник за огнище'
+register = 'хасковски/тракийски диалект'
+ipa = 'pi.rus.ˈti.jɐ'
+
+[[dialect_glossary]]
+term = 'маша'
+standard = 'щипки за въглища'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɐ.ˈʃa'
+
+[[dialect_glossary]]
+term = 'ръжен'
+standard = 'железен прът за разравяне на огън'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈrɤ.ʒɛn'
+
+[[dialect_glossary]]
+term = 'кюмюр'
+standard = 'въглища'
+register = 'хасковски/тракийски диалект'
+ipa = 'kʲu.ˈmʲur'
+
+[[dialect_glossary]]
+term = 'кюмюрь'
+standard = 'въглища'
+register = 'хасковски/тракийски диалект'
+ipa = 'kʲu.ˈmʲurʲ'
+
+[[dialect_glossary]]
+term = 'жарава'
+standard = 'жар'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʒɐ.ˈra.vɐ'
+
+[[dialect_glossary]]
+term = 'пепель'
+standard = 'пепел'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈpɛ.pɛlʲ'
+
+[[dialect_glossary]]
+term = 'кюнец'
+standard = 'тръба за печка'
+register = 'хасковски/тракийски диалект'
+ipa = 'kʲu.ˈnɛt͡s'
+
+[[dialect_glossary]]
+term = 'бурия'
+standard = 'кюнец / тръба'
+register = 'хасковски/тракийски диалект'
+ipa = 'bu.ˈri.jɐ'
+
+[[dialect_glossary]]
+term = 'соба'
+standard = 'печка'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈsɔ.bɐ'
+
+[[dialect_glossary]]
+term = 'оджак'
+standard = 'огнище / комин'
+register = 'хасковски/тракийски диалект'
+ipa = 'u.ˈdʒak'
+
+[[dialect_glossary]]
+term = 'кумин'
+standard = 'комин'
+register = 'хасковски/тракийски диалект'
+ipa = 'ku.ˈmin'
+
+[[dialect_glossary]]
+term = 'куминь'
+standard = 'комин'
+register = 'хасковски/тракийски диалект'
+ipa = 'ku.ˈminʲ'
+
+[[dialect_glossary]]
+term = 'цигла'
+standard = 'керемида / тухла'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈt͡si.ɡlɐ'
+
+[[dialect_glossary]]
+term = 'кирпич'
+standard = 'непечена тухла от кал и слама'
+register = 'хасковски/тракийски диалект'
+ipa = 'kir.ˈpitʃ'
+
+[[dialect_glossary]]
+term = 'варь'
+standard = 'вар'
+register = 'хасковски/тракийски диалект'
+ipa = 'varʲ'
+
+[[dialect_glossary]]
+term = 'хоросан'
+standard = 'строителен разтвор'
+register = 'хасковски/тракийски диалект'
+ipa = 'xu.ru.ˈsan'
+
+[[dialect_glossary]]
+term = 'дирек'
+standard = 'стълб / греда'
+register = 'хасковски/тракийски диалект'
+ipa = 'di.ˈrɛk'
+
+[[dialect_glossary]]
+term = 'мертек'
+standard = 'покривна греда'
+register = 'хасковски/тракийски диалект'
+ipa = 'mɛr.ˈtɛk'
+
+[[dialect_glossary]]
+term = 'талпа'
+standard = 'дебела дъска'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtal.pɐ'
+
+[[dialect_glossary]]
+term = 'пирон'
+standard = 'гвоздей'
+register = 'хасковски/тракийски диалект'
+ipa = 'pi.ˈrɔn'
+
+[[dialect_glossary]]
+term = 'пиронь'
+standard = 'гвоздей'
+register = 'хасковски/тракийски диалект'
+ipa = 'pi.ˈrɔnʲ'
+
+[[dialect_glossary]]
+term = 'ексер'
+standard = 'голям кован гвоздей'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɛk.ˈsɛr'
+
+[[dialect_glossary]]
+term = 'кесер'
+standard = 'тесла'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɛ.ˈsɛr'
+
+[[dialect_glossary]]
+term = 'трионь'
+standard = 'трион'
+register = 'хасковски/тракийски диалект'
+ipa = 'tri.ˈɔnʲ'
+
+[[dialect_glossary]]
+term = 'бичкия'
+standard = 'ръчен трион'
+register = 'хасковски/тракийски диалект'
+ipa = 'bitʃ.ˈki.jɐ'
+
+[[dialect_glossary]]
+term = 'балтия'
+standard = 'брадва'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɐl.ˈti.jɐ'
+
+[[dialect_glossary]]
+term = 'топор'
+standard = 'брадва'
+register = 'хасковски/тракийски диалект'
+ipa = 'tu.ˈpɔr'
+
+[[dialect_glossary]]
+term = 'секира'
+standard = 'брадва'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛ.ˈki.rɐ'
+
+[[dialect_glossary]]
+term = 'чапа'
+standard = 'малка мотика'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtʃa.pɐ'
+
+[[dialect_glossary]]
+term = 'дикел'
+standard = 'двурога мотика'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈdi.kɛl'
+
+[[dialect_glossary]]
+term = 'бел'
+standard = 'права лопата за копаене'
+register = 'хасковски/тракийски диалект'
+ipa = 'bɛl'
+
+[[dialect_glossary]]
+term = 'кюрек'
+standard = 'лопата'
+register = 'хасковски/тракийски диалект'
+ipa = 'kʲu.ˈrɛk'
+
+[[dialect_glossary]]
+term = 'вила'
+standard = 'вила за сено'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈvi.lɐ'
+
+[[dialect_glossary]]
+term = 'яба'
+standard = 'дървена вила'
+register = 'хасковски/тракийски диалект'
+ipa = 'jɐ.ˈba'
+
+[[dialect_glossary]]
+term = 'коса'
+standard = 'коса за трева'
+register = 'хасковски/тракийски диалект'
+ipa = 'ku.ˈsa'
+
+[[dialect_glossary]]
+term = 'паламарка'
+standard = 'дървена ръкавица за жътва'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐ.lɐ.ˈmar.kɐ'
+
+[[dialect_glossary]]
+term = 'кръстец'
+standard = 'куп от снопи'
+register = 'хасковски/тракийски диалект'
+ipa = 'krɤs.ˈtɛt͡s'
+
+[[dialect_glossary]]
+term = 'харман'
+standard = 'място за вършеене'
+register = 'хасковски/тракийски диалект'
+ipa = 'xɐr.ˈman'
+
+[[dialect_glossary]]
+term = 'диканя'
+standard = 'уред за вършеене с кремъци'
+register = 'хасковски/тракийски диалект'
+ipa = 'di.ˈka.nʲɐ'
+
+[[dialect_glossary]]
+term = 'плява'
+standard = 'ситно натрошена слама'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈplʲa.vɐ'
+
+[[dialect_glossary]]
+term = 'сено'
+standard = 'суха трева'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɛ.ˈnɔ'
+
+[[dialect_glossary]]
+term = 'фий'
+standard = 'фуражно растение'
+register = 'хасковски/тракийски диалект'
+ipa = 'fij'
+
+[[dialect_glossary]]
+term = 'уров'
+standard = 'фуражно зърно'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈu.ruf'
+
+[[dialect_glossary]]
+term = 'жито'
+standard = 'пшеница'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈʒi.tu'
+
+[[dialect_glossary]]
+term = 'пченица'
+standard = 'пшеница'
+register = 'хасковски/тракийски диалект'
+ipa = 'ptʃɛ.ˈni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'тютюнь'
+standard = 'тютюн'
+register = 'хасковски/тракийски диалект'
+ipa = 'tʲu.ˈtʲunʲ'
+
+[[dialect_glossary]]
+term = 'низа'
+standard = 'низа тютюн'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈni.zɐ'
+
+[[dialect_glossary]]
+term = 'шило'
+standard = 'голяма игла за низане на тютюн'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈʃi.lu'
+
+[[dialect_glossary]]
+term = 'сарък'
+standard = 'дълъг прът за сушене на тютюн'
+register = 'хасковски/тракийски диалект'
+ipa = 'sɐ.ˈrɤk'
+
+[[dialect_glossary]]
+term = 'денк'
+standard = 'бала тютюн'
+register = 'хасковски/тракийски диалект'
+ipa = 'dɛŋk'
+
+[[dialect_glossary]]
+term = 'бала'
+standard = 'стегнат вързоп'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈba.lɐ'
+
+[[dialect_glossary]]
+term = 'чувал'
+standard = 'торба'
+register = 'хасковски/тракийски диалект'
+ipa = 'tʃu.ˈval'
+
+[[dialect_glossary]]
+term = 'чуваль'
+standard = 'чувал'
+register = 'хасковски/тракийски диалект'
+ipa = 'tʃu.ˈvalʲ'
+
+[[dialect_glossary]]
+term = 'дисаги'
+standard = 'двойна торба за премятане през рамо или седло'
+register = 'хасковски/тракийски диалект'
+ipa = 'di.ˈsa.ɡi'
+
+[[dialect_glossary]]
+term = 'торба'
+standard = 'чанта'
+register = 'хасковски/тракийски диалект'
+ipa = 'tur.ˈba'
+
+[[dialect_glossary]]
+term = 'цедило'
+standard = 'тъкана торба за носене на гръб'
+register = 'хасковски/тракийски диалект'
+ipa = 't͡sɛ.ˈdi.lu'
+
+[[dialect_glossary]]
+term = 'бохча'
+standard = 'вързоп с дрехи'
+register = 'хасковски/тракийски диалект'
+ipa = 'bux.ˈtʃa'
+
+[[dialect_glossary]]
+term = 'парцал'
+standard = 'дреха / кърпа'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐr.ˈt͡sal'
+
+[[dialect_glossary]]
+term = 'парцаль'
+standard = 'парцал'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐr.ˈt͡salʲ'
+
+[[dialect_glossary]]
+term = 'черга'
+standard = 'тъкана постелка'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈtʃɛr.ɡɐ'
+
+[[dialect_glossary]]
+term = 'козяк'
+standard = 'дебела завивка от козина'
+register = 'хасковски/тракийски диалект'
+ipa = 'ku.ˈzʲak'
+
+[[dialect_glossary]]
+term = 'губер'
+standard = 'дебела вълнена завивка'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈɡu.bɛr'
+
+[[dialect_glossary]]
+term = 'рогoзка'
+standard = 'плетена постелка от папур'
+register = 'хасковски/тракийски диалект'
+ipa = 'ru.ˈɡɔs.kɐ'
+
+[[dialect_glossary]]
+term = 'папур'
+standard = 'камъш / водно растение'
+register = 'хасковски/тракийски диалект'
+ipa = 'pɐ.ˈpur'
+
+[[dialect_glossary]]
+term = 'камъш'
+standard = 'тръстика'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.ˈmɤʃ'
+
+[[dialect_glossary]]
+term = 'шавар'
+standard = 'блатиста трева'
+register = 'хасковски/тракийски диалект'
+ipa = 'ʃɐ.ˈvar'
+
+[[dialect_glossary]]
+term = 'дюшек'
+standard = 'матрак'
+register = 'хасковски/тракийски диалект'
+ipa = 'dʲu.ˈʃɛk'
+
+[[dialect_glossary]]
+term = 'сламеник'
+standard = 'дюшек, пълен със слама'
+register = 'хасковски/тракийски диалект'
+ipa = 'ˈsla.mɛ.nik'
+
+[[dialect_glossary]]
+term = 'юрган'
+standard = 'завивка'
+register = 'хасковски/тракийски диалект'
+ipa = 'jur.ˈɡan'
+
+[[dialect_glossary]]
+term = 'юргань'
+standard = 'юрган'
+register = 'хасковски/тракийски диалект'
+ipa = 'jur.ˈɡanʲ'
+
+[[dialect_glossary]]
+term = 'главница'
+standard = 'възглавница'
+register = 'хасковски/тракийски диалект'
+ipa = 'ɡlɐv.ˈni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'калъфка'
+standard = 'калъф за възглавница'
+register = 'хасковски/тракийски диалект'
+ipa = 'kɐ.ˈlɤf.kɐ'
+
+[[dialect_glossary]]
+term = 'миндер'
+standard = 'одър за сядане покрай стената'
+register = 'хасковски/тракийски диалект'
+ipa = 'min.ˈdɛr'
+
 [[acronyms]]
 abbr = 'ДДС'
 expansion = 'Данък върху добавената стойност'
