@@ -1,12 +1,14 @@
-﻿pub mod config;
+pub mod config;
 pub mod db;
 pub mod db_funnel;
+pub mod logger;
 pub mod models;
 pub mod politeness;
 pub mod traits;
 
 pub use config::*;
 pub use db::*;
+pub use logger::*;
 pub use models::*;
 pub use politeness::*;
 pub use traits::*;

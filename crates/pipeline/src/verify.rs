@@ -1,4 +1,4 @@
-﻿use std::collections::HashSet;
+use std::collections::HashSet;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -472,6 +472,7 @@ impl PipelineContext {
                 self.verify_claim_with_retrieval(video_id, claim.id).await?;
             }
         }
+        let _ = self.rank_all().await;
         Ok(())
     }
 

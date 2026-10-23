@@ -8,8 +8,8 @@ use sqlx::{Row, SqlitePool};
 use crate::config::SeedEntry;
 use crate::models::{
     AttributionAct, Claim, ClaimWithEvidence, Creator, Decision, Evidence, HardwareProfile, Job,
-    LeadCardSummary, OcrText, Person, Seed, Stage, Transcript, TranscriptSegment, Video,
-    VideoDetail, VideoRef, VideoState,
+    LeadCardSummary, OcrText, Person, ProviderUsageSummary, Seed, Stage, Transcript,
+    TranscriptSegment, Video, VideoDetail, VideoRef, VideoState,
 };
 use crate::politeness::compute_backoff_delay;
 
@@ -261,6 +261,16 @@ impl Database {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    pub async fn list_known_phashes(&self) -> Result<Vec<String>> {
+        let rows = sqlx::query("SELECT phash FROM videos WHERE phash IS NOT NULL")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.get::<Option<String>, _>("phash"))
+            .collect())
     }
 
     pub async fn set_video_ranking(
@@ -1070,6 +1080,14 @@ impl Database {
         }
     }
 
+    pub async fn get_job(&self, job_id: i64) -> Result<Option<Job>> {
+        let row = sqlx::query("SELECT * FROM jobs WHERE id = ?1")
+            .bind(job_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.as_ref().map(Self::map_job_row))
+    }
+
     pub async fn claim_next_job(&self, stage_filter: Option<Stage>) -> Result<Option<Job>> {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
@@ -1217,6 +1235,44 @@ impl Database {
         Ok(res.rows_affected())
     }
 
+    pub async fn recover_stalled_jobs(&self, max_running_seconds: i64) -> Result<u64> {
+        let now = Utc::now();
+        let cutoff = (now - chrono::Duration::seconds(max_running_seconds)).to_rfc3339();
+        let now_str = now.to_rfc3339();
+        let res = sqlx::query(
+            "UPDATE jobs
+             SET status = 'queued',
+                 attempts = CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END,
+                 run_after = NULL,
+                 updated_at = ?1
+             WHERE status = 'running' AND updated_at < ?2",
+        )
+        .bind(&now_str)
+        .bind(&cutoff)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.rows_affected())
+    }
+
+    pub async fn defer_job_to(&self, job_id: i64, run_after: &str, reason: &str) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE jobs
+             SET status = 'deferred',
+                 run_after = ?2,
+                 last_error = ?3,
+                 updated_at = ?4
+             WHERE id = ?1",
+        )
+        .bind(job_id)
+        .bind(run_after)
+        .bind(reason)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn queue_counts(&self) -> Result<serde_json::Value> {
         let rows = sqlx::query("SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status")
             .fetch_all(&self.pool)
@@ -1272,6 +1328,32 @@ impl Database {
         .fetch_one(&self.pool)
         .await?;
         Ok(row.get::<i64, _>("total").max(0) as u64)
+    }
+
+    pub async fn get_today_provider_usage(&self) -> Result<Vec<ProviderUsageSummary>> {
+        let day = Utc::now().format("%Y-%m-%d").to_string();
+        let rows = sqlx::query(
+            "SELECT provider, model, day, requests, tokens_in, tokens_out, errors_429
+             FROM provider_usage
+             WHERE day = ?1",
+        )
+        .bind(&day)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(ProviderUsageSummary {
+                provider: r.get("provider"),
+                model: r.get("model"),
+                day: r.get("day"),
+                requests: r.get("requests"),
+                tokens_in: r.get("tokens_in"),
+                tokens_out: r.get("tokens_out"),
+                errors_429: r.get("errors_429"),
+            });
+        }
+        Ok(list)
     }
 
     pub async fn save_profile(&self, profile: &HardwareProfile) -> Result<()> {

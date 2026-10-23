@@ -1,21 +1,28 @@
-﻿use std::collections::HashMap;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, RwLock};
+use chrono::Utc;
 use leadfinder_core::{
     load_app_config, load_primary_sources, load_seed_entries, resolve_or_create_api_token,
     AppConfig, CoreEvent, Database, DiscoveryQuery, FrameSample, Ocr, OcrText, PolitenessGuard,
-    PolitenessPolicy, PrimarySourceEntry, ProviderErrorKind, RuntimePaths, Stage, TranscribeInput,
-    Transcriber, Transcript, Video, VideoDetail, VideoFilter, VideoRef, VideoSource, VideoState,
+    PolitenessPolicy, PrimarySourceEntry, ProviderError, ProviderErrorKind, RuntimePaths, Stage,
+    TranscribeInput, Transcriber, Transcript, Video, VideoDetail, VideoFilter, VideoRef,
+    VideoSource, VideoState,
 };
 use leadfinder_providers::{
     compute_wer, CaptionFirstTranscriber, DirectHttpDiscoverySource,
     HeadlessBrowserDiscoverySource, MediaAcquirer, PaddleOnnxOcr, PasteLinkSource, TesseractOcr,
     WhisperCppTranscriber, YtDlpClient, YtDlpDiscoverySource,
 };
+
+use crate::concurrency::{AimdConcurrencyManager, AimdStage};
+use crate::funnel::{screen_cheap, BudgetState, FunnelClaim, FunnelVideo, ScreenOutcome};
+use crate::janitor::run_media_retention_janitor;
+use crate::quota::ProviderQuotaGuard;
 
 #[derive(Clone)]
 pub struct PipelineContext {
@@ -28,6 +35,8 @@ pub struct PipelineContext {
     pub ytdlp: YtDlpClient,
     pub paste_source: PasteLinkSource,
     pub events_tx: broadcast::Sender<CoreEvent>,
+    pub concurrency: Arc<AimdConcurrencyManager>,
+    pub quota_guard: Arc<ProviderQuotaGuard>,
 }
 
 impl PipelineContext {
@@ -37,6 +46,7 @@ impl PipelineContext {
     }
 
     pub async fn init_with_paths(paths: RuntimePaths) -> Result<Self> {
+        let _ = leadfinder_core::init_structured_logging(&paths.log_dir);
         let cfg = load_app_config(&paths.config_dir)?;
         let primary = load_primary_sources(&paths.config_dir).unwrap_or_default();
         let seeds = load_seed_entries(&paths.config_dir).unwrap_or_default();
@@ -62,6 +72,9 @@ impl PipelineContext {
         let paste_source = PasteLinkSource::new(ytdlp.clone(), guard.clone());
         let (events_tx, _) = broadcast::channel(512);
 
+        let concurrency = Arc::new(AimdConcurrencyManager::new());
+        let quota_guard = Arc::new(ProviderQuotaGuard::new());
+
         Ok(Self {
             paths,
             config: Arc::new(RwLock::new(cfg)),
@@ -72,6 +85,8 @@ impl PipelineContext {
             ytdlp,
             paste_source,
             events_tx,
+            concurrency,
+            quota_guard,
         })
     }
 
@@ -134,6 +149,79 @@ impl PipelineContext {
         };
         let refs = self.paste_source.discover(&query).await?;
         self.ingest_video_refs(refs, 0, true).await
+    }
+
+    pub async fn run_screen_cheap_job(&self, video_id: &str) -> Result<()> {
+        let video = self
+            .db
+            .get_video(video_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("video not found: {video_id}"))?;
+
+        let cfg = self.config.read().await.clone();
+        let seeds = self.db.list_seeds(true).await.unwrap_or_default();
+        let seed_terms: Vec<String> = seeds.into_iter().map(|s| s.value).collect();
+        let seen_phashes = self.db.list_known_phashes().await.unwrap_or_default();
+
+        let claims = self.db.get_claims_for_video(video_id).await.unwrap_or_default();
+        let fclaims = claims
+            .into_iter()
+            .map(|c| FunnelClaim {
+                id: c.id,
+                text: c.text_bg,
+                claim_type: c.claim_type,
+                checkworthiness: c.checkworthiness.unwrap_or(0.0),
+                verdict: c.verdict,
+                label: c.label,
+            })
+            .collect();
+
+        let fvideo = FunnelVideo {
+            id: video.id.clone(),
+            views: video.views.unwrap_or(0),
+            posted_at: video.posted_at.clone(),
+            phash: video.phash.clone(),
+            discovered_via: video.discovered_via.clone(),
+            caption: video.caption.clone().unwrap_or_default(),
+            hashtags: video.hashtags.clone(),
+            transcript_quality: 0.8,
+            failed: video.state == "FAILED",
+            claims: fclaims,
+            kept_label: None,
+            creator: video.creator_handle.clone(),
+        };
+
+        let budget = BudgetState {
+            llm_used: 0,
+            search_used: 0,
+        };
+
+        let outcome = screen_cheap(
+            &fvideo,
+            &cfg.funnel,
+            cfg.ranking.checkworthy_threshold,
+            &seed_terms,
+            &seen_phashes,
+            &budget,
+            Utc::now(),
+        );
+
+        match outcome {
+            ScreenOutcome::Out(reason) => {
+                self.db
+                    .set_video_state(&video.id, VideoState::ScreenedOut, Some(&reason))
+                    .await?;
+                self.emit(CoreEvent::VideoUpdated {
+                    video_id: video.id.clone(),
+                    state: VideoState::ScreenedOut.as_str().to_string(),
+                    lane: Some("screened_out".to_string()),
+                });
+            }
+            ScreenOutcome::Pass => {
+                let _ = self.db.enqueue_job(Some(&video.id), Stage::Acquire).await?;
+            }
+        }
+        Ok(())
     }
 
     pub async fn process_single_video(&self, video_id_or_url: &str) -> Result<VideoDetail> {
@@ -255,6 +343,8 @@ impl PipelineContext {
             state: VideoState::Extracted.as_str().to_string(),
             lane: video.lane.clone(),
         });
+
+        let _ = self.db.enqueue_job(Some(&video.id), Stage::Claims).await;
 
         self.db
             .get_video_detail(&video.id)
@@ -483,11 +573,52 @@ impl PipelineContext {
     }
 
     pub fn spawn_worker_loop(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
+        let maintenance_ctx = Arc::clone(&self);
         tokio::spawn(async move {
             loop {
+                tokio::time::sleep(Duration::from_secs(60)).await;
+                let _ = maintenance_ctx.db.recover_stalled_jobs(900).await;
+                let cfg = maintenance_ctx.config.read().await.clone();
+                let _ = run_media_retention_janitor(
+                    &maintenance_ctx.db,
+                    &maintenance_ctx.media_root(),
+                    cfg.funnel.retention_days,
+                )
+                .await;
+            }
+        });
+
+        tokio::spawn(async move {
+            loop {
+                let counts = self
+                    .db
+                    .queue_counts()
+                    .await
+                    .unwrap_or_else(|_| serde_json::json!({}));
+                let queued_count = counts.get("queued").and_then(|v| v.as_i64()).unwrap_or(0);
+                self.concurrency.update_backpressure(queued_count as usize).await;
+
                 match self.db.claim_next_job(None).await {
                     Ok(Some(job)) => {
-                        let res = match Stage::from_db(&job.stage) {
+                        let st_opt = Stage::from_db(&job.stage);
+                        let aimd_stage = match st_opt {
+                            Some(Stage::ScreenCheap) => AimdStage::ScreenCheap,
+                            Some(Stage::Acquire) | Some(Stage::Extract) => AimdStage::Acquire,
+                            Some(Stage::Claims) | Some(Stage::Checkworthy) => AimdStage::Claims,
+                            Some(Stage::Verify) => AimdStage::Verify,
+                            _ => AimdStage::Extract,
+                        };
+
+                        let permit = self.concurrency.acquire_permit(aimd_stage).await;
+
+                        let res = match st_opt {
+                            Some(Stage::ScreenCheap) => {
+                                if let Some(vid) = &job.video_id {
+                                    self.run_screen_cheap_job(vid).await
+                                } else {
+                                    Ok(())
+                                }
+                            }
                             Some(Stage::Acquire) | Some(Stage::Extract) => {
                                 if let Some(vid) = &job.video_id {
                                     self.process_single_video(vid).await.map(|_| ())
@@ -514,6 +645,7 @@ impl PipelineContext {
 
                         match res {
                             Ok(()) => {
+                                permit.finish(true).await;
                                 let _ = self.db.complete_job(job.id).await;
                                 self.emit(CoreEvent::JobUpdated {
                                     job_id: job.id,
@@ -523,10 +655,43 @@ impl PipelineContext {
                                 });
                             }
                             Err(err) => {
-                                let _ = self
-                                    .db
-                                    .fail_or_retry_job(&job, &err.to_string(), 3, true)
-                                    .await;
+                                permit.finish(false).await;
+                                let err_str = err.to_string();
+                                let is_quota = err_str.contains("429")
+                                    || err_str.contains("quota")
+                                    || err_str.contains("RateLimited")
+                                    || err_str.contains("QuotaExhausted");
+
+                                if is_quota {
+                                    let provider_err = ProviderError::new(
+                                        ProviderErrorKind::QuotaExhausted,
+                                        "llm",
+                                        &err_str,
+                                        false,
+                                    );
+                                    let chain = vec![
+                                        "local".to_string(),
+                                        "gemini".to_string(),
+                                        "heuristics".to_string(),
+                                    ];
+                                    let _ = self
+                                        .quota_guard
+                                        .handle_error(
+                                            "local",
+                                            "BgGPT",
+                                            &provider_err,
+                                            &chain,
+                                            &self.db,
+                                            &job,
+                                        )
+                                        .await;
+                                } else {
+                                    let _ = self
+                                        .db
+                                        .fail_or_retry_job(&job, &err_str, 3, true)
+                                        .await;
+                                }
+
                                 self.emit(CoreEvent::JobUpdated {
                                     job_id: job.id,
                                     video_id: job.video_id.clone(),

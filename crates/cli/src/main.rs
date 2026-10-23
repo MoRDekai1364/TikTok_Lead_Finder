@@ -1,4 +1,4 @@
-﻿use std::collections::HashMap;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use anyhow::Result;
@@ -149,6 +149,14 @@ enum Commands {
     ReplayFunnel {
         #[arg(required = true)]
         fixture_json: PathBuf,
+    },
+    SoakRun {
+        #[arg(long, default_value_t = 300)]
+        limit: usize,
+        #[arg(long)]
+        fixture_json: Option<PathBuf>,
+        #[arg(long, default_value = "docs/SCALE_REPORT.md")]
+        out_report: PathBuf,
     },
 }
 
@@ -500,6 +508,24 @@ async fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&serde_json::json!({ "result": result, "ranked": ranked }))?
             );
+        }
+        Commands::SoakRun {
+            limit,
+            fixture_json,
+            out_report,
+        } => {
+            let report = leadfinder_pipeline::soak::run_soak_test(
+                &ctx,
+                fixture_json.as_deref(),
+                limit,
+            )
+            .await?;
+            let md = leadfinder_pipeline::soak::format_scale_report_markdown(&report);
+            if let Some(parent) = out_report.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            std::fs::write(&out_report, md)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::VerifyVideo { video_id } => {
             ctx.run_verify_job(&video_id).await?;

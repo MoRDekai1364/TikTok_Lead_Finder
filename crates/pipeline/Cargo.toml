@@ -20,6 +20,7 @@ regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+sysinfo.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tower.workspace = true
@@ -31,4 +32,5 @@ uuid.workspace = true
 [dev-dependencies]
 reqwest.workspace = true
 sqlx.workspace = true
+sysinfo.workspace = true
 tempfile.workspace = true

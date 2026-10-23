@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 7 in progress. Phase 4 and Phase 5 have partial items noted below.
+Last updated: 2026-10-23 · Current active phase: Phase 8 in progress. Phase 4 and Phase 5 have partial items noted below.
 
 ## Phase Summary
 
@@ -13,7 +13,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 7 in progress. Phase 4 a
 | Phase 4 | Claims and people | PARTIAL (80% accuracy target and owner review of 50 claims not met) |
 | Phase 5 | Verification | PARTIAL (synthetic gold set only, see D-009) |
 | Phase 6 | Funnel, ranking and clustering | PASS |
-| Phase 7 | Scale hardening | PENDING |
+| Phase 7 | Scale hardening | PASS |
 | Phase 8 | Triage UI | PENDING |
 | Phase 9 | People research, export, packaging | PENDING |
 
@@ -250,3 +250,41 @@ Last updated: 2026-10-23 · Current active phase: Phase 7 in progress. Phase 4 a
   - All workspace tests pass.
   - `replay-funnel` outputs JSON confirming 300 total videos, 97 screened out, 203 passed, exactly 25 leads, 47 leads_queued, 10/10 seeded clusters verified with 0 split.
   - `docs/FUNNEL_REPORT.md` contains the full replay metrics and clustering evaluation table.
+
+---
+
+## Phase 7: Scale hardening
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - Durable queue crash recovery (`recover_running_jobs` and `recover_stalled_jobs` in `crates/core/src/db.rs`): resumes interrupted in-flight jobs without duplicate work or duplicated rows.
+  - Per-stage AIMD concurrency controller (`crates/pipeline/src/concurrency.rs`): additive increase on low-latency success streaks; multiplicative decrease on congestion, errors, and latency spikes; cross-stage backpressure clamps upstream `Acquire` concurrency when downstream queue depth exceeds threshold.
+  - Provider quota guard (`crates/pipeline/src/quota.rs`): detects HTTP 429 and daily quota errors, logs structured events, enforces exponential backoff cooldowns, falls back through provider chain, and defers jobs until midnight UTC reset (`00:05:00 UTC`) rather than retrying in a tight loop.
+  - Circuit breakers integrated across discovery, search, and archive retrieval (`PolitenessGuard`), feeding health status into `/metrics` and SSE.
+  - Media retention janitor (`crates/pipeline/src/janitor.rs`) running periodically in background and on disk threshold events.
+  - Daily rotating structured JSON logging (`crates/core/src/logger.rs`) writing to `logs/leadfinder.log.YYYY-MM-DD`.
+  - Local `/metrics` endpoint enhanced with Prometheus metrics (queue status, circuit breaker states, AIMD concurrency and active tasks per stage, backpressure state, process RSS memory bytes, free disk bytes, media bytes, and provider usage statistics), plus `/api/scale/status` JSON endpoint.
+  - 300-video soak run CLI command (`leadfinder soak-run`) and test suite (`crates/pipeline/src/soak.rs`).
+- **Measured**:
+  - 300-video soak run (`docs/SCALE_REPORT.md`):
+    - 300 videos processed through the pipeline (256 passed, 44 screened out).
+    - Initial RSS memory: 26.1 MB, peak RSS: 31.5 MB, final RSS: 31.5 MB (growth: +5.4 MB, well below the 250 MB boundary). Memory bounded: PASS.
+    - Janitor retention disk cleanup: PASS.
+    - Backpressure controller: triggered and verified.
+    - Final AIMD concurrency states: ScreenCheap: 8, Acquire: 1, Extract: 1, Claims: 1, Verify: 2.
+  - Integration test `tests::crash_recovery_resumes_without_duplicate_work`: 3 in-flight jobs recovered, 5 total completed with exact zero duplicate jobs.
+  - Integration test `tests::metrics_endpoint_exposes_aimd_and_scale_stats`: verifies Prometheus and JSON scale metrics.
+- **Decisions taken**:
+  - `D-012`: AIMD concurrency adaptation and provider quota deferral strategy.
+- **Open issues**:
+  - None blocking Phase 8.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  cargo run -p leadfinder-cli -- soak-run --limit 300 --out-report docs/SCALE_REPORT.md
+  Get-Content docs/SCALE_REPORT.md -TotalCount 25
+  ```
+  Expected output:
+  - All workspace tests pass (23 pipeline tests, 19 provider tests, 2 probe tests, 2 core tests).
+  - `soak-run` prints JSON confirming 300 videos, `memory_bounded: true`, `disk_bounded: true`, `backpressure_activated: true`.
+  - `docs/SCALE_REPORT.md` displays the scale report table.

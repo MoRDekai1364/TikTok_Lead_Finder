@@ -489,6 +489,17 @@ pub struct VideoDetail {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderUsageSummary {
+    pub provider: String,
+    pub model: String,
+    pub day: String,
+    pub requests: i64,
+    pub tokens_in: i64,
+    pub tokens_out: i64,
+    pub errors_429: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaimWithEvidence {
     pub claim: Claim,
     pub evidence: Vec<Evidence>,

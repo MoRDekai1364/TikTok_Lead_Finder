@@ -1,4 +1,4 @@
-﻿use std::convert::Infallible;
+use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
 use axum::extract::{Path, Query, Request, State};
@@ -134,6 +134,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/calibrate", post(handle_calibrate))
         .route("/api/calibrate/overrides", post(handle_calibrate_overrides))
         .route("/api/settings", get(handle_list_settings).post(handle_update_settings))
+        .route("/api/scale/status", get(handle_scale_status))
         .route_layer(middleware::from_fn_with_state(ctx.clone(), auth_middleware));
 
     Router::new()
@@ -567,6 +568,47 @@ async fn handle_update_settings(
     Json(serde_json::json!({ "updated": body.len() })).into_response()
 }
 
+async fn handle_scale_status(State(ctx): State<Arc<PipelineContext>>) -> impl IntoResponse {
+    let aimd = ctx.concurrency.snapshot().await;
+    let mut sys = sysinfo::System::new();
+    let pid = sysinfo::get_current_pid().ok();
+    let rss = if let Some(p) = pid {
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[p]), true);
+        sys.process(p).map(|proc| proc.memory()).unwrap_or(0)
+    } else {
+        0
+    };
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let free_disk = disks.iter().map(|d| d.available_space()).max().unwrap_or(0);
+    let media_bytes = compute_media_bytes(&ctx.media_root());
+    let breakers = ctx.guard.breaker_statuses().await;
+    let open_breakers = breakers.iter().filter(|b| b.is_open).count();
+
+    Json(serde_json::json!({
+        "aimd": aimd,
+        "rss_bytes": rss,
+        "disk_free_bytes": free_disk,
+        "media_bytes": media_bytes,
+        "open_breakers": open_breakers,
+    }))
+}
+
+fn compute_media_bytes(media_root: &std::path::Path) -> u64 {
+    let mut total = 0u64;
+    if let Ok(entries) = std::fs::read_dir(media_root) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                total += compute_media_bytes(&p);
+            } else if let Ok(meta) = p.metadata() {
+                total += meta.len();
+            }
+        }
+    }
+    total
+}
+
 async fn handle_metrics(State(ctx): State<Arc<PipelineContext>>) -> impl IntoResponse {
     let queue = ctx.db.queue_counts().await.unwrap_or_else(|_| serde_json::json!({}));
     let breakers = ctx.guard.breaker_statuses().await;
@@ -577,8 +619,61 @@ async fn handle_metrics(State(ctx): State<Arc<PipelineContext>>) -> impl IntoRes
     let succeeded = queue.get("succeeded").and_then(|v| v.as_i64()).unwrap_or(0);
     let failed = queue.get("failed").and_then(|v| v.as_i64()).unwrap_or(0);
 
-    let text = format!(
-        "leadfinder_jobs_queued {queued}\nleadfinder_jobs_running {running}\nleadfinder_jobs_succeeded {succeeded}\nleadfinder_jobs_failed {failed}\nleadfinder_circuit_breakers_open {open_breakers}\n"
+    let aimd = ctx.concurrency.snapshot().await;
+
+    let mut sys = sysinfo::System::new();
+    let pid = sysinfo::get_current_pid().ok();
+    let rss = if let Some(p) = pid {
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[p]), true);
+        sys.process(p).map(|proc| proc.memory()).unwrap_or(0)
+    } else {
+        0
+    };
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let free_disk = disks.iter().map(|d| d.available_space()).max().unwrap_or(0);
+    let media_bytes = compute_media_bytes(&ctx.media_root());
+
+    let mut text = format!(
+        "leadfinder_jobs_queued {queued}\nleadfinder_jobs_running {running}\nleadfinder_jobs_succeeded {succeeded}\nleadfinder_jobs_failed {failed}\nleadfinder_circuit_breakers_open {open_breakers}\nleadfinder_process_memory_rss_bytes {rss}\nleadfinder_disk_free_bytes {free_disk}\nleadfinder_media_bytes {media_bytes}\nleadfinder_backpressure_active {}\n",
+        if aimd.backpressure_active { 1 } else { 0 }
     );
+
+    for (st, snap) in &aimd.stages {
+        text.push_str(&format!(
+            "leadfinder_aimd_concurrency{{stage=\"{}\"}} {}\n",
+            st, snap.current_concurrency
+        ));
+        text.push_str(&format!(
+            "leadfinder_aimd_active_tasks{{stage=\"{}\"}} {}\n",
+            st, snap.active_tasks
+        ));
+        text.push_str(&format!(
+            "leadfinder_aimd_latency_ms{{stage=\"{}\"}} {}\n",
+            st, snap.last_latency_ms
+        ));
+    }
+
+    if let Ok(usages) = ctx.db.get_today_provider_usage().await {
+        for u in usages {
+            text.push_str(&format!(
+                "leadfinder_provider_requests_today{{provider=\"{}\",model=\"{}\"}} {}\n",
+                u.provider, u.model, u.requests
+            ));
+            text.push_str(&format!(
+                "leadfinder_provider_tokens_in_today{{provider=\"{}\",model=\"{}\"}} {}\n",
+                u.provider, u.model, u.tokens_in
+            ));
+            text.push_str(&format!(
+                "leadfinder_provider_tokens_out_today{{provider=\"{}\",model=\"{}\"}} {}\n",
+                u.provider, u.model, u.tokens_out
+            ));
+            text.push_str(&format!(
+                "leadfinder_provider_errors_429_today{{provider=\"{}\",model=\"{}\"}} {}\n",
+                u.provider, u.model, u.errors_429
+            ));
+        }
+    }
+
     ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], text)
 }

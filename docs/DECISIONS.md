@@ -1,4 +1,4 @@
-﻿# Architecture & Implementation Decisions Log
+# Architecture & Implementation Decisions Log
 
 Every deviation from `docs/PLAN.md` and every resolution of a deferred decision (Section 18) is recorded here with its rationale.
 
@@ -109,3 +109,14 @@ Every deviation from `docs/PLAN.md` and every resolution of a deferred decision 
 - **Replay fixture**: `fixtures/phase6_replay.json` is generated and flagged `"synthetic": true`. No recorded TikTok corpus with owner labels exists yet.
 - **Lanes**: besides the four plan lanes the ranker writes `leads_queued` (behind the daily cap), `clustered` (non-representative members of a cluster) and `screened_out` (no check-worthy claim). The UI shows only the four plan lanes.
 - **Reason**: Cheap, offline and explainable. An embedding re-rank can replace it later without changing the lane logic.
+
+## D-012: AIMD Concurrency Adaptation and Provider Quota Deferral Strategy
+- **Date**: 2026-10-23
+- **Phase**: 7
+- **Context**: Section 10 and Section 11 require an AIMD concurrency controller per stage, with queue wait reducing concurrency on the constrained resource first, and provider quota guard deferring jobs until reset time rather than retrying in a tight loop.
+- **Decision**:
+  - Implemented per-stage AIMD concurrency (`crates/pipeline/src/concurrency.rs`): additive increase (+1 concurrency) after consecutive latency-SLA successes; multiplicative decrease (concurrency cut by 0.5 down to minimum 1) on errors or latency spikes.
+  - Cross-stage backpressure: when downstream queue depth exceeds `backpressure_threshold` (15), upstream `Acquire` concurrency is clamped to 1, preventing out-of-memory or unbounded disk growth.
+  - Quota guard (`crates/pipeline/src/quota.rs`): on HTTP 429 or daily budget exhaustion, records error in `provider_usage`, enforces exponential cooldown (30s to 15m), and falls back through the provider chain (`local -> gemini -> paid -> heuristics`). If all providers are exhausted, defers the job until midnight UTC (`00:05:00 UTC`), updating job status to `deferred` and setting `run_after`.
+  - Crash recovery & idempotency: `recover_running_jobs` and `recover_stalled_jobs` reset interrupted in-flight jobs without duplicate work.
+- **Reason**: Guarantees bounded resource usage, zero tight retry loops, and resilient crash recovery under high volume.
