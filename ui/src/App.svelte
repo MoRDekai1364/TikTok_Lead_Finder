@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import {
     initDesktopConnection,
+    deleteVideo,
     fetchProfile,
     fetchQueueStatus,
     fetchScaleStatus,
@@ -141,23 +142,37 @@
   }
 
   async function handleKeep(id: string) {
-    const c = cards.find((x) => x.id === id);
-    if (c) {
+    const idx = cards.findIndex((x) => x.id === id);
+    if (idx !== -1) {
+      const c = cards[idx];
       undoStack.push({ id, prevLane: c.lane });
       cards = cards.filter((x) => x.id !== id);
+      advanceSelectionAfterRemoval(idx);
       await logDecision(id, 'keep');
-      advanceSelectionAfterRemoval(id);
     }
   }
 
   async function handleDiscard(id: string) {
-    const c = cards.find((x) => x.id === id);
-    if (c) {
+    const idx = cards.findIndex((x) => x.id === id);
+    if (idx !== -1) {
+      const c = cards[idx];
       undoStack.push({ id, prevLane: c.lane });
       cards = cards.filter((x) => x.id !== id);
+      advanceSelectionAfterRemoval(idx);
       await logDecision(id, 'discard');
-      advanceSelectionAfterRemoval(id);
     }
+  }
+
+  async function handleDeleteVideo(id: string) {
+    const idx = cards.findIndex((x) => x.id === id);
+    if (idx !== -1) {
+      cards = cards.filter((x) => x.id !== id);
+      advanceSelectionAfterRemoval(idx);
+    }
+    if (drawerVideoId === id) {
+      drawerVideoId = null;
+    }
+    await deleteVideo(id);
   }
 
   async function handleResearchMore(id: string) {
@@ -195,10 +210,9 @@
     cards = await fetchVideos(activeLane);
   }
 
-  function advanceSelectionAfterRemoval(removedId: string) {
-    const idx = cards.findIndex((c) => c.id === removedId);
+  function advanceSelectionAfterRemoval(prevIdx: number) {
     if (cards.length > 0) {
-      const nextIdx = Math.min(idx, cards.length - 1);
+      const nextIdx = Math.max(0, Math.min(prevIdx, cards.length - 1));
       selectedId = cards[nextIdx].id;
       if (drawerVideoId) {
         drawerVideoId = cards[nextIdx].id;
@@ -340,6 +354,8 @@
           {currentLang}
           onClose={() => (drawerVideoId = null)}
           onSelectVideo={(id) => (drawerVideoId = id)}
+          onDiscard={handleDiscard}
+          onDeleteVideo={handleDeleteVideo}
         />
       {/key}
     {/if}

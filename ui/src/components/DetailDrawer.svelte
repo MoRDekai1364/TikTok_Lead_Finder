@@ -1,10 +1,13 @@
 <script lang="ts">
   import {
     aiCheckTranscript,
+    deleteVideo,
+    fetchEvidencePreview,
     fetchVideoDetail,
     fetchVideosByCreator,
     getCoreUrl,
     logDecision,
+    researchPerson,
     retranscribeVideo,
     setCreatorWatchlist,
     updateTranscript,
@@ -18,11 +21,15 @@
     currentLang,
     onClose,
     onSelectVideo,
+    onDiscard,
+    onDeleteVideo,
   }: {
     videoId: string;
     currentLang: Language;
     onClose: () => void;
     onSelectVideo?: (id: string) => void;
+    onDiscard?: (id: string) => void;
+    onDeleteVideo?: (id: string) => void;
   } = $props();
 
   const t = $derived(translations[currentLang]);
@@ -43,6 +50,27 @@
   let creatorVideos = $state<LeadCard[]>([]);
   let isLoadingCreatorVideos = $state(false);
   let isTogglingWatchlist = $state(false);
+  let previewModalData = $state<{ url: string; title: string; text: string; domain: string } | null>(null);
+  let isLoadingPreview = $state(false);
+  let isResearchingPersonId = $state<number | null>(null);
+  let expandedEvidenceId = $state<number | null>(null);
+
+  const transcriptDisplaySegments = $derived.by(() => {
+    if (!detail?.transcript) return [];
+    if (detail.transcript.segments && detail.transcript.segments.length > 0) {
+      return detail.transcript.segments;
+    }
+    const full = detail.transcript.edited_text || detail.transcript.text || '';
+    if (!full.trim()) return [];
+    const sentences = full.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const estDuration = (detail.video.duration_s || 60) * 1000;
+    const step = Math.max(1000, Math.round(estDuration / Math.max(1, sentences.length)));
+    return sentences.map((st, i) => ({
+      start_ms: i * step,
+      end_ms: (i + 1) * step,
+      text: st,
+    }));
+  });
 
   let activeLoadId = '';
 
@@ -147,17 +175,21 @@
     }, 2500);
   }
 
-  function getSegmentClaimInfo(seg: { start_ms: number; end_ms: number }) {
+  function getSegmentClaimInfo(seg: { start_ms: number; end_ms: number; text?: string }) {
     if (!detail?.claims || detail.claims.length === 0) return null;
     for (let i = 0; i < detail.claims.length; i++) {
       const c = detail.claims[i].claim;
       const s = c.start_ms ?? 0;
       const e = c.end_ms ?? 0;
-      if (
+      const timeMatch = (s > 0 || e > 0) && (
         (seg.start_ms >= s && seg.start_ms < e) ||
         (seg.end_ms > s && seg.end_ms <= e) ||
         (s >= seg.start_ms && e <= seg.end_ms)
-      ) {
+      );
+      const segText = (seg.text || '').trim().toLowerCase();
+      const claimText = (c.text_bg || '').trim().toLowerCase();
+      const textMatch = segText.length > 15 && (claimText.includes(segText) || segText.includes(claimText.slice(0, 30)));
+      if (timeMatch || textMatch) {
         return {
           claimId: c.id,
           index: i + 1,
@@ -167,6 +199,49 @@
       }
     }
     return null;
+  }
+
+  async function handleLoadEvidencePreview(url: string) {
+    if (!url) return;
+    isLoadingPreview = true;
+    try {
+      const res = await fetchEvidencePreview(url);
+      previewModalData = res;
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при зареждане на източника' : 'Failed to load source';
+      setTimeout(() => (copyToast = null), 3000);
+    } finally {
+      isLoadingPreview = false;
+    }
+  }
+
+  async function handleResearchPerson(person: Person) {
+    isResearchingPersonId = person.id;
+    try {
+      const updated = await researchPerson(person.id, person.canonical_name);
+      if (detail?.people) {
+        detail.people = detail.people.map(p => p.id === person.id ? { ...p, ...updated } : p);
+      }
+      copyToast = currentLang === 'bg' ? `✓ Проучен: ${person.canonical_name}` : `✓ Researched: ${person.canonical_name}`;
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при проучване на лицето' : 'Research error';
+    } finally {
+      isResearchingPersonId = null;
+      setTimeout(() => (copyToast = null), 3000);
+    }
+  }
+
+  async function handleRemoveThisVideo() {
+    if (!detail) return;
+    const vid = detail.video.id;
+    onClose();
+    if (onDiscard) {
+      onDiscard(vid);
+    } else if (onDeleteVideo) {
+      onDeleteVideo(vid);
+    } else {
+      await deleteVideo(vid);
+    }
   }
 
   async function handleSaveTranscript() {
@@ -288,31 +363,59 @@
   }
 
   function computePersonCredibility(person: Person) {
-    if (!detail?.claims || detail.claims.length === 0) {
-      return { score: 60, level: 'moderate', label: 'Умерена достоверност', badgeClass: 'cred-moderate' };
-    }
+    const pAny = person as any;
+    const dbContradicted = pAny.contradicted_count ?? 0;
+    const dbSupported = pAny.supported_count ?? 0;
+    const dbTotal = pAny.total_claims ?? 0;
+
     const nameLower = person.canonical_name.toLowerCase();
-    const related = detail.claims.filter((c) => {
+    const related = (detail?.claims || []).filter((c) => {
       const sp = (c.claim.speaker || '').toLowerCase();
       const attr = (c.claim.attribution || []).some((a) => (a.actor || '').toLowerCase().includes(nameLower));
       return sp.includes(nameLower) || attr;
     });
 
-    const hasContradicted = related.some((c) => (c.claim.verdict || '').toUpperCase() === 'CONTRADICTED');
+    const hasContradicted = related.some((c) => (c.claim.verdict || '').toUpperCase() === 'CONTRADICTED') || dbContradicted > 0;
+    const hasSupported = related.some((c) => (c.claim.verdict || '').toUpperCase() === 'SUPPORTED') || dbSupported > 0;
+
+    let score = 65;
+    let level = 'neutral';
+    let label = 'Споменато лице';
+    let levelLabel = 'Неутрален';
+    let badgeClass = 'cred-neutral';
+
     if (hasContradicted) {
-      return { score: 25, level: 'high-risk', label: '⚠️ Повишен риск от дезинформация', badgeClass: 'cred-low' };
+      score = Math.max(15, 35 - dbContradicted * 5);
+      level = 'high-risk';
+      label = '⚠️ Повишен риск от дезинформация';
+      levelLabel = 'Нисък рейтинг на достоверност';
+      badgeClass = 'cred-low';
+    } else if (hasSupported) {
+      score = Math.min(95, 80 + dbSupported * 3);
+      level = 'supported';
+      label = '✅ Висока достоверност';
+      levelLabel = 'Потвърдени факти';
+      badgeClass = 'cred-high';
+    } else if (related.length > 0 || dbTotal > 0) {
+      score = 50;
+      level = 'unverifiable';
+      label = 'ℹ️ Изисква проверка';
+      levelLabel = 'Непроверени твърдения';
+      badgeClass = 'cred-moderate';
     }
 
-    const hasSupported = related.some((c) => (c.claim.verdict || '').toUpperCase() === 'SUPPORTED');
-    if (hasSupported) {
-      return { score: 88, level: 'supported', label: '✅ Висока достоверност', badgeClass: 'cred-high' };
-    }
-
-    if (related.length > 0) {
-      return { score: 50, level: 'unverifiable', label: 'ℹ️ Изисква проверка', badgeClass: 'cred-moderate' };
-    }
-
-    return { score: 65, level: 'neutral', label: 'Споменато лице', badgeClass: 'cred-neutral' };
+    return {
+      score,
+      level,
+      label,
+      levelLabel,
+      badgeClass,
+      stats: {
+        total: related.length + dbTotal,
+        contradicted: (related.filter(c => (c.claim.verdict || '').toUpperCase() === 'CONTRADICTED').length) + dbContradicted,
+        supported: (related.filter(c => (c.claim.verdict || '').toUpperCase() === 'SUPPORTED').length) + dbSupported,
+      }
+    };
   }
 
   function computeAuthorRisk(creator: any) {
@@ -362,9 +465,18 @@
         <span class="video-ref-id">ID: {detail.video.id}</span>
       {/if}
     </div>
-    <button class="close-btn" onclick={onClose} title={t.drawerClose} aria-label={t.drawerClose}>
-      ✕
-    </button>
+    <div class="drawer-header-actions">
+      <button
+        class="btn btn-danger btn-sm drawer-remove-btn"
+        onclick={handleRemoveThisVideo}
+        title={currentLang === 'bg' ? 'Премахни видеото от списъка (✕)' : 'Remove video (✕)'}
+      >
+        ✕ {currentLang === 'bg' ? 'Премахни видеото' : 'Remove video'}
+      </button>
+      <button class="close-btn" onclick={onClose} title={t.drawerClose} aria-label={t.drawerClose}>
+        ✕
+      </button>
+    </div>
   </div>
 
   {#if isLoading}
@@ -411,7 +523,7 @@
               class="btn btn-secondary btn-sm"
               onclick={handleWarmStartRedact}
               disabled={isRetranscribing}
-              title={currentLang === 'bg' ? 'Преработка с българския речник (1567 думи) и AI без изтриване' : 'Fast lexicon & AI warm-start redaction'}
+              title={currentLang === 'bg' ? 'Преработка с българския речник и AI без изтриване' : 'Fast lexicon & AI warm-start redaction'}
             >
               {isRetranscribing ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Бърза преработка' : 'Warm-start')}
             </button>
@@ -431,6 +543,15 @@
             >
               {isAiChecking ? '...' : '🤖 AI'}
             </button>
+            <a
+              href={`https://www.google.com/search?udm=50&q=${encodeURIComponent('what would the fixed text look like?\n' + (editedText || detail.transcript?.text || ''))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-secondary btn-sm google-sge-btn"
+              title={currentLang === 'bg' ? 'Отвори външен AI Overview инструмент в Google за поправка на стенограмата' : 'Open external Google AI Overview tool for transcription fix'}
+            >
+              🔎 Google AI Overview ↗
+            </a>
             {#if !isEditingTranscript}
               <button class="btn btn-secondary btn-sm" onclick={() => (isEditingTranscript = true)}>
                 ✏️ {t.transcriptEditBtn}
@@ -447,7 +568,7 @@
           <textarea class="transcript-editor" bind:value={editedText} rows="6"></textarea>
         {:else if detail.transcript}
           <div class="transcript-segments">
-            {#each detail.transcript.segments as seg}
+            {#each transcriptDisplaySegments as seg}
               {@const cinfo = getSegmentClaimInfo(seg)}
               <span
                 id={`seg-${seg.start_ms}`}
@@ -637,25 +758,46 @@
                   </div>
                 {:else}
                   {#each cwith.evidence as ev}
-                    <div class="evidence-item">
+                    <div class="evidence-item" class:expanded={expandedEvidenceId === ev.id}>
                       <div class="evidence-meta">
                         <span class="stance-badge {stanceClass(ev.stance || '')}">{stanceLabel(ev.stance || '')}</span>
                         <span class="evidence-source">{ev.source_name || ev.source_kind}</span>
                         {#if ev.published_at}
                           <span class="evidence-date">• {ev.published_at.substring(0, 10)}</span>
                         {/if}
+                        {#if ev.source_url || (ev as any).url}
+                          <button
+                            class="btn btn-outline btn-xs preview-act-btn"
+                            onclick={() => handleLoadEvidencePreview(ev.source_url || (ev as any).url)}
+                            title="Зареди и виж скрапнатия пълен текст на статията"
+                          >
+                            📖 {currentLang === 'bg' ? 'Зареди статия / преглед' : 'Load article / preview'}
+                          </button>
+                        {/if}
                       </div>
-                      <div class="evidence-snippet">{ev.passage || (ev as any).snippet}</div>
-                      {#if ev.source_url || (ev as any).url}
-                        <a
-                          href={ev.source_url || (ev as any).url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="evidence-link"
+                      <div class="evidence-snippet">
+                        {ev.passage || (ev as any).snippet}
+                      </div>
+                      <div class="evidence-actions-row">
+                        {#if ev.source_url || (ev as any).url}
+                          <a
+                            href={ev.source_url || (ev as any).url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="evidence-link"
+                          >
+                            {(ev as any).title || ev.source_url || (ev as any).url} ↗
+                          </a>
+                        {/if}
+                        <button
+                          class="btn btn-text btn-xs toggle-expand-btn"
+                          onclick={() => (expandedEvidenceId = expandedEvidenceId === ev.id ? null : ev.id)}
                         >
-                          {(ev as any).title || ev.source_url || (ev as any).url} ↗
-                        </a>
-                      {/if}
+                          {expandedEvidenceId === ev.id
+                            ? (currentLang === 'bg' ? 'Свий цитата ▲' : 'Collapse ▲')
+                            : (currentLang === 'bg' ? 'Пълен цитат ▼' : 'Full passage ▼')}
+                        </button>
+                      </div>
                     </div>
                   {/each}
                 {/if}
@@ -692,6 +834,12 @@
                   <span class="person-cred-badge {cred.badgeClass}">{cred.label}</span>
                 </div>
 
+                {#if person.summary}
+                  <div class="person-bio-box">
+                    <p class="person-bio-text">{person.summary}</p>
+                  </div>
+                {/if}
+
                 <div class="credibility-meter">
                   <div class="meter-bar-track">
                     <div
@@ -701,11 +849,30 @@
                   </div>
                   <div class="meter-labels">
                     <span>{currentLang === 'bg' ? 'Оценка на достоверност' : 'Credibility score'}</span>
-                    <strong>{cred.score}%</strong>
+                    <strong>{cred.score}% ({cred.levelLabel})</strong>
                   </div>
+                  {#if cred.stats && cred.stats.total > 0}
+                    <div class="person-stats-mini">
+                      <span>{currentLang === 'bg' ? 'Свързани твърдения:' : 'Claims:'} <strong>{cred.stats.total}</strong></span>
+                      {#if cred.stats.contradicted > 0}
+                        <span class="stat-warn">• {currentLang === 'bg' ? 'Опровергани:' : 'False:'} <strong>{cred.stats.contradicted}</strong></span>
+                      {/if}
+                      {#if cred.stats.supported > 0}
+                        <span class="stat-ok">• {currentLang === 'bg' ? 'Потвърдени:' : 'Supported:'} <strong>{cred.stats.supported}</strong></span>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
 
                 <div class="person-actions-row">
+                  <button
+                    class="btn btn-primary btn-sm person-verify-btn"
+                    onclick={() => handleResearchPerson(person)}
+                    disabled={isResearchingPersonId === person.id}
+                    title="Стартирай автоматично проучване, скрапване и профилиране на лицето с AI"
+                  >
+                    {isResearchingPersonId === person.id ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи в мрежата с AI' : 'AI Web Research')}
+                  </button>
                   <a
                     href={`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg "' + person.canonical_name + '"')}`}
                     target="_blank"
@@ -744,13 +911,6 @@
                       Wikidata ({person.wikidata_id}) ↗
                     </a>
                   {/if}
-                  <button
-                    class="btn btn-secondary btn-sm person-verify-btn"
-                    onclick={() => handleTriggerClaimVerify(person.canonical_name)}
-                    title="Стартирай автоматично онлайн проучване за тази личност"
-                  >
-                    ⚡ {currentLang === 'bg' ? 'Проучи' : 'Research'}
-                  </button>
                 </div>
               </div>
             {/each}
@@ -802,6 +962,15 @@
                   ? (currentLang === 'bg' ? '👁 В наблюдение' : '👁 Watchlisted')
                   : (currentLang === 'bg' ? '+ Добави в наблюдение' : '+ Add to watchlist')}
               </button>
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent('site:tiktok.com/@' + creator.handle + ' OR "' + (creator.display_name || creator.handle) + '"')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-outline btn-sm"
+                title="Търсене за този автор в Google"
+              >
+                🔍 Търси в Google
+              </a>
             </div>
 
             <div class="creator-stat-row">
@@ -852,11 +1021,23 @@
                 {/each}
               </div>
             {:else if !isLoadingCreatorVideos}
-              <p class="empty-hint">
-                {currentLang === 'bg'
-                  ? 'Няма други записани видеа от този автор в локалната база.'
-                  : 'No other videos by this creator in local database.'}
-              </p>
+              <div class="creator-empty-box">
+                <p class="empty-hint">
+                  {currentLang === 'bg'
+                    ? 'Няма други записани видеа от този автор в локалната база.'
+                    : 'No other videos by this creator in local database.'}
+                </p>
+                <div class="creator-empty-actions">
+                  <a
+                    href={`https://www.tiktok.com/@${creator.handle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-outline btn-sm"
+                  >
+                    🎬 Отвори видеата на @{creator.handle} в TikTok ↗
+                  </a>
+                </div>
+              </div>
             {/if}
           </div>
         </div>
@@ -870,6 +1051,44 @@
         {#if metadataOpen}
           <pre class="metadata-dump">{JSON.stringify(detail.video, null, 2)}</pre>
         {/if}
+      </div>
+    </div>
+  {/if}
+
+  {#if previewModalData}
+    <div class="modal-backdrop" onclick={() => (previewModalData = null)} role="presentation">
+      <div class="preview-modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+        <div class="preview-modal-header">
+          <div>
+            <span class="preview-domain-pill">{previewModalData.domain || 'Уеб източник'}</span>
+            <h3 class="preview-modal-title">{previewModalData.title || previewModalData.url}</h3>
+          </div>
+          <button class="close-btn" onclick={() => (previewModalData = null)}>✕</button>
+        </div>
+        <div class="preview-modal-body">
+          {#if previewModalData.text}
+            {#each previewModalData.text.split('\n\n') as para}
+              {#if para.trim()}
+                <p class="preview-paragraph">{para.trim()}</p>
+              {/if}
+            {/each}
+          {:else}
+            <p class="empty-hint">Няма извлечен текст от този източник.</p>
+          {/if}
+        </div>
+        <div class="preview-modal-footer">
+          <a
+            href={previewModalData.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-primary btn-sm"
+          >
+            Отвори оригиналната страница ↗
+          </a>
+          <button class="btn btn-secondary btn-sm" onclick={() => (previewModalData = null)}>
+            Затвори
+          </button>
+        </div>
       </div>
     </div>
   {/if}
@@ -1707,5 +1926,175 @@
     color: var(--text-muted);
     font-size: 0.8rem;
     margin: 0;
+  }
+
+  .drawer-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .drawer-remove-btn {
+    font-size: 0.76rem;
+    padding: 0.25rem 0.6rem;
+    background: rgba(225, 29, 72, 0.2);
+    color: var(--verdict-contradicted);
+    border: 1px solid rgba(225, 29, 72, 0.4);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .drawer-remove-btn:hover {
+    background: rgba(225, 29, 72, 0.35);
+  }
+
+  .google-sge-btn {
+    text-decoration: none;
+    color: #60a5fa !important;
+    border-color: rgba(96, 165, 250, 0.4);
+  }
+
+  .google-sge-btn:hover {
+    background: rgba(96, 165, 250, 0.15);
+  }
+
+  .preview-act-btn {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.45rem;
+    margin-left: auto;
+  }
+
+  .evidence-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.4rem;
+  }
+
+  .toggle-expand-btn {
+    font-size: 0.7rem;
+    color: var(--primary-accent);
+    cursor: pointer;
+  }
+
+  .person-bio-box {
+    margin: 0.4rem 0;
+    padding: 0.45rem 0.65rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid var(--primary-accent);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .person-bio-text {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-body);
+  }
+
+  .person-stats-mini {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+
+  .stat-warn {
+    color: var(--verdict-contradicted);
+    font-weight: 600;
+  }
+
+  .stat-ok {
+    color: var(--verdict-supported);
+    font-weight: 600;
+  }
+
+  .creator-empty-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .creator-empty-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .preview-modal {
+    background: var(--surface-bg, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 720px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .preview-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color, #333);
+  }
+
+  .preview-domain-pill {
+    font-size: 0.7rem;
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .preview-modal-title {
+    margin: 0.35rem 0 0 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    line-height: 1.35;
+  }
+
+  .preview-modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--text-body);
+  }
+
+  .preview-paragraph {
+    margin: 0 0 0.85rem 0;
+  }
+
+  .preview-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--border-color, #333);
+    background: rgba(0, 0, 0, 0.15);
   }
 </style>

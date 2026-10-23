@@ -350,8 +350,8 @@ pub fn assign_lanes(
 
         let already_checked = v.claims.iter().any(|c| {
             c.claim_type != "opinion"
-                && c.checkworthiness >= ranking.checkworthy_threshold
-                && c.verdict.as_deref() == Some("ALREADY_CHECKED")
+                && (c.verdict.as_deref().map(|s| s.eq_ignore_ascii_case("ALREADY_CHECKED")).unwrap_or(false)
+                    || (c.checkworthiness >= ranking.checkworthy_threshold && c.verdict.as_deref() == Some("ALREADY_CHECKED")))
         });
         let has_checkworthy = v
             .claims
@@ -694,7 +694,7 @@ impl PipelineContext {
             let state = if r.lane == "failed" {
                 VideoState::Failed
             } else {
-                VideoState::Ready
+                VideoState::Verified
             };
             self.db
                 .set_video_ranking(

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getCoreUrl } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { QueueCounts, ScaleStatus, Screen } from '../lib/types';
@@ -37,10 +38,15 @@
     id: string;
     url?: string;
     creator_handle?: string | null;
+    creator_display_name?: string | null;
     caption?: string | null;
+    duration_s?: number | null;
+    views?: number | null;
+    thumbnail_url?: string | null;
     state?: string | null;
     progress_pct?: number | null;
     etr_seconds?: number | null;
+    stage_desc?: string | null;
   } | null>(null);
 
   const t = $derived(translations[currentLang]);
@@ -104,7 +110,19 @@
       const res = await onPasteUrls(pasteText);
       pasteText = '';
       if (res) {
-        lastPasted = res;
+        lastPasted = {
+          ...lastPasted,
+          ...res,
+          creator_handle: res.creator_handle || lastPasted?.creator_handle,
+          creator_display_name: res.creator_display_name || lastPasted?.creator_display_name,
+          caption: res.caption || lastPasted?.caption,
+          duration_s: res.duration_s || lastPasted?.duration_s,
+          views: res.views || lastPasted?.views,
+          thumbnail_url: res.id ? `${getCoreUrl()}/api/media/${res.id}/thumb.jpg` : null,
+          progress_pct: res.progress_pct ?? 30,
+          etr_seconds: res.etr_seconds ?? 20,
+          stage_desc: res.stage_desc ?? 'В обработка...',
+        };
       }
       toastMessage = currentLang === 'bg' ? '✓ Линкът е добавен в опашката!' : '✓ Added to processing queue!';
       setTimeout(() => { toastMessage = null; }, 3500);
@@ -202,26 +220,64 @@
   </div>
 
   {#if lastPasted}
-    <div class="pasted-preview-bar">
-      <div class="preview-badge">📌 {t.previewCardTitle}</div>
-      <div class="preview-author">@{lastPasted.creator_handle || 'tiktok_user'}</div>
-      <div class="preview-title" title={lastPasted.caption || lastPasted.id}>{lastPasted.caption || lastPasted.id}</div>
-      <div class="preview-status">
-        {#if lastPasted.progress_pct !== undefined && lastPasted.progress_pct !== null && lastPasted.progress_pct < 100}
-          <div class="preview-progress-box">
-            <div class="preview-progress-fill" style="width: {lastPasted.progress_pct}%"></div>
-            <span class="preview-progress-text">⏳ {lastPasted.progress_pct}% {#if lastPasted.etr_seconds}(~{lastPasted.etr_seconds}s ETR){/if}</span>
-          </div>
-        {:else}
-          <span class="preview-ready-badge">✓ {t.processingBadge}</span>
+    <div class="pasted-preview-card">
+      <div class="preview-thumb-col">
+        {#if lastPasted.id && lastPasted.id !== 'tiktok_link'}
+          <img
+            src={`${getCoreUrl()}/api/media/${lastPasted.id}/thumb.jpg`}
+            alt=""
+            class="preview-thumb-img"
+            onerror={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
         {/if}
+        <div class="preview-thumb-fallback" aria-hidden="true">🎬</div>
       </div>
-      {#if onJumpToVideo}
-        <button class="btn-jump" onclick={() => onJumpToVideo?.(lastPasted!.id)}>
-          🔍 {t.jumpToVideo}
-        </button>
-      {/if}
-      <button class="preview-dismiss" onclick={() => (lastPasted = null)} aria-label="Close">✕</button>
+
+      <div class="preview-content-col">
+        <div class="preview-header-line">
+          <span class="preview-badge">📌 {t.previewCardTitle}</span>
+          <span class="preview-author-handle">@{lastPasted.creator_handle || 'tiktok_creator'}</span>
+          {#if lastPasted.creator_display_name}
+            <span class="preview-author-name">({lastPasted.creator_display_name})</span>
+          {/if}
+          {#if lastPasted.duration_s}
+            <span class="preview-pill">⏱ {Math.round(lastPasted.duration_s)}s</span>
+          {/if}
+          {#if lastPasted.views}
+            <span class="preview-pill">👁 {lastPasted.views.toLocaleString()}</span>
+          {/if}
+        </div>
+
+        <div class="preview-caption-text" title={lastPasted.caption || lastPasted.id}>
+          {lastPasted.caption || lastPasted.id}
+        </div>
+
+        <div class="preview-status-line">
+          <div class="preview-progress-track">
+            <div
+              class="preview-progress-fill"
+              style="width: {Math.max(12, lastPasted.progress_pct ?? 25)}%"
+            ></div>
+          </div>
+          <span class="preview-progress-label">
+            ⚙️ {lastPasted.stage_desc || 'В обработка...'} ({lastPasted.progress_pct ?? 25}%)
+            {#if lastPasted.etr_seconds}
+              • ~{lastPasted.etr_seconds}s
+            {/if}
+          </span>
+        </div>
+      </div>
+
+      <div class="preview-actions-col">
+        {#if onJumpToVideo && lastPasted.id && lastPasted.id !== 'tiktok_link'}
+          <button class="btn btn-primary btn-sm btn-jump" onclick={() => onJumpToVideo?.(lastPasted!.id)}>
+            👁 {t.jumpToVideo}
+          </button>
+        {/if}
+        <button class="preview-dismiss" onclick={() => (lastPasted = null)} aria-label="Close">✕</button>
+      </div>
     </div>
   {/if}
 
@@ -406,76 +462,128 @@
     border-bottom-color: var(--primary-accent);
   }
 
-  .pasted-preview-bar {
+  .pasted-preview-card {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.4rem 0.75rem;
-    margin: 0.4rem 0 0.2rem 0;
+    gap: 0.85rem;
+    padding: 0.55rem 0.85rem;
+    margin: 0.45rem 0 0.25rem 0;
+    border-radius: 8px;
+    background: var(--surface-bg);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .preview-thumb-col {
+    width: 48px;
+    height: 64px;
     border-radius: 6px;
-    background: rgba(99, 102, 241, 0.08);
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    font-size: 0.82rem;
+    overflow: hidden;
+    position: relative;
+    background: #000;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+  }
+
+  .preview-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+
+  .preview-thumb-fallback {
+    position: absolute;
+    font-size: 1.3rem;
+    color: var(--text-muted);
+  }
+
+  .preview-content-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .preview-header-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
   }
 
   .preview-badge {
     font-weight: 700;
     color: var(--primary-accent);
-    white-space: nowrap;
   }
 
-  .preview-author {
-    font-weight: 600;
+  .preview-author-handle {
+    font-weight: 700;
     color: var(--text-heading);
-    white-space: nowrap;
   }
 
-  .preview-title {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .preview-author-name {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+  }
+
+  .preview-pill {
+    font-size: 0.7rem;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--pill-bg);
     color: var(--text-muted);
   }
 
-  .preview-status {
-    display: flex;
-    align-items: center;
+  .preview-caption-text {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-heading);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .preview-progress-box {
-    position: relative;
-    width: 140px;
-    height: 18px;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 999px;
-    overflow: hidden;
+  .preview-status-line {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .preview-progress-track {
+    width: 140px;
+    height: 10px;
+    background: var(--border-color);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
   }
 
   .preview-progress-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, #6366f1, #10b981);
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #06b6d4);
+    border-radius: 999px;
     transition: width 0.3s ease;
   }
 
-  .preview-progress-text {
-    position: relative;
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  .preview-progress-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 600;
   }
 
-  .preview-ready-badge {
-    font-weight: 600;
-    color: var(--verdict-supported);
+  .preview-actions-col {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
   }
 
   .btn-jump {

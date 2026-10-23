@@ -13,6 +13,7 @@
 
   let newKind = $state<'hashtag' | 'keyword' | 'creator'>('hashtag');
   let newValue = $state('');
+  let newPriority = $state<number>(5);
 
   onMount(async () => {
     isLoading = true;
@@ -29,7 +30,7 @@
       kind: newKind,
       value: newValue.trim(),
       active: true,
-      priority: 5,
+      priority: newPriority,
     });
     seeds = [...seeds, added];
     newValue = '';
@@ -44,6 +45,12 @@
     const updated = !s.active;
     await upsertSeed({ ...s, active: updated });
     s.active = updated;
+    seeds = [...seeds];
+  }
+
+  async function handleSetPriority(s: Seed, priority: number) {
+    s.priority = priority;
+    await upsertSeed({ ...s, priority });
     seeds = [...seeds];
   }
 </script>
@@ -68,6 +75,25 @@
       aria-label="Стойност на ключова дума"
       onkeydown={(e) => e.key === 'Enter' && handleAddSeed()}
     />
+
+    <div class="priority-picker" title={currentLang === 'bg' ? 'Приоритет (1-5 звезди: повече звезди = по-висок приоритет)' : 'Priority (1-5 stars: more stars = higher priority)'}>
+      <span class="priority-picker-label">{currentLang === 'bg' ? 'Приоритет:' : 'Priority:'}</span>
+      <div class="stars-group">
+        {#each [1, 2, 3, 4, 5] as star}
+          <button
+            type="button"
+            class="star-btn"
+            class:active={star <= newPriority}
+            onclick={() => (newPriority = star)}
+            aria-label={`${star} звезди`}
+            title={`${star} / 5`}
+          >
+            ★
+          </button>
+        {/each}
+      </div>
+    </div>
+
     <button class="btn btn-primary" onclick={handleAddSeed} disabled={!newValue.trim()}>
       {currentLang === 'bg' ? 'Добави' : 'Add Seed'}
     </button>
@@ -84,7 +110,7 @@
           <tr>
             <th>{currentLang === 'bg' ? 'Тип' : 'Kind'}</th>
             <th>{currentLang === 'bg' ? 'Стойност' : 'Value'}</th>
-            <th>{currentLang === 'bg' ? 'Приоритет' : 'Priority'}</th>
+            <th>{currentLang === 'bg' ? 'Приоритет (1-5 звезди)' : 'Priority (1-5 stars)'}</th>
             <th>{currentLang === 'bg' ? 'Последно пускане' : 'Last run'}</th>
             <th>{currentLang === 'bg' ? 'Статус' : 'Status'}</th>
             <th>{currentLang === 'bg' ? 'Действия' : 'Actions'}</th>
@@ -95,7 +121,23 @@
             <tr>
               <td><span class="kind-tag {s.kind}">{s.kind}</span></td>
               <td><strong>{s.value}</strong></td>
-              <td>{s.priority}</td>
+              <td>
+                <div class="stars-group table-stars" title={`${s.priority ?? 5} / 5 звезди`}>
+                  {#each [1, 2, 3, 4, 5] as star}
+                    <button
+                      type="button"
+                      class="star-btn"
+                      class:active={star <= (s.priority ?? 5)}
+                      onclick={() => handleSetPriority(s, star)}
+                      aria-label={`${star} звезди`}
+                      title={`${star} звезди`}
+                    >
+                      ★
+                    </button>
+                  {/each}
+                  <span class="stars-count-text">({s.priority ?? 5}/5)</span>
+                </div>
+              </td>
               <td>{s.last_ran_at ? s.last_ran_at.substring(0, 16) : '-'}</td>
               <td>
                 <button
@@ -158,6 +200,8 @@
     border-radius: 8px;
     padding: 0.75rem;
     margin-bottom: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .select-kind {
@@ -171,12 +215,66 @@
 
   .seed-input {
     flex: 1;
+    min-width: 200px;
     padding: 0.45rem 0.85rem;
     font-size: 0.85rem;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     background: var(--input-bg);
     color: var(--text-body);
+  }
+
+  .priority-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+  }
+
+  .priority-picker-label {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .stars-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .table-stars {
+    gap: 3px;
+  }
+
+  .star-btn {
+    background: none;
+    border: none;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #64748b;
+    padding: 0 1px;
+    transition: color 0.12s ease, transform 0.12s ease;
+  }
+
+  .star-btn:hover {
+    transform: scale(1.25);
+    color: #fbbf24;
+  }
+
+  .star-btn.active {
+    color: #f59e0b;
+    text-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  }
+
+  .stars-count-text {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-left: 0.3rem;
   }
 
   .table-card {

@@ -479,6 +479,7 @@ impl PipelineContext {
                 self.verify_claim_with_retrieval(video_id, claim.id).await?;
             }
         }
+        let _ = self.check_and_mark_video_verified(video_id).await;
         let _ = self.rank_all().await;
         if let Ok(Some(v)) = self.db.get_video(video_id).await {
             self.emit(CoreEvent::VideoUpdated {
@@ -557,6 +558,7 @@ impl PipelineContext {
             }
         }
 
+        let _ = self.check_and_mark_video_verified(video_id).await;
         let _ = self.rank_all().await;
         if let Some(v) = self.db.get_video(video_id).await? {
             self.emit(CoreEvent::VideoUpdated {
@@ -570,17 +572,18 @@ impl PipelineContext {
 
     async fn check_and_mark_video_verified(&self, video_id: &str) -> Result<()> {
         let claims = self.db.get_claims_for_video(video_id).await?;
-        let all_verified = !claims.is_empty() && claims.iter().all(|c| c.verdict.is_some());
+        let all_verified = claims.is_empty() || claims.iter().all(|c| c.verdict.is_some());
         if all_verified {
             self.db
                 .set_video_state(video_id, VideoState::Verified, None)
                 .await?;
-            let v = self.db.get_video(video_id).await?.unwrap();
-            self.emit(CoreEvent::VideoUpdated {
-                video_id: video_id.to_string(),
-                state: VideoState::Verified.as_str().to_string(),
-                lane: v.lane,
-            });
+            if let Ok(Some(v)) = self.db.get_video(video_id).await {
+                self.emit(CoreEvent::VideoUpdated {
+                    video_id: video_id.to_string(),
+                    state: VideoState::Verified.as_str().to_string(),
+                    lane: v.lane,
+                });
+            }
         }
         Ok(())
     }

@@ -12,7 +12,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
 use tower_http::cors::CorsLayer;
-use leadfinder_core::{CoreEvent, Stage, VideoFilter};
+use leadfinder_core::{CoreEvent, Search, Stage, VideoFilter};
 use leadfinder_probe::{apply_calibration_overrides, run_calibration, CalibrationOverrides};
 use crate::engine::PipelineContext;
 
@@ -147,11 +147,13 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/rank/pull-more", post(handle_pull_more))
         .route("/api/rank/tune", post(handle_tune))
         .route("/api/videos", get(handle_list_videos))
-        .route("/api/videos/:id", get(handle_video_detail))
+        .route("/api/videos/:id", get(handle_video_detail).delete(handle_delete_video))
         .route("/api/videos/:id/decision", post(handle_decision))
         .route("/api/videos/:id/transcript", patch(handle_edit_transcript))
         .route("/api/videos/:id/retranscribe", post(handle_retranscribe))
         .route("/api/videos/:id/ai-check", post(handle_ai_check_transcript))
+        .route("/api/evidence/preview", get(handle_evidence_preview))
+        .route("/api/people/:id/research", post(handle_research_person))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
         .route("/api/seeds/:id", delete(handle_delete_seed))
         .route("/api/creators", get(handle_list_creators))
@@ -396,6 +398,27 @@ async fn handle_video_detail(
     }
 }
 
+async fn handle_delete_video(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+) -> Response {
+    match ctx.db.delete_video(&id).await {
+        Ok(()) => {
+            ctx.emit(CoreEvent::VideoUpdated {
+                video_id: id.clone(),
+                state: "DELETED".to_string(),
+                lane: None,
+            });
+            Json(serde_json::json!({ "ok": true, "deleted": id })).into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
 async fn handle_decision(
     State(ctx): State<Arc<PipelineContext>>,
     Path(id): Path<String>,
@@ -538,8 +561,8 @@ async fn handle_retranscribe(
 
         let stage1 = lex.normalize_text(&base_text);
 
-        let system_prompt = "You are a Bulgarian language spellcheck and grammar assistant. Fix speech recognition mistakes, merged words, and punctuation in the provided Bulgarian transcript while preserving the exact original meaning and structure. Output a JSON object with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
-        let user_prompt = format!("Original transcript:\n{stage1}");
+        let system_prompt = "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
+        let user_prompt = format!("what would the fixed text look like?\n{stage1}");
 
         let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
         let schema_val = serde_json::json!({
@@ -625,8 +648,8 @@ async fn handle_ai_check_transcript(
 
     let stage1 = lex.normalize_text(&base_text);
 
-    let system_prompt = "You are a Bulgarian language spellcheck and grammar assistant. Fix speech recognition mistakes, merged words, and punctuation in the provided Bulgarian transcript while preserving the exact original meaning and structure. Output a JSON object with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
-    let user_prompt = format!("Original transcript:\n{stage1}");
+    let system_prompt = "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string();
+    let user_prompt = format!("what would the fixed text look like?\n{stage1}");
 
     let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
     let schema_val = serde_json::json!({
@@ -665,6 +688,130 @@ async fn handle_ai_check_transcript(
         "corrected_text": corrected
     }))
     .into_response()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EvidencePreviewQuery {
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResearchPersonRequest {
+    pub name: Option<String>,
+}
+
+async fn handle_evidence_preview(
+    State(ctx): State<Arc<PipelineContext>>,
+    Query(q): Query<EvidencePreviewQuery>,
+) -> Response {
+    let cfg = ctx.config.read().await.clone();
+    let lex = leadfinder_providers::global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
+    let ranker = leadfinder_providers::PassageExtractorAndRanker::new(ctx.guard.clone(), lex);
+    let body = ranker.fetch_html_cached(&q.url).await.unwrap_or_default();
+    let text = ranker.extract_main_text(&body);
+    let title = if let Some(start) = body.to_lowercase().find("<title>") {
+        if let Some(end) = body.to_lowercase().find("</title>") {
+            if end > start + 7 {
+                body[start + 7..end].trim().to_string()
+            } else {
+                q.url.clone()
+            }
+        } else {
+            q.url.clone()
+        }
+    } else {
+        q.url.clone()
+    };
+    let domain = url::Url::parse(&q.url).ok().and_then(|u| u.domain().map(|d| d.to_string())).unwrap_or_default();
+    Json(serde_json::json!({
+        "url": q.url,
+        "title": title,
+        "text": text,
+        "domain": domain
+    })).into_response()
+}
+
+async fn handle_research_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+    Json(body): Json<ResearchPersonRequest>,
+) -> Response {
+    let name = body.name.unwrap_or_default();
+    let cfg = ctx.config.read().await.clone();
+    let lex = leadfinder_providers::global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
+    let query_str = format!("{} новини биография длъжност фактчекинг", name);
+    let search_q = leadfinder_core::SearchQuery {
+        query: query_str,
+        restrict_domains: Vec::new(),
+        date_from: None,
+        date_to: None,
+        max_results: 4,
+    };
+    let archive_ep = cfg.factcheck_archives.clone();
+    let primary_entries = leadfinder_core::load_primary_sources(&ctx.paths.config_dir).unwrap_or_default();
+    let search_engine = leadfinder_providers::WebAndPrimarySearch::new(
+        &cfg.providers.searxng_url,
+        primary_entries,
+        archive_ep,
+        cfg.verification.news_domains.clone(),
+        ctx.guard.clone(),
+    );
+    let ranker = leadfinder_providers::PassageExtractorAndRanker::new(ctx.guard.clone(), lex);
+    let mut hits_text = Vec::new();
+    if let Ok(hits) = search_engine.search(&search_q).await {
+        for hit in hits.into_iter().take(3) {
+            let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+            let txt = ranker.extract_main_text(&html);
+            if !txt.is_empty() {
+                hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(800).collect::<String>()));
+            }
+        }
+    }
+
+    let summary_context = hits_text.join("\n\n");
+    let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+    let schema_val = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "role": { "type": "string" },
+            "summary": { "type": "string" },
+            "public_figure": { "type": "boolean" }
+        },
+        "required": ["role", "summary", "public_figure"]
+    });
+    let llm_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: "You are a Bulgarian investigative journalist. Given the scraped news data about the named person, summarize in Bulgarian in 2 concise sentences: their public position or profession, and any notable public actions or fact-checks. Output valid JSON.".to_string(),
+        user_prompt: format!("Лице: {}\nКонтекст от мрежата:\n{}", name, summary_context),
+        json_schema: Some(schema_val),
+        max_tokens: 512,
+        temperature: 0.1,
+    };
+
+    let mut res_role = None;
+    let mut res_summary = None;
+    let mut res_pub = false;
+    if let Ok(val) = runner.complete_validated(&llm_req, &ctx.db).await {
+        res_role = val.response.parsed_json.get("role").and_then(|v| v.as_str()).map(|s| s.to_string());
+        res_summary = val.response.parsed_json.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
+        res_pub = val.response.parsed_json.get("public_figure").and_then(|v| v.as_bool()).unwrap_or(false);
+    }
+    if res_summary.is_none() && !summary_context.is_empty() {
+        res_summary = Some(summary_context.chars().take(250).collect());
+    }
+
+    let _ = ctx.db.update_person_profile(id, res_role.as_deref(), res_summary.as_deref(), res_pub).await;
+    let (total_claims, contradicted, supported) = ctx.db.get_person_claims_stats(id).await.unwrap_or((0, 0, 0));
+
+    Json(serde_json::json!({
+        "id": id,
+        "canonical_name": name,
+        "role": res_role,
+        "summary": res_summary,
+        "public_figure": res_pub,
+        "total_claims": total_claims,
+        "contradicted_count": contradicted,
+        "supported_count": supported
+    })).into_response()
 }
 
 async fn handle_list_seeds(State(ctx): State<Arc<PipelineContext>>) -> Response {

@@ -181,6 +181,23 @@ export async function retranscribeVideo(id: string, warmStart: boolean = true, r
   });
 }
 
+export async function deleteVideo(id: string): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`/api/videos/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchEvidencePreview(url: string): Promise<{ url: string; title: string; text: string; domain: string }> {
+  return fetchJson<{ url: string; title: string; text: string; domain: string }>(`/api/evidence/preview?url=${encodeURIComponent(url)}`);
+}
+
+export async function researchPerson(personId: number, name?: string): Promise<Person & { total_claims?: number; contradicted_count?: number; supported_count?: number }> {
+  return fetchJson<Person & { total_claims?: number; contradicted_count?: number; supported_count?: number }>(`/api/people/${personId}/research`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
 export async function fetchVideosByCreator(creatorId: string, limit: number = 10): Promise<LeadCard[]> {
   const res = await fetchJson<any>(`/api/videos?creator_id=${encodeURIComponent(creatorId)}&limit=${limit}`);
   const list = Array.isArray(res) ? res : Array.isArray(res?.cards) ? res.cards : [];

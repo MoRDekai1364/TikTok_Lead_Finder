@@ -325,9 +325,11 @@ impl Database {
              WHERE (?1 IS NULL
                     OR (?1 = 'pasted' AND v.lane = 'pasted')
                     OR (?1 = 'leads' AND (v.lane = 'leads' OR (v.lane IS NULL AND v.state IN ('VERIFIED', 'READY'))))
+                    OR (?1 = 'already_checked' AND (v.lane = 'already_checked' OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND (cl.verdict = 'ALREADY_CHECKED' OR cl.verdict = 'already_checked'))))
                     OR v.lane = ?1)
                AND (?2 IS NULL OR v.state = ?2)
-               AND (?3 IS NULL OR v.creator_id = ?3)
+               AND (?1 = 'discarded' OR ?2 = 'DISCARDED' OR (v.state != 'DISCARDED' AND COALESCE(v.lane, '') != 'discarded'))
+               AND (?3 IS NULL OR v.creator_id = ?3 OR c.handle = ?3 OR c.handle = REPLACE(?3, '@', ''))
                AND (?4 IS NULL OR COALESCE(v.lead_score, 0.0) >= ?4)
                AND (?5 IS NULL OR COALESCE(v.views, 0) >= ?5)
                AND (?6 IS NULL OR LOWER(COALESCE(v.caption, '')) LIKE '%' || LOWER(?6) || '%'
@@ -380,6 +382,14 @@ impl Database {
         .await?;
         let leads_cnt: i64 = leads_cnt_row.get("cnt");
         map.insert("leads".to_string(), leads_cnt);
+
+        let already_checked_cnt_row = sqlx::query(
+            "SELECT COUNT(*) AS cnt FROM videos WHERE lane = 'already_checked' OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = videos.id AND (cl.verdict = 'ALREADY_CHECKED' OR cl.verdict = 'already_checked'))",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        let already_checked_cnt: i64 = already_checked_cnt_row.get("cnt");
+        map.insert("already_checked".to_string(), already_checked_cnt);
 
         let pasted_cnt_row = sqlx::query(
             "SELECT COUNT(*) AS cnt FROM videos WHERE lane = 'pasted'",
@@ -454,11 +464,12 @@ impl Database {
             .bind(&video.id)
             .fetch_one(&self.pool)
             .await?;
-            let research_running = research_running_row.get::<i64, _>("cnt") > 0 || video.state != "VERIFIED";
+            let is_completed = matches!(video.state.as_str(), "VERIFIED" | "READY" | "KEPT" | "FAILED" | "SCREENED_OUT" | "DISCARDED");
+            let research_running = research_running_row.get::<i64, _>("cnt") > 0 || !is_completed;
 
             let top_claim_bg_final = if top_claim_bg.is_some() {
                 top_claim_bg
-            } else if video.state != "VERIFIED" {
+            } else if !is_completed {
                 Some("Видеото се обработва в момента (транскрибиране, OCR и проверка)...".to_string())
             } else {
                 None
@@ -466,7 +477,7 @@ impl Database {
 
             let top_verdict_final = if top_verdict.is_some() {
                 top_verdict
-            } else if video.state != "VERIFIED" {
+            } else if !is_completed {
                 Some("PROCESSING".to_string())
             } else {
                 None
@@ -474,7 +485,7 @@ impl Database {
 
             let top_label_final = if top_label.is_some() {
                 top_label
-            } else if video.state != "VERIFIED" {
+            } else if !is_completed {
                 Some("В обработка...".to_string())
             } else {
                 None
@@ -494,7 +505,7 @@ impl Database {
             .await?;
 
             let (progress_pct, etr_seconds, stage_desc) = match video.state.as_str() {
-                "VERIFIED" | "READY" | "KEPT" => (Some(100), Some(0), Some("Готово (Проверено)".to_string())),
+                "VERIFIED" | "READY" | "KEPT" => (Some(100), Some(0), Some("100% Завършено".to_string())),
                 "FAILED" => (Some(100), Some(0), Some("Грешка при обработка".to_string())),
                 "SCREENED_OUT" => (Some(100), Some(0), Some("Филтрирано".to_string())),
                 "DISCARDED" => (Some(100), Some(0), Some("Отхвърлено".to_string())),
@@ -1046,6 +1057,17 @@ impl Database {
         };
         if let Some(st) = new_state {
             self.set_video_state(video_id, st, None).await?;
+            if action == "discard" {
+                sqlx::query("UPDATE videos SET lane = 'discarded' WHERE id = ?1")
+                    .bind(video_id)
+                    .execute(&self.pool)
+                    .await?;
+            } else if action == "keep" {
+                sqlx::query("UPDATE videos SET lane = 'kept' WHERE id = ?1")
+                    .bind(video_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
         }
 
         Ok(Decision {
@@ -1055,6 +1077,90 @@ impl Database {
             note: note.map(|s| s.to_string()),
             decided_at: now,
         })
+    }
+
+    pub async fn delete_video(&self, video_id: &str) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM evidence WHERE claim_id IN (SELECT id FROM claims WHERE video_id = ?1)")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM claims WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM video_people WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM transcripts WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM ocr_texts WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM decisions WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM jobs WHERE video_id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM videos WHERE id = ?1")
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn update_person_profile(
+        &self,
+        person_id: i64,
+        role: Option<&str>,
+        summary: Option<&str>,
+        public_figure: bool,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE people SET
+               role = COALESCE(?2, role),
+               summary = COALESCE(?3, summary),
+               public_figure = CASE WHEN ?4 = 1 THEN 1 ELSE public_figure END,
+               researched_at = ?5
+             WHERE id = ?1",
+        )
+        .bind(person_id)
+        .bind(role)
+        .bind(summary)
+        .bind(if public_figure { 1i64 } else { 0i64 })
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_person_claims_stats(&self, person_id: i64) -> Result<(i64, i64, i64)> {
+        let row = sqlx::query(
+            "SELECT
+               COUNT(c.id) AS total,
+               SUM(CASE WHEN UPPER(COALESCE(c.verdict, '')) = 'CONTRADICTED' THEN 1 ELSE 0 END) AS contradicted,
+               SUM(CASE WHEN UPPER(COALESCE(c.verdict, '')) = 'SUPPORTED' THEN 1 ELSE 0 END) AS supported
+             FROM claims c
+             JOIN video_people vp ON vp.video_id = c.video_id
+             WHERE vp.person_id = ?1",
+        )
+        .bind(person_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let total: i64 = row.try_get("total").unwrap_or(0);
+        let contradicted: i64 = row.try_get("contradicted").unwrap_or(0);
+        let supported: i64 = row.try_get("supported").unwrap_or(0);
+        Ok((total, contradicted, supported))
     }
 
     pub async fn get_decisions_for_video(&self, video_id: &str) -> Result<Vec<Decision>> {

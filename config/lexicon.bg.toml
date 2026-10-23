@@ -9990,6 +9990,4098 @@ standard = 'бягаме'
 register = 'източнобългарски/варненски диалект'
 ipa = 'ˈbʲa.ɡɐ.mi'
 
+[[dialect_glossary]]
+term = 'въй'
+standard = 'въх / леле (възклицание за учудване)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'vɤj'
+
+[[dialect_glossary]]
+term = 'батка'
+standard = 'батко / приятел / обръщение към мъж'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbat.kɐ'
+
+[[dialect_glossary]]
+term = 'маняк'
+standard = 'маниак / приятел / човек (обръщение)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐ.ˈnʲak'
+
+[[dialect_glossary]]
+term = 'маняче'
+standard = 'приятелче / младеж'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐ.ˈnʲa.tʃɛ'
+
+[[dialect_glossary]]
+term = 'гларус'
+standard = 'чайка / плажен сваляч'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡla.rus'
+
+[[dialect_glossary]]
+term = 'що'
+standard = 'защо'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ʃtɔ'
+
+[[dialect_glossary]]
+term = 'оти'
+standard = 'защото / защо (странджанско влияние)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɔ.ti'
+
+[[dialect_glossary]]
+term = 'неска'
+standard = 'днес'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈnɛs.kɐ'
+
+[[dialect_glossary]]
+term = 'вчерака'
+standard = 'вчера'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈftʃɛ.rɐ.kɐ'
+
+[[dialect_glossary]]
+term = 'оная'
+standard = 'онази'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'u.ˈna.jɐ'
+
+[[dialect_glossary]]
+term = 'ино'
+standard = 'едно'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'i.ˈnɔ'
+
+[[dialect_glossary]]
+term = 'ина'
+standard = 'една'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'i.ˈna'
+
+[[dialect_glossary]]
+term = 'ини'
+standard = 'едни'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'i.ˈni'
+
+[[dialect_glossary]]
+term = 'жа'
+standard = 'ще (тракийско/странджанско влияние)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ʒɐ'
+
+[[dialect_glossary]]
+term = 'нъл'
+standard = 'нали'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'nɤl'
+
+[[dialect_glossary]]
+term = 'ам'
+standard = 'ами'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐm'
+
+[[dialect_glossary]]
+term = 'ади'
+standard = 'хайде'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈa.di'
+
+[[dialect_glossary]]
+term = 'ай'
+standard = 'хайде'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'aj'
+
+[[dialect_glossary]]
+term = 'льо'
+standard = 'льо (звателна частица)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'lʲɔ'
+
+[[dialect_glossary]]
+term = 'уа'
+standard = 'бе / уа (тракийско влияние)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'wa'
+
+[[dialect_glossary]]
+term = 'бичме'
+standard = 'здравеняк / нахалник / грубиян'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'bitʃ.ˈmɛ'
+
+[[dialect_glossary]]
+term = 'авер'
+standard = 'приятел / другар'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐ.ˈvɛr'
+
+[[dialect_glossary]]
+term = 'аверче'
+standard = 'приятелче'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐ.ˈvɛr.tʃɛ'
+
+[[dialect_glossary]]
+term = 'гадже'
+standard = 'приятел / приятелка (любовни)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡa.dʒɛ'
+
+[[dialect_glossary]]
+term = 'чайка'
+standard = 'гларус / морска птица'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈtʃaj.kɐ'
+
+[[dialect_glossary]]
+term = 'мида'
+standard = 'черна морска мида'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈmi.dɐ'
+
+[[dialect_glossary]]
+term = 'рапан'
+standard = 'морски охлюв (рапана)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'rɐ.ˈpan'
+
+[[dialect_glossary]]
+term = 'сафрид'
+standard = 'черноморска риба сафрид'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'sɐ.ˈfrit'
+
+[[dialect_glossary]]
+term = 'цаца'
+standard = 'трицона / дребна морска риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈt͡sa.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'трицона'
+standard = 'цаца / копърка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tri.ˈt͡sɔ.nɐ'
+
+[[dialect_glossary]]
+term = 'попче'
+standard = 'дънна черноморска риба (кая)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈpɔp.tʃɛ'
+
+[[dialect_glossary]]
+term = 'кая'
+standard = 'попче (риба)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.ˈja'
+
+[[dialect_glossary]]
+term = 'лихнус'
+standard = 'голямо попче (риба)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈlix.nus'
+
+[[dialect_glossary]]
+term = 'лефер'
+standard = 'черноморска хищна риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'lɛ.ˈfɛr'
+
+[[dialect_glossary]]
+term = 'чернокоп'
+standard = 'млад лефер'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃɛr.nu.ˈkɔp'
+
+[[dialect_glossary]]
+term = 'паламуд'
+standard = 'едра черноморска риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɐ.lɐ.ˈmut'
+
+[[dialect_glossary]]
+term = 'циганка'
+standard = 'дребен паламуд'
+register = 'източнобългарски/бургаски диалект'
+ipa = 't͡si.ˈɡaŋ.kɐ'
+
+[[dialect_glossary]]
+term = 'зарган'
+standard = 'морска риба с дълъг клюн'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'zɐr.ˈɡan'
+
+[[dialect_glossary]]
+term = 'калкан'
+standard = 'плоска дънна риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐl.ˈkan'
+
+[[dialect_glossary]]
+term = 'илария'
+standard = 'морска риба от семейство кефалови'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'i.ˈla.ri.jɐ'
+
+[[dialect_glossary]]
+term = 'платерина'
+standard = 'вид морски кефал'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'plɐ.tɛ.ˈri.nɐ'
+
+[[dialect_glossary]]
+term = 'кефал'
+standard = 'морска риба кефал / удоволствие'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɛ.ˈfal'
+
+[[dialect_glossary]]
+term = 'скорпид'
+standard = 'морски скорпион (отровна риба)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'skɔr.ˈpit'
+
+[[dialect_glossary]]
+term = 'дракон'
+standard = 'морски дракон (отровна риба)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'drɐ.ˈkɔn'
+
+[[dialect_glossary]]
+term = 'атерина'
+standard = 'гупа / дребна сребриста рибка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐ.tɛ.ˈri.nɐ'
+
+[[dialect_glossary]]
+term = 'гупа'
+standard = 'атерина / дребна риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡu.pɐ'
+
+[[dialect_glossary]]
+term = 'хамсия'
+standard = 'дребна морска риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'xɐm.ˈsi.jɐ'
+
+[[dialect_glossary]]
+term = 'карагьоз'
+standard = 'черноморска скумрия / дунавска скумрия'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.rɐ.ˈɡʲɔs'
+
+[[dialect_glossary]]
+term = 'чепаре'
+standard = 'въдица с много кукички и перушина'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃɛ.pɐ.ˈrɛ'
+
+[[dialect_glossary]]
+term = 'такъм'
+standard = 'рибарска принадлежност / линия за риболов'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tɐ.ˈkɤm'
+
+[[dialect_glossary]]
+term = 'парагад'
+standard = 'дълга дънна въдица с много куки'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɐ.rɐ.ˈɡat'
+
+[[dialect_glossary]]
+term = 'винтер'
+standard = 'мрежен капан за риба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈvin.tɛr'
+
+[[dialect_glossary]]
+term = 'далян'
+standard = 'неподвижна крайбрежна мрежа за риболов'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'dɐ.ˈlʲan'
+
+[[dialect_glossary]]
+term = 'гриб'
+standard = 'голяма рибарска мрежа'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɡrip'
+
+[[dialect_glossary]]
+term = 'лодка'
+standard = 'рибарска лодка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈlɔt.kɐ'
+
+[[dialect_glossary]]
+term = 'гемия'
+standard = 'дървен плавателен съд / кораб'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɡɛ.ˈmi.jɐ'
+
+[[dialect_glossary]]
+term = 'мауна'
+standard = 'голяма товарна лодка / шлеп'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐ.ˈu.nɐ'
+
+[[dialect_glossary]]
+term = 'сандал'
+standard = 'малка гребна лодка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'sɐn.ˈdal'
+
+[[dialect_glossary]]
+term = 'буна'
+standard = 'каменна дига в морето / вълнолом'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbu.nɐ'
+
+[[dialect_glossary]]
+term = 'мостчето'
+standard = 'мостът в Морската градина в Бургас'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈmɔs.tʃɛ.tu'
+
+[[dialect_glossary]]
+term = 'казиното'
+standard = 'Морското казино в Бургас'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.ˈzi.nu.tu'
+
+[[dialect_glossary]]
+term = 'гъбката'
+standard = 'емблематичен павилион в Морската градина'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡɤp.kɐ.tɐ'
+
+[[dialect_glossary]]
+term = 'часовника'
+standard = 'часовникът до хотел България (място за срещи)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃɐ.ˈsɔv.ni.kɐ'
+
+[[dialect_glossary]]
+term = 'компаса'
+standard = 'площадчето с компаса на главната улица'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɔm.ˈpa.sɐ'
+
+[[dialect_glossary]]
+term = 'богориди'
+standard = 'булевард Алеко Богориди'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'bu.ɡu.ˈri.di'
+
+[[dialect_glossary]]
+term = 'александровска'
+standard = 'главната пешеходна улица Александровска'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐ.lɛk.ˈsan.druf.skɐ'
+
+[[dialect_glossary]]
+term = 'меден рудник'
+standard = 'най-големият квартал в Бургас (Меден рудник)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈmɛ.dɛn ˈrud.nik'
+
+[[dialect_glossary]]
+term = 'възраждане'
+standard = 'квартал Възраждане (Възраждани)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'vɐz.ˈraʒ.dɐ.nɛ'
+
+[[dialect_glossary]]
+term = 'лазур'
+standard = 'квартал Лазур'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'lɐ.ˈzur'
+
+[[dialect_glossary]]
+term = 'славейков'
+standard = 'квартал Петко Славейков'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'slɐ.ˈvɛj.kuf'
+
+[[dialect_glossary]]
+term = 'изгрев'
+standard = 'квартал Изгрев'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈiz.ɡrɛf'
+
+[[dialect_glossary]]
+term = 'зорница'
+standard = 'квартал Зорница'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'zɔr.ˈni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'сарафово'
+standard = 'квартал Сарафово'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'sɐ.ˈra.fu.vu'
+
+[[dialect_glossary]]
+term = 'крайморие'
+standard = 'квартал Крайморие'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'krɐj.ˈmɔ.ri.ɛ'
+
+[[dialect_glossary]]
+term = 'ченгене скеле'
+standard = 'рибарско селище до Бургас'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃɛŋ.ɡɛ.ˈnɛ ˈskɛ.lɛ'
+
+[[dialect_glossary]]
+term = 'солниците'
+standard = 'Бургаските солници / лугата'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈsɔl.ni.t͡si.tɛ'
+
+[[dialect_glossary]]
+term = 'лугата'
+standard = 'басейните с лечебна луга и кал'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈlu.ɡɐ.tɐ'
+
+[[dialect_glossary]]
+term = 'калта'
+standard = 'лечебната кал на солниците'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐl.ˈta'
+
+[[dialect_glossary]]
+term = 'капаните'
+standard = 'крайбрежните заведения на Северния плаж'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.ˈpa.ni.tɛ'
+
+[[dialect_glossary]]
+term = 'капанче'
+standard = 'малко крайбрежно заведение / кръчма на плажа'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.ˈpan.tʃɛ'
+
+[[dialect_glossary]]
+term = 'странджанка'
+standard = 'принцеса с кайма (специфична за Бургас)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈstran.dʒɐŋ.kɐ'
+
+[[dialect_glossary]]
+term = 'принцеса'
+standard = 'филия с кайма или кашкавал (в Бургас е със специфична форма)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'prin.ˈt͡sɛ.sɐ'
+
+[[dialect_glossary]]
+term = 'тостер'
+standard = 'препечен сандвич / тост'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈtɔs.tɛr'
+
+[[dialect_glossary]]
+term = 'джоб'
+standard = 'питка с плънка (сандвич)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'dʒɔp'
+
+[[dialect_glossary]]
+term = 'дюнер'
+standard = 'арабски сандвич с месо'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈdʲu.nɛr'
+
+[[dialect_glossary]]
+term = 'катма'
+standard = 'дебела палачинка на сач (странджанска)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐt.ˈma'
+
+[[dialect_glossary]]
+term = 'гьозлеме'
+standard = 'тънка баница на сач'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɡʲɔz.lɛ.ˈmɛ'
+
+[[dialect_glossary]]
+term = 'зелник'
+standard = 'странджански зелник (баница със зеле/лапад)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈzɛl.nik'
+
+[[dialect_glossary]]
+term = 'пестил'
+standard = 'сушено плодово пюре на листове'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɛs.ˈtil'
+
+[[dialect_glossary]]
+term = 'маджуун'
+standard = 'гъст петмез от захарна метла или грозде'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐ.ˈdʒun'
+
+[[dialect_glossary]]
+term = 'буламач'
+standard = 'рядка каша / нещо лошо сготвено'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'bu.lɐ.ˈmatʃ'
+
+[[dialect_glossary]]
+term = 'манджа'
+standard = 'ястие / гозба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈman.dʒɐ'
+
+[[dialect_glossary]]
+term = 'чорба'
+standard = 'супа / рибена чорба'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃɔr.ˈba'
+
+[[dialect_glossary]]
+term = 'саламура'
+standard = 'лют рибен бульон с чесън и оцет / солен разтвор'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'sɐ.lɐ.ˈmu.rɐ'
+
+[[dialect_glossary]]
+term = 'плакия'
+standard = 'ястие от риба или зеленчуци на фурна с много лук'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'plɐ.ˈki.jɐ'
+
+[[dialect_glossary]]
+term = 'чироз'
+standard = 'сушена солена риба (скумрия или сафрид)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃi.ˈrɔs'
+
+[[dialect_glossary]]
+term = 'веяна риба'
+standard = 'сушена на вятър риба (паламуд)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈvɛ.jɐ.nɐ ˈri.bɐ'
+
+[[dialect_glossary]]
+term = 'маринована риба'
+standard = 'риба приготвена в оцет и сол'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐ.ri.ˈnɔ.vɐ.nɐ ˈri.bɐ'
+
+[[dialect_glossary]]
+term = 'мезе'
+standard = 'храна за питие / предястие'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɛ.ˈzɛ'
+
+[[dialect_glossary]]
+term = 'питие'
+standard = 'алкохолна напитка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pi.ti.ˈɛ'
+
+[[dialect_glossary]]
+term = 'ракия'
+standard = 'плодова дестилирана напитка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'rɐ.ˈki.jɐ'
+
+[[dialect_glossary]]
+term = 'смокинова'
+standard = 'смокинова ракия (типична за южното черноморие)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'smu.ˈki.nu.vɐ'
+
+[[dialect_glossary]]
+term = 'мастика'
+standard = 'анасонова спиртна напитка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐs.ˈti.kɐ'
+
+[[dialect_glossary]]
+term = 'мента'
+standard = 'ментов ликьор'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈmɛn.tɐ'
+
+[[dialect_glossary]]
+term = 'облак'
+standard = 'коктейл от мастика и мента'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɔ.blɐk'
+
+[[dialect_glossary]]
+term = 'айрян'
+standard = 'разбито кисело мляко с вода и сол'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐj.ˈrʲan'
+
+[[dialect_glossary]]
+term = 'газирано'
+standard = 'безалкохолна газирана напитка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɡɐ.ˈzi.rɐ.nu'
+
+[[dialect_glossary]]
+term = 'кафе'
+standard = 'кафе (често произнесено с редукция)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.ˈfɛ'
+
+[[dialect_glossary]]
+term = 'кафенце'
+standard = 'умалително за кафе'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐ.ˈfɛn.t͡sɛ'
+
+[[dialect_glossary]]
+term = 'бира'
+standard = 'пиво'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbi.rɐ'
+
+[[dialect_glossary]]
+term = 'биричка'
+standard = 'умалително за бира'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbi.ritʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'наливно'
+standard = 'наливна бира или вино'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'nɐ.ˈliv.nu'
+
+[[dialect_glossary]]
+term = 'цапам'
+standard = 'ходя в плитка вода / пръскам / цапам'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈt͡sa.pɐm'
+
+[[dialect_glossary]]
+term = 'цамбуркане'
+standard = 'скачане във вода с плясък'
+register = 'източнобългарски/бургаски диалект'
+ipa = 't͡sɐm.ˈbur.kɐ.nɛ'
+
+[[dialect_glossary]]
+term = 'цамбурвам'
+standard = 'скачам във водата'
+register = 'източнобългарски/бургаски диалект'
+ipa = 't͡sɐm.ˈbur.vɐm'
+
+[[dialect_glossary]]
+term = 'гмуркам се'
+standard = 'потапям се под вода'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡmur.kɐm sɛ'
+
+[[dialect_glossary]]
+term = 'плувам'
+standard = 'плувам'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈplu.vɐm'
+
+[[dialect_glossary]]
+term = 'къпя се'
+standard = 'влизам в морето / взимам душ'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈkɤ.pʲɐ sɛ'
+
+[[dialect_glossary]]
+term = 'плажувам'
+standard = 'стоя на плажа / пека се'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'plɐ.ˈʒu.vɐm'
+
+[[dialect_glossary]]
+term = 'пека се'
+standard = 'излагам се на слънце'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɛ.ˈkɤ sɛ'
+
+[[dialect_glossary]]
+term = 'изгарям'
+standard = 'получавам слънчево изгаряне'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'iz.ˈɡa.rʲɐm'
+
+[[dialect_glossary]]
+term = 'пясък'
+standard = 'морски пясък'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈpʲa.sɐk'
+
+[[dialect_glossary]]
+term = 'мидички'
+standard = 'черупки от миди на плажа'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈmi.ditʃ.ki'
+
+[[dialect_glossary]]
+term = 'водорасли'
+standard = 'морска трева / водорасли'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'vu.du.ˈras.li'
+
+[[dialect_glossary]]
+term = 'камъчета'
+standard = 'обли морски камъни'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈka.mɐ.tʃɛ.tɐ'
+
+[[dialect_glossary]]
+term = 'вълна'
+standard = 'морска вълна'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'vɐl.ˈna'
+
+[[dialect_glossary]]
+term = 'вълнение'
+standard = 'бурно море с високи вълни'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'vɐl.ˈnɛ.ni.ɛ'
+
+[[dialect_glossary]]
+term = 'мъртвак'
+standard = 'мъртво вълнение / опасно подводно течение'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐrt.ˈvak'
+
+[[dialect_glossary]]
+term = 'солуган'
+standard = 'мъртво вълнение / големи вълни след буря'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'su.lu.ˈɡan'
+
+[[dialect_glossary]]
+term = 'бриз'
+standard = 'морски вятър'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'bris'
+
+[[dialect_glossary]]
+term = 'вятър'
+standard = 'вятър'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈvʲa.tɐr'
+
+[[dialect_glossary]]
+term = 'буря'
+standard = 'морска буря / щорм'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbu.rʲɐ'
+
+[[dialect_glossary]]
+term = 'щорм'
+standard = 'силна морска буря'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ʃtɔrm'
+
+[[dialect_glossary]]
+term = 'бонаца'
+standard = 'пълно безветрие и гладко като огледало море'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'bu.ˈna.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'тава'
+standard = 'много спокойно и равно море (морето е тава)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tɐ.ˈva'
+
+[[dialect_glossary]]
+term = 'чайник'
+standard = 'човек, който не може да плува добре / аджамия'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈtʃaj.nik'
+
+[[dialect_glossary]]
+term = 'шамандура'
+standard = 'плаващ знак в морето'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ʃɐ.mɐn.ˈdu.rɐ'
+
+[[dialect_glossary]]
+term = 'спасител'
+standard = 'воден спасител на плажа'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'spɐ.ˈsi.tɛl'
+
+[[dialect_glossary]]
+term = 'флаг'
+standard = 'сигнален флаг на спасителния пост'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'flak'
+
+[[dialect_glossary]]
+term = 'хавлия'
+standard = 'плажна кърпа'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'xɐv.ˈli.jɐ'
+
+[[dialect_glossary]]
+term = 'пешкир'
+standard = 'кърпа за лице или тяло'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɛʃ.ˈkir'
+
+[[dialect_glossary]]
+term = 'чадър'
+standard = 'плажен чадър'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃɐ.ˈdɤr'
+
+[[dialect_glossary]]
+term = 'шезлонг'
+standard = 'плажно легло'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ʃɛz.ˈlɔŋk'
+
+[[dialect_glossary]]
+term = 'джапанки'
+standard = 'чехли за плаж'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈdʒa.pɐŋ.ki'
+
+[[dialect_glossary]]
+term = 'чехли'
+standard = 'домашни или плажни обувки без пета'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈtʃɛx.li'
+
+[[dialect_glossary]]
+term = 'шорти'
+standard = 'къси гащи / бански'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈʃɔr.ti'
+
+[[dialect_glossary]]
+term = 'бански'
+standard = 'бански костюм'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈban.ski'
+
+[[dialect_glossary]]
+term = 'потник'
+standard = 'дреха без ръкави'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈpɔt.nik'
+
+[[dialect_glossary]]
+term = 'фанелка'
+standard = 'тениска / долна риза'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'fɐ.ˈnɛl.kɐ'
+
+[[dialect_glossary]]
+term = 'блуза'
+standard = 'горна дреха с дълъг ръкав'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈblu.zɐ'
+
+[[dialect_glossary]]
+term = 'анцуг'
+standard = 'спортен екип (символ на кварталната мода)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈan.t͡suk'
+
+[[dialect_glossary]]
+term = 'анцунг'
+standard = 'анцуг (с вмъкнато н)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈan.t͡suŋk'
+
+[[dialect_glossary]]
+term = 'маратонки'
+standard = 'спортни обувки'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐ.rɐ.ˈtɔŋ.ki'
+
+[[dialect_glossary]]
+term = 'гуменки'
+standard = 'платнени обувки с гумена подметка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡu.mɛŋ.ki'
+
+[[dialect_glossary]]
+term = 'яке'
+standard = 'къса връхна дреха'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈja.kɛ'
+
+[[dialect_glossary]]
+term = 'шуба'
+standard = 'дебело зимно яке'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈʃu.bɐ'
+
+[[dialect_glossary]]
+term = 'гащи'
+standard = 'панталони / бельо'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈɡa.ʃti'
+
+[[dialect_glossary]]
+term = 'дънки'
+standard = 'джинси / панталон от деним'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈdɤŋ.ki'
+
+[[dialect_glossary]]
+term = 'чорапи'
+standard = 'чорапи (произнесено чурапи)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃu.ˈra.pi'
+
+[[dialect_glossary]]
+term = 'шапка'
+standard = 'шапка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈʃap.kɐ'
+
+[[dialect_glossary]]
+term = 'каскет'
+standard = 'шапка с козирка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'kɐs.ˈkɛt'
+
+[[dialect_glossary]]
+term = 'очила'
+standard = 'слънчеви или диоптрични очила (учила)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'u.tʃi.ˈla'
+
+[[dialect_glossary]]
+term = 'ланец'
+standard = 'дебела златна или сребърна верижка за врат'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈla.nɛt͡s'
+
+[[dialect_glossary]]
+term = 'чанта'
+standard = 'торба / раница / дамска чанта'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈtʃan.tɐ'
+
+[[dialect_glossary]]
+term = 'торбичка'
+standard = 'найлонов плик / пазарска чанта'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tur.ˈbitʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'пликче'
+standard = 'малка найлонова торбичка'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈplik.tʃɛ'
+
+[[dialect_glossary]]
+term = 'сак'
+standard = 'пътна или спортна чанта'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'sak'
+
+[[dialect_glossary]]
+term = 'раница'
+standard = 'раница'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈra.ni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'портмоне'
+standard = 'портфейл (пуртмуне)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'purt.mu.ˈnɛ'
+
+[[dialect_glossary]]
+term = 'кинти'
+standard = 'пари (сленг)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈkin.ti'
+
+[[dialect_glossary]]
+term = 'мангизи'
+standard = 'пари (сленг)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'mɐŋ.ˈɡi.zi'
+
+[[dialect_glossary]]
+term = 'пара'
+standard = 'пари / монета'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɐ.ˈra'
+
+[[dialect_glossary]]
+term = 'леф'
+standard = 'лев (валута)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'lɛf'
+
+[[dialect_glossary]]
+term = 'стинки'
+standard = 'стотинки'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈstiŋ.ki'
+
+[[dialect_glossary]]
+term = 'стотачка'
+standard = 'банкнота от сто лева'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'stu.ˈtatʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'петарка'
+standard = 'пет лева'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'pɛ.ˈtar.kɐ'
+
+[[dialect_glossary]]
+term = 'десетачка'
+standard = 'десет лева'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'dɛ.sɛ.ˈtatʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'двадесетачка'
+standard = 'двадесет лева'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'dvɐ.dɛ.sɛ.ˈtatʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'бачкам'
+standard = 'работя'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbatʃ.kɐm'
+
+[[dialect_glossary]]
+term = 'бачкане'
+standard = 'работа'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈbatʃ.kɐ.nɛ'
+
+[[dialect_glossary]]
+term = 'аргатин'
+standard = 'слуга / ратай (странджанско)'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ɐr.ˈɡa.tin'
+
+[[dialect_glossary]]
+term = 'чирак'
+standard = 'помощник / ученик в занаят'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃi.ˈrak'
+
+[[dialect_glossary]]
+term = 'калфа'
+standard = 'помощник-майстор'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈkal.fɐ'
+
+[[dialect_glossary]]
+term = 'майстор'
+standard = 'специалист / занаятчия'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ˈmaj.stur'
+
+[[dialect_glossary]]
+term = 'шеф'
+standard = 'началник / управител'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'ʃɛf'
+
+[[dialect_glossary]]
+term = 'чорбаджия'
+standard = 'богаташ / собственик / работодател'
+register = 'източнобългарски/бургаски диалект'
+ipa = 'tʃur.bɐ.ˈdʒi.jɐ'
+
+[[dialect_glossary]]
+term = 'ньие'
+standard = 'ние'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɲi.ɛ'
+
+[[dialect_glossary]]
+term = 'виека'
+standard = 'вие'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvi.ɛ.kɐ'
+
+[[dialect_glossary]]
+term = 'ньи'
+standard = 'ни / нас'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɲi'
+
+[[dialect_glossary]]
+term = 'ги'
+standard = 'тях / ги'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡi'
+
+[[dialect_glossary]]
+term = 'га'
+standard = 'го / я'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡɐ'
+
+[[dialect_glossary]]
+term = 'ньега'
+standard = 'него'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɲɛ.ɡɐ'
+
+[[dialect_glossary]]
+term = 'ньему'
+standard = 'нему / на него'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɲɛ.mu'
+
+[[dialect_glossary]]
+term = 'ньой'
+standard = 'на нея / ѝ'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɲɔj'
+
+[[dialect_glossary]]
+term = 'ньин'
+standard = 'техен'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɲin'
+
+[[dialect_glossary]]
+term = 'ньина'
+standard = 'тяхна'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɲi.nɐ'
+
+[[dialect_glossary]]
+term = 'ньино'
+standard = 'тяхно'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɲi.nɔ'
+
+[[dialect_glossary]]
+term = 'ньини'
+standard = 'техни'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɲi.ni'
+
+[[dialect_glossary]]
+term = 'свойту'
+standard = 'своето'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsvɔj.tu'
+
+[[dialect_glossary]]
+term = 'кудека'
+standard = 'където / къде'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ku.ˈdɛ.kɐ'
+
+[[dialect_glossary]]
+term = 'овде'
+standard = 'тук'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɔv.dɛ'
+
+[[dialect_glossary]]
+term = 'овдека'
+standard = 'тук'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔv.ˈdɛ.kɐ'
+
+[[dialect_glossary]]
+term = 'тува'
+standard = 'тук / това'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtu.vɐ'
+
+[[dialect_glossary]]
+term = 'тамока'
+standard = 'там'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈta.mɔ.kɐ'
+
+[[dialect_glossary]]
+term = 'оноде'
+standard = 'там / отвъд'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔ.ˈnɔ.dɛ'
+
+[[dialect_glossary]]
+term = 'такъвзи'
+standard = 'такъв'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tɐ.ˈkɤv.zi'
+
+[[dialect_glossary]]
+term = 'онова'
+standard = 'онова'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔ.ˈnɔ.vɐ'
+
+[[dialect_glossary]]
+term = 'тоя'
+standard = 'този'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtɔ.jɐ'
+
+[[dialect_glossary]]
+term = 'сваки'
+standard = 'всеки'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsva.ki'
+
+[[dialect_glossary]]
+term = 'сви'
+standard = 'всички'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'svi'
+
+[[dialect_glossary]]
+term = 'свите'
+standard = 'всичките'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsvi.tɛ'
+
+[[dialect_glossary]]
+term = 'све'
+standard = 'всичко'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'svɛ'
+
+[[dialect_glossary]]
+term = 'никой'
+standard = 'никой'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈni.kɔj'
+
+[[dialect_glossary]]
+term = 'некакъв'
+standard = 'някакъв'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.kɐ.kɤf'
+
+[[dialect_glossary]]
+term = 'некуга'
+standard = 'някога'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.ku.ɡɐ'
+
+[[dialect_glossary]]
+term = 'некуде'
+standard = 'някъде'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.ku.dɛ'
+
+[[dialect_glossary]]
+term = 'отийде'
+standard = 'отиде'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔ.ˈtij.dɛ'
+
+[[dialect_glossary]]
+term = 'дойде'
+standard = 'дойде'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈdɔj.dɛ'
+
+[[dialect_glossary]]
+term = 'улезне'
+standard = 'влезе'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'u.ˈlɛz.nɛ'
+
+[[dialect_glossary]]
+term = 'излезне'
+standard = 'излезе'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'iz.ˈlɛz.nɛ'
+
+[[dialect_glossary]]
+term = 'слезне'
+standard = 'слезе'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈslɛz.nɛ'
+
+[[dialect_glossary]]
+term = 'че'
+standard = 'ще'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡ʃɛ'
+
+[[dialect_glossary]]
+term = 'нече'
+standard = 'няма да / не ще'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.t͡ʃɛ'
+
+[[dialect_glossary]]
+term = 'немам'
+standard = 'нямам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.mɐm'
+
+[[dialect_glossary]]
+term = 'немаш'
+standard = 'нямаш'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.mɐʃ'
+
+[[dialect_glossary]]
+term = 'немаме'
+standard = 'нямаме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.mɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'немате'
+standard = 'нямате'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.mɐ.tɛ'
+
+[[dialect_glossary]]
+term = 'немат'
+standard = 'нямат'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɛ.mɐt'
+
+[[dialect_glossary]]
+term = 'бео'
+standard = 'бях'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.ɔ'
+
+[[dialect_glossary]]
+term = 'беше'
+standard = 'беше'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.ʃɛ'
+
+[[dialect_glossary]]
+term = 'бемо'
+standard = 'бяхме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.mɔ'
+
+[[dialect_glossary]]
+term = 'бете'
+standard = 'бяхте'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.tɛ'
+
+[[dialect_glossary]]
+term = 'беу'
+standard = 'бяха'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.u'
+
+[[dialect_glossary]]
+term = 'имао'
+standard = 'имах'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈi.mɐ.ɔ'
+
+[[dialect_glossary]]
+term = 'имамо'
+standard = 'имахме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈi.mɐ.mɔ'
+
+[[dialect_glossary]]
+term = 'ортувам'
+standard = 'говоря / приказвам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔr.ˈtu.vɐm'
+
+[[dialect_glossary]]
+term = 'ортуваш'
+standard = 'говориш'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔr.ˈtu.vɐʃ'
+
+[[dialect_glossary]]
+term = 'ортува'
+standard = 'говори'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔr.ˈtu.vɐ'
+
+[[dialect_glossary]]
+term = 'ортуваме'
+standard = 'говорим'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔr.ˈtu.vɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'ортувате'
+standard = 'говорите'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔr.ˈtu.vɐ.tɛ'
+
+[[dialect_glossary]]
+term = 'ортуват'
+standard = 'говорят'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔr.ˈtu.vɐt'
+
+[[dialect_glossary]]
+term = 'думам'
+standard = 'казвам / говоря'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈdu.mɐm'
+
+[[dialect_glossary]]
+term = 'тражим'
+standard = 'търся'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtra.ʒim'
+
+[[dialect_glossary]]
+term = 'сакаш'
+standard = 'искаш'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsa.kɐʃ'
+
+[[dialect_glossary]]
+term = 'сака'
+standard = 'иска'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsa.kɐ'
+
+[[dialect_glossary]]
+term = 'носем'
+standard = 'нося'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈnɔ.sɛm'
+
+[[dialect_glossary]]
+term = 'праим'
+standard = 'правя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpra.im'
+
+[[dialect_glossary]]
+term = 'одим'
+standard = 'ходя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɔ.dim'
+
+[[dialect_glossary]]
+term = 'видим'
+standard = 'виждам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvi.dim'
+
+[[dialect_glossary]]
+term = 'лежим'
+standard = 'лежа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'lɛ.ˈʒim'
+
+[[dialect_glossary]]
+term = 'мълчим'
+standard = 'мълча'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'mɤl.ˈt͡ʃim'
+
+[[dialect_glossary]]
+term = 'търчим'
+standard = 'тичам / бягам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tɤr.ˈt͡ʃim'
+
+[[dialect_glossary]]
+term = 'турим'
+standard = 'сложа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtu.rim'
+
+[[dialect_glossary]]
+term = 'пущим'
+standard = 'пусна'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpu.ʃtim'
+
+[[dialect_glossary]]
+term = 'пущам'
+standard = 'пускам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpu.ʃtɐm'
+
+[[dialect_glossary]]
+term = 'фрлим'
+standard = 'хвърля'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈfr̩.lim'
+
+[[dialect_glossary]]
+term = 'фрлям'
+standard = 'хвърлям'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈfr̩.lʲɐm'
+
+[[dialect_glossary]]
+term = 'връжем'
+standard = 'вържа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvr̩.ʒɛm'
+
+[[dialect_glossary]]
+term = 'връзвам'
+standard = 'вързвам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvr̩.zvɐm'
+
+[[dialect_glossary]]
+term = 'кръшим'
+standard = 'чупя / кърша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈkr̩.ʃim'
+
+[[dialect_glossary]]
+term = 'мръдам'
+standard = 'мърдам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmr̩.dɐm'
+
+[[dialect_glossary]]
+term = 'пръжим'
+standard = 'пържа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpr̩.ʒim'
+
+[[dialect_glossary]]
+term = 'сръбам'
+standard = 'сърбам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsr̩.bɐm'
+
+[[dialect_glossary]]
+term = 'цръкам'
+standard = 'църкам / пръскам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈt͡sr̩.kɐm'
+
+[[dialect_glossary]]
+term = 'длъбам'
+standard = 'дълбая'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈdl̩.bɐm'
+
+[[dialect_glossary]]
+term = 'клъцам'
+standard = 'кълцам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈkl̩.t͡sɐm'
+
+[[dialect_glossary]]
+term = 'млъзем'
+standard = 'доя / мълзя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈml̩.zɛm'
+
+[[dialect_glossary]]
+term = 'плъним'
+standard = 'пълня'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpl̩.nim'
+
+[[dialect_glossary]]
+term = 'слъзим'
+standard = 'сълзя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsl̩.zim'
+
+[[dialect_glossary]]
+term = 'тлъчем'
+standard = 'тълча / чукам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtl̩.t͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'поручам'
+standard = 'закусвам / хапвам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'pɔ.ˈru.t͡ʃɐm'
+
+[[dialect_glossary]]
+term = 'пладнувам'
+standard = 'обядвам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'plɐd.ˈnu.vɐm'
+
+[[dialect_glossary]]
+term = 'вечерям'
+standard = 'вечерям'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'vɛ.ˈt͡ʃɛ.rʲɐm'
+
+[[dialect_glossary]]
+term = 'гулям'
+standard = 'пия / гуляя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡu.ˈlʲam'
+
+[[dialect_glossary]]
+term = 'мотам'
+standard = 'мотая'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmɔ.tɐm'
+
+[[dialect_glossary]]
+term = 'играм'
+standard = 'играя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'i.ˈɡram'
+
+[[dialect_glossary]]
+term = 'чувам'
+standard = 'пазя / отглеждам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈt͡ʃu.vɐm'
+
+[[dialect_glossary]]
+term = 'вардим'
+standard = 'пазя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvar.dim'
+
+[[dialect_glossary]]
+term = 'бръшем'
+standard = 'бърша / мета'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbr̩.ʃɛm'
+
+[[dialect_glossary]]
+term = 'перим'
+standard = 'пера'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpɛ.rim'
+
+[[dialect_glossary]]
+term = 'метем'
+standard = 'мета'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'mɛ.ˈtɛm'
+
+[[dialect_glossary]]
+term = 'плетем'
+standard = 'плета'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'plɛ.ˈtɛm'
+
+[[dialect_glossary]]
+term = 'четем'
+standard = 'чета'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡ʃɛ.ˈtɛm'
+
+[[dialect_glossary]]
+term = 'предем'
+standard = 'преда'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'prɛ.ˈdɛm'
+
+[[dialect_glossary]]
+term = 'пасем'
+standard = 'паса'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'pɐ.ˈsɛm'
+
+[[dialect_glossary]]
+term = 'тресем'
+standard = 'треса'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'trɛ.ˈsɛm'
+
+[[dialect_glossary]]
+term = 'бодем'
+standard = 'бода'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'bɔ.ˈdɛm'
+
+[[dialect_glossary]]
+term = 'крадем'
+standard = 'крада'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'krɐ.ˈdɛm'
+
+[[dialect_glossary]]
+term = 'кладем'
+standard = 'клада (огън)'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'klɐ.ˈdɛm'
+
+[[dialect_glossary]]
+term = 'печем'
+standard = 'пека'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'pɛ.ˈt͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'речем'
+standard = 'река / кажа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'rɛ.ˈt͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'сечем'
+standard = 'сека'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'sɛ.ˈt͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'течем'
+standard = 'тека'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tɛ.ˈt͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'влечем'
+standard = 'влека'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'vlɛ.ˈt͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'можем'
+standard = 'мога'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmɔ.ʒɛm'
+
+[[dialect_glossary]]
+term = 'лъжем'
+standard = 'лъжа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈlɤ.ʒɛm'
+
+[[dialect_glossary]]
+term = 'мажем'
+standard = 'мажа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈma.ʒɛm'
+
+[[dialect_glossary]]
+term = 'стрижем'
+standard = 'стрижа'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈstri.ʒɛm'
+
+[[dialect_glossary]]
+term = 'пишем'
+standard = 'пиша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpi.ʃɛm'
+
+[[dialect_glossary]]
+term = 'плачем'
+standard = 'плача'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpla.t͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'скачем'
+standard = 'скачам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈska.t͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'сучем'
+standard = 'суча'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsu.t͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'тъчем'
+standard = 'тъка'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tɤ.ˈt͡ʃɛm'
+
+[[dialect_glossary]]
+term = 'орем'
+standard = 'ора'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɔ.ˈrɛm'
+
+[[dialect_glossary]]
+term = 'берем'
+standard = 'бера'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'bɛ.ˈrɛm'
+
+[[dialect_glossary]]
+term = 'дерем'
+standard = 'дера'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'dɛ.ˈrɛm'
+
+[[dialect_glossary]]
+term = 'мелем'
+standard = 'меля'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmɛ.lɛm'
+
+[[dialect_glossary]]
+term = 'колем'
+standard = 'коля'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈkɔ.lɛm'
+
+[[dialect_glossary]]
+term = 'бегаме'
+standard = 'бягаме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.ɡɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'чекаме'
+standard = 'чакаме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈt͡ʃɛ.kɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'гледаме'
+standard = 'гледаме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡlɛ.dɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'слушаме'
+standard = 'слушаме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈslu.ʃɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'питаме'
+standard = 'питаме'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpi.tɐ.mɛ'
+
+[[dialect_glossary]]
+term = 'газим'
+standard = 'газя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡa.zim'
+
+[[dialect_glossary]]
+term = 'лазим'
+standard = 'лазя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈla.zim'
+
+[[dialect_glossary]]
+term = 'мразим'
+standard = 'мразя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmra.zim'
+
+[[dialect_glossary]]
+term = 'пазим'
+standard = 'пазя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpa.zim'
+
+[[dialect_glossary]]
+term = 'возим'
+standard = 'возя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvɔ.zim'
+
+[[dialect_glossary]]
+term = 'грозим'
+standard = 'грозя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡrɔ.zim'
+
+[[dialect_glossary]]
+term = 'мутим'
+standard = 'мътя / разбърквам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmu.tim'
+
+[[dialect_glossary]]
+term = 'сушим'
+standard = 'суша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsu.ʃim'
+
+[[dialect_glossary]]
+term = 'губим'
+standard = 'губя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡu.bim'
+
+[[dialect_glossary]]
+term = 'любим'
+standard = 'любя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈlʲu.bim'
+
+[[dialect_glossary]]
+term = 'купим'
+standard = 'купя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈku.pim'
+
+[[dialect_glossary]]
+term = 'скубем'
+standard = 'скубя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsku.bɛm'
+
+[[dialect_glossary]]
+term = 'абим'
+standard = 'хабя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈa.bim'
+
+[[dialect_glossary]]
+term = 'ловим'
+standard = 'ловя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈlɔ.vim'
+
+[[dialect_glossary]]
+term = 'давим'
+standard = 'давя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈda.vim'
+
+[[dialect_glossary]]
+term = 'славим'
+standard = 'славя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsla.vim'
+
+[[dialect_glossary]]
+term = 'главим'
+standard = 'главя / наемам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡla.vim'
+
+[[dialect_glossary]]
+term = 'цедим'
+standard = 'цедя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡sɛ.ˈdim'
+
+[[dialect_glossary]]
+term = 'редим'
+standard = 'редя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'rɛ.ˈdim'
+
+[[dialect_glossary]]
+term = 'градим'
+standard = 'градя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡrɐ.ˈdim'
+
+[[dialect_glossary]]
+term = 'садим'
+standard = 'садя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'sɐ.ˈdim'
+
+[[dialect_glossary]]
+term = 'будим'
+standard = 'будя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbu.dim'
+
+[[dialect_glossary]]
+term = 'чудим се'
+standard = 'чудя се'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈt͡ʃu.dim sɛ'
+
+[[dialect_glossary]]
+term = 'лудим'
+standard = 'лудея'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈlu.dim'
+
+[[dialect_glossary]]
+term = 'студим'
+standard = 'студя / охлаждам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'stu.ˈdim'
+
+[[dialect_glossary]]
+term = 'родим'
+standard = 'родя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'rɔ.ˈdim'
+
+[[dialect_glossary]]
+term = 'бродим'
+standard = 'бродя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbrɔ.dim'
+
+[[dialect_glossary]]
+term = 'водим'
+standard = 'водя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvɔ.dim'
+
+[[dialect_glossary]]
+term = 'годим'
+standard = 'годя / сгодявам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡɔ.ˈdim'
+
+[[dialect_glossary]]
+term = 'пъдим'
+standard = 'пъдя / гоня'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpɤ.dim'
+
+[[dialect_glossary]]
+term = 'съдим'
+standard = 'съдя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsɤ.dim'
+
+[[dialect_glossary]]
+term = 'кадим'
+standard = 'кадя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'kɐ.ˈdim'
+
+[[dialect_glossary]]
+term = 'вадим'
+standard = 'вадя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈva.dim'
+
+[[dialect_glossary]]
+term = 'гладим'
+standard = 'гладя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡla.dim'
+
+[[dialect_glossary]]
+term = 'сладим'
+standard = 'подслаждам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'slɐ.ˈdim'
+
+[[dialect_glossary]]
+term = 'млатим'
+standard = 'млатя / удрям'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmla.tim'
+
+[[dialect_glossary]]
+term = 'платим'
+standard = 'платя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'plɐ.ˈtim'
+
+[[dialect_glossary]]
+term = 'пратим'
+standard = 'пратя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpra.tim'
+
+[[dialect_glossary]]
+term = 'кратим'
+standard = 'скъсявам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈkra.tim'
+
+[[dialect_glossary]]
+term = 'светим'
+standard = 'светя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsvɛ.tim'
+
+[[dialect_glossary]]
+term = 'клетим'
+standard = 'кълна'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈklɛ.tim'
+
+[[dialect_glossary]]
+term = 'чистим'
+standard = 'чистя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈt͡ʃi.stim'
+
+[[dialect_glossary]]
+term = 'гостим'
+standard = 'гостя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡɔ.stim'
+
+[[dialect_glossary]]
+term = 'постим'
+standard = 'постя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpɔ.stim'
+
+[[dialect_glossary]]
+term = 'кръстим'
+standard = 'кръстя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈkrɤ.stim'
+
+[[dialect_glossary]]
+term = 'мъстим'
+standard = 'отмъщавам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'mɤ.ˈstim'
+
+[[dialect_glossary]]
+term = 'патим'
+standard = 'патя / страдам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpa.tim'
+
+[[dialect_glossary]]
+term = 'въртим'
+standard = 'въртя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'vr̩.ˈtim'
+
+[[dialect_glossary]]
+term = 'летим'
+standard = 'летя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'lɛ.ˈtim'
+
+[[dialect_glossary]]
+term = 'цъфтим'
+standard = 'цъфтя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡sɤf.ˈtim'
+
+[[dialect_glossary]]
+term = 'плашим'
+standard = 'плаша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpla.ʃim'
+
+[[dialect_glossary]]
+term = 'кашим'
+standard = 'кашлям'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈka.ʃim'
+
+[[dialect_glossary]]
+term = 'грешим'
+standard = 'греша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡrɛ.ˈʃim'
+
+[[dialect_glossary]]
+term = 'решим'
+standard = 'реша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'rɛ.ˈʃim'
+
+[[dialect_glossary]]
+term = 'тешим'
+standard = 'утешавам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tɛ.ˈʃim'
+
+[[dialect_glossary]]
+term = 'трошим'
+standard = 'троша / чупя'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'trɔ.ˈʃim'
+
+[[dialect_glossary]]
+term = 'душим'
+standard = 'душа / помирисвам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈdu.ʃim'
+
+[[dialect_glossary]]
+term = 'гушим се'
+standard = 'гуша се'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɡu.ʃim sɛ'
+
+[[dialect_glossary]]
+term = 'рушим'
+standard = 'руша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ru.ˈʃim'
+
+[[dialect_glossary]]
+term = 'пушим'
+standard = 'пуша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpu.ʃim'
+
+[[dialect_glossary]]
+term = 'мушим'
+standard = 'муша / пъхам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmu.ʃim'
+
+[[dialect_glossary]]
+term = 'тушим'
+standard = 'гася / туша'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tu.ˈʃim'
+
+[[dialect_glossary]]
+term = 'връшим'
+standard = 'върша / вършея'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvr̩.ʃim'
+
+[[dialect_glossary]]
+term = 'мръшим'
+standard = 'слабея / мършавея'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmr̩.ʃim'
+
+[[dialect_glossary]]
+term = 'пръшим'
+standard = 'праша / пръскам'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpr̩.ʃim'
+
+[[dialect_glossary]]
+term = 'стръшим'
+standard = 'стърча'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈstr̩.ʃim'
+
+[[dialect_glossary]]
+term = 'ветеро'
+standard = 'вятърът'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvɛ.tɛ.rɔ'
+
+[[dialect_glossary]]
+term = 'брег'
+standard = 'бряг'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'brɛk'
+
+[[dialect_glossary]]
+term = 'свят'
+standard = 'свят'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'svɛt'
+
+[[dialect_glossary]]
+term = 'звер'
+standard = 'звяр'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'zvɛr'
+
+[[dialect_glossary]]
+term = 'тесто'
+standard = 'тясто'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtɛ.stɔ'
+
+[[dialect_glossary]]
+term = 'вера'
+standard = 'вяра'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈvɛ.rɐ'
+
+[[dialect_glossary]]
+term = 'мера'
+standard = 'мяра'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmɛ.rɐ'
+
+[[dialect_glossary]]
+term = 'стреа'
+standard = 'стряха'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈstrɛ.ɐ'
+
+[[dialect_glossary]]
+term = 'грех'
+standard = 'грях'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡrɛx'
+
+[[dialect_glossary]]
+term = 'смех'
+standard = 'смях'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'smɛx'
+
+[[dialect_glossary]]
+term = 'орех'
+standard = 'орех'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈɔ.rɛx'
+
+[[dialect_glossary]]
+term = 'човек'
+standard = 'човек'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡ʃɔ.ˈvɛk'
+
+[[dialect_glossary]]
+term = 'век'
+standard = 'вяк / век'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'vɛk'
+
+[[dialect_glossary]]
+term = 'лек'
+standard = 'ляк / лек'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'lɛk'
+
+[[dialect_glossary]]
+term = 'бел'
+standard = 'бял'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'bɛl'
+
+[[dialect_glossary]]
+term = 'цел'
+standard = 'цял'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡sɛl'
+
+[[dialect_glossary]]
+term = 'лево'
+standard = 'ляво'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈlɛ.vɔ'
+
+[[dialect_glossary]]
+term = 'прясно'
+standard = 'прясно'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈprɛ.snɔ'
+
+[[dialect_glossary]]
+term = 'бесно'
+standard = 'бясно'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbɛ.snɔ'
+
+[[dialect_glossary]]
+term = 'редко'
+standard = 'рядко'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈrɛt.kɔ'
+
+[[dialect_glossary]]
+term = 'слеп'
+standard = 'сляп'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'slɛp'
+
+[[dialect_glossary]]
+term = 'нем'
+standard = 'ням'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'nɛm'
+
+[[dialect_glossary]]
+term = 'зелен'
+standard = 'зелен'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'zɛ.ˈlɛn'
+
+[[dialect_glossary]]
+term = 'слънце'
+standard = 'слънце'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsl̩n.t͡sɛ'
+
+[[dialect_glossary]]
+term = 'блъа'
+standard = 'бълха'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈbl̩.ɐ'
+
+[[dialect_glossary]]
+term = 'мълния'
+standard = 'мълния'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈml̩.ni.jɐ'
+
+[[dialect_glossary]]
+term = 'клъбо'
+standard = 'кълбо'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈkl̩.bɔ'
+
+[[dialect_glossary]]
+term = 'стлъба'
+standard = 'стълба'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈstl̩.bɐ'
+
+[[dialect_glossary]]
+term = 'стлъп'
+standard = 'стълб'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'stl̩p'
+
+[[dialect_glossary]]
+term = 'длъбок'
+standard = 'дълбок'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'dl̩.ˈbɔk'
+
+[[dialect_glossary]]
+term = 'тлъст'
+standard = 'тлъст / дебел'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tl̩st'
+
+[[dialect_glossary]]
+term = 'гръб'
+standard = 'гръб'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ɡr̩p'
+
+[[dialect_glossary]]
+term = 'дръва'
+standard = 'дърва'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'dr̩.ˈva'
+
+[[dialect_glossary]]
+term = 'пръв'
+standard = 'пръв / първи'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'pr̩f'
+
+[[dialect_glossary]]
+term = 'пръст'
+standard = 'пръст'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'pr̩st'
+
+[[dialect_glossary]]
+term = 'пръстен'
+standard = 'пръстен'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈpr̩.stɛn'
+
+[[dialect_glossary]]
+term = 'кръв'
+standard = 'кръв'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'kr̩f'
+
+[[dialect_glossary]]
+term = 'кръст'
+standard = 'кръст'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'kr̩st'
+
+[[dialect_glossary]]
+term = 'връх'
+standard = 'връх'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'vr̩x'
+
+[[dialect_glossary]]
+term = 'връв'
+standard = 'връв'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'vr̩f'
+
+[[dialect_glossary]]
+term = 'сръна'
+standard = 'сърна'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈsr̩.nɐ'
+
+[[dialect_glossary]]
+term = 'смрът'
+standard = 'смърт'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'smr̩t'
+
+[[dialect_glossary]]
+term = 'твръд'
+standard = 'твърд'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'tvr̩t'
+
+[[dialect_glossary]]
+term = 'бръз'
+standard = 'бърз'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'br̩s'
+
+[[dialect_glossary]]
+term = 'мръсен'
+standard = 'мръсен'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmr̩.sɛn'
+
+[[dialect_glossary]]
+term = 'мрътъв'
+standard = 'мъртъв'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈmr̩.tɤf'
+
+[[dialect_glossary]]
+term = 'цръква'
+standard = 'църква'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈt͡sr̩.kvɐ'
+
+[[dialect_glossary]]
+term = 'чвръст'
+standard = 'чевърст / здрав'
+register = 'северозападен/белоградчишки диалект'
+ipa = 't͡ʃvr̩st'
+
+[[dialect_glossary]]
+term = 'баща'
+standard = 'баща'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'bɐ.ˈʃta'
+
+[[dialect_glossary]]
+term = 'татко'
+standard = 'татко'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈtat.kɔ'
+
+[[dialect_glossary]]
+term = 'матер'
+standard = 'майка'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈma.tɛr'
+
+[[dialect_glossary]]
+term = 'мама'
+standard = 'мама'
+register = 'северозападен/белоградчишки диалект'
+ipa = 'ˈma.mɐ'
+
+[[dialect_glossary]]
+term = 'ово'
+standard = 'това'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈvɔ'
+
+[[dialect_glossary]]
+term = 'оно'
+standard = 'онова / то'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈnɔ'
+
+[[dialect_glossary]]
+term = 'овая'
+standard = 'тази'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈva.ja'
+
+[[dialect_glossary]]
+term = 'овия'
+standard = 'този / тези'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈvi.ja'
+
+[[dialect_glossary]]
+term = 'ония'
+standard = 'онзи / онези'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈni.ja'
+
+[[dialect_glossary]]
+term = 'те'
+standard = 'ето'
+register = 'западен/трънски диалект'
+ipa = 'tɛ'
+
+[[dialect_glossary]]
+term = 'а'
+standard = 'аз'
+register = 'западен/трънски диалект'
+ipa = 'a'
+
+[[dialect_glossary]]
+term = 'я'
+standard = 'аз'
+register = 'западен/трънски диалект'
+ipa = 'ja'
+
+[[dialect_glossary]]
+term = 'ньи'
+standard = 'ние'
+register = 'западен/трънски диалект'
+ipa = 'ɲi'
+
+[[dialect_glossary]]
+term = 'ви'
+standard = 'вие'
+register = 'западен/трънски диалект'
+ipa = 'vi'
+
+[[dialect_glossary]]
+term = 'ньима'
+standard = 'тях / им'
+register = 'западен/трънски диалект'
+ipa = 'ˈɲi.ma'
+
+[[dialect_glossary]]
+term = 'ньу'
+standard = 'нея'
+register = 'западен/трънски диалект'
+ipa = 'ɲu'
+
+[[dialect_glossary]]
+term = 'ньему'
+standard = 'на него / му'
+register = 'западен/трънски диалект'
+ipa = 'ˈɲɛ.mu'
+
+[[dialect_glossary]]
+term = 'мойе'
+standard = 'мое'
+register = 'западен/трънски диалект'
+ipa = 'ˈmɔ.jɛ'
+
+[[dialect_glossary]]
+term = 'твойе'
+standard = 'твое'
+register = 'западен/трънски диалект'
+ipa = 'ˈtvɔ.jɛ'
+
+[[dialect_glossary]]
+term = 'ньегово'
+standard = 'негово'
+register = 'западен/трънски диалект'
+ipa = 'ˈɲɛ.ɡɔ.vɔ'
+
+[[dialect_glossary]]
+term = 'ньейно'
+standard = 'нейно'
+register = 'западен/трънски диалект'
+ipa = 'ˈɲɛj.nɔ'
+
+[[dialect_glossary]]
+term = 'нашо'
+standard = 'наше'
+register = 'западен/трънски диалект'
+ipa = 'ˈna.ʃɔ'
+
+[[dialect_glossary]]
+term = 'вашо'
+standard = 'ваше'
+register = 'западен/трънски диалект'
+ipa = 'ˈva.ʃɔ'
+
+[[dialect_glossary]]
+term = 'ньивно'
+standard = 'тяхно'
+register = 'западен/трънски диалект'
+ipa = 'ˈɲiv.nɔ'
+
+[[dialect_glossary]]
+term = 'койи'
+standard = 'кой'
+register = 'западен/трънски диалект'
+ipa = 'ˈkɔ.ji'
+
+[[dialect_glossary]]
+term = 'коя'
+standard = 'коя'
+register = 'западен/трънски диалект'
+ipa = 'ˈkɔ.ja'
+
+[[dialect_glossary]]
+term = 'койе'
+standard = 'кое'
+register = 'западен/трънски диалект'
+ipa = 'ˈkɔ.jɛ'
+
+[[dialect_glossary]]
+term = 'свака'
+standard = 'всяка'
+register = 'западен/трънски диалект'
+ipa = 'ˈsva.ka'
+
+[[dialect_glossary]]
+term = 'свако'
+standard = 'всяко'
+register = 'западен/трънски диалект'
+ipa = 'ˈsva.kɔ'
+
+[[dialect_glossary]]
+term = 'никойи'
+standard = 'никой'
+register = 'западен/трънски диалект'
+ipa = 'ˈni.kɔ.ji'
+
+[[dialect_glossary]]
+term = 'нищо'
+standard = 'нищо'
+register = 'западен/трънски диалект'
+ipa = 'ˈni.ʃtɔ'
+
+[[dialect_glossary]]
+term = 'некойи'
+standard = 'някой'
+register = 'западен/трънски диалект'
+ipa = 'ˈnɛ.kɔ.ji'
+
+[[dialect_glossary]]
+term = 'нещо'
+standard = 'нещо'
+register = 'западен/трънски диалект'
+ipa = 'ˈnɛ.ʃtɔ'
+
+[[dialect_glossary]]
+term = 'ижа'
+standard = 'къща'
+register = 'западен/трънски диалект'
+ipa = 'ˈi.ʒa'
+
+[[dialect_glossary]]
+term = 'ижище'
+standard = 'голяма къща / място на къща'
+register = 'западен/трънски диалект'
+ipa = 'ˈi.ʒi.ʃtɛ'
+
+[[dialect_glossary]]
+term = 'кошуля'
+standard = 'риза'
+register = 'западен/трънски диалект'
+ipa = 'kɔ.ˈʃu.ʎa'
+
+[[dialect_glossary]]
+term = 'чешире'
+standard = 'потури / панталони'
+register = 'западен/трънски диалект'
+ipa = 'tʃɛ.ˈʃi.rɛ'
+
+[[dialect_glossary]]
+term = 'литак'
+standard = 'сукман'
+register = 'западен/трънски диалект'
+ipa = 'li.ˈtak'
+
+[[dialect_glossary]]
+term = 'гунь'
+standard = 'връхна дреха'
+register = 'западен/трънски диалект'
+ipa = 'ɡuɲ'
+
+[[dialect_glossary]]
+term = 'опинци'
+standard = 'цървули'
+register = 'западен/трънски диалект'
+ipa = 'ˈɔ.pin.t͡si'
+
+[[dialect_glossary]]
+term = 'обоняци'
+standard = 'чорапи / калцуни'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.bɔ.ˈɲa.t͡si'
+
+[[dialect_glossary]]
+term = 'пояс'
+standard = 'колан / пояс'
+register = 'западен/трънски диалект'
+ipa = 'ˈpɔ.jas'
+
+[[dialect_glossary]]
+term = 'капа'
+standard = 'шапка'
+register = 'западен/трънски диалект'
+ipa = 'ˈka.pa'
+
+[[dialect_glossary]]
+term = 'шамия'
+standard = 'забрадка'
+register = 'западен/трънски диалект'
+ipa = 'ʃa.ˈmi.ja'
+
+[[dialect_glossary]]
+term = 'руба'
+standard = 'дреха / облекло'
+register = 'западен/трънски диалект'
+ipa = 'ˈru.ba'
+
+[[dialect_glossary]]
+term = 'рубище'
+standard = 'парцал / стара дреха'
+register = 'западен/трънски диалект'
+ipa = 'ˈru.bi.ʃtɛ'
+
+[[dialect_glossary]]
+term = 'дзeбнем'
+standard = 'мръзна / студувам'
+register = 'западен/трънски диалект'
+ipa = 'ˈd͡zɛb.nɛm'
+
+[[dialect_glossary]]
+term = 'дзвезда'
+standard = 'звезда'
+register = 'западен/трънски диалект'
+ipa = 'd͡zvɛz.ˈda'
+
+[[dialect_glossary]]
+term = 'дзвирка'
+standard = 'пролука / процеп'
+register = 'западен/трънски диалект'
+ipa = 'ˈd͡zvir.ka'
+
+[[dialect_glossary]]
+term = 'дзвер'
+standard = 'звяр'
+register = 'западен/трънски диалект'
+ipa = 'd͡zvɛr'
+
+[[dialect_glossary]]
+term = 'дзвънец'
+standard = 'звънец'
+register = 'западен/трънски диалект'
+ipa = 'd͡zvɤ.ˈnɛt͡s'
+
+[[dialect_glossary]]
+term = 'дзад'
+standard = 'зад'
+register = 'западен/трънски диалект'
+ipa = 'd͡zad'
+
+[[dialect_glossary]]
+term = 'дзаран'
+standard = 'сутрин / утре'
+register = 'западен/трънски диалект'
+ipa = 'ˈd͡za.ran'
+
+[[dialect_glossary]]
+term = 'дзаранка'
+standard = 'сутринта'
+register = 'западен/трънски диалект'
+ipa = 'ˈd͡za.ran.ka'
+
+[[dialect_glossary]]
+term = 'снощи'
+standard = 'снощи'
+register = 'западен/трънски диалект'
+ipa = 'ˈsnɔ.ʃti'
+
+[[dialect_glossary]]
+term = 'чера'
+standard = 'вчера'
+register = 'западен/трънски диалект'
+ipa = 'ˈtʃɛ.ra'
+
+[[dialect_glossary]]
+term = 'онъйден'
+standard = 'онзи ден'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈnɤj.dɛn'
+
+[[dialect_glossary]]
+term = 'ютре'
+standard = 'утре'
+register = 'западен/трънски диалект'
+ipa = 'ˈju.trɛ'
+
+[[dialect_glossary]]
+term = 'заютре'
+standard = 'вдругиден'
+register = 'западен/трънски диалект'
+ipa = 'za.ˈju.trɛ'
+
+[[dialect_glossary]]
+term = 'са'
+standard = 'сега'
+register = 'западен/трънски диалект'
+ipa = 'sa'
+
+[[dialect_glossary]]
+term = 'тъкмо'
+standard = 'тъкмо / точно'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɤk.mɔ'
+
+[[dialect_glossary]]
+term = 'веднага'
+standard = 'веднага'
+register = 'западен/трънски диалект'
+ipa = 'vɛd.ˈna.ɡa'
+
+[[dialect_glossary]]
+term = 'после'
+standard = 'после'
+register = 'западен/трънски диалект'
+ipa = 'ˈpɔ.slɛ'
+
+[[dialect_glossary]]
+term = 'напре'
+standard = 'напред / преди'
+register = 'западен/трънски диалект'
+ipa = 'ˈna.prɛ'
+
+[[dialect_glossary]]
+term = 'ндзад'
+standard = 'назад'
+register = 'западен/трънски диалект'
+ipa = 'nd͡zad'
+
+[[dialect_glossary]]
+term = 'унутра'
+standard = 'вътре'
+register = 'западен/трънски диалект'
+ipa = 'u.ˈnu.tra'
+
+[[dialect_glossary]]
+term = 'надвор'
+standard = 'навън'
+register = 'западен/трънски диалект'
+ipa = 'nad.ˈvɔr'
+
+[[dialect_glossary]]
+term = 'горе'
+standard = 'горе'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡɔ.rɛ'
+
+[[dialect_glossary]]
+term = 'вук'
+standard = 'вълк'
+register = 'западен/трънски диалект'
+ipa = 'vuk'
+
+[[dialect_glossary]]
+term = 'жуто'
+standard = 'жълто'
+register = 'западен/трънски диалект'
+ipa = 'ˈʒu.tɔ'
+
+[[dialect_glossary]]
+term = 'пуно'
+standard = 'пълно'
+register = 'западен/трънски диалект'
+ipa = 'ˈpu.nɔ'
+
+[[dialect_glossary]]
+term = 'дуго'
+standard = 'дълго'
+register = 'западен/трънски диалект'
+ipa = 'ˈdu.ɡɔ'
+
+[[dialect_glossary]]
+term = 'тънко'
+standard = 'тънко'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɤn.kɔ'
+
+[[dialect_glossary]]
+term = 'дебело'
+standard = 'дебело'
+register = 'западен/трънски диалект'
+ipa = 'dɛ.ˈbɛ.lɔ'
+
+[[dialect_glossary]]
+term = 'широко'
+standard = 'широко'
+register = 'западен/трънски диалект'
+ipa = 'ʃi.ˈrɔ.kɔ'
+
+[[dialect_glossary]]
+term = 'високо'
+standard = 'високо'
+register = 'западен/трънски диалект'
+ipa = 'vi.ˈsɔ.kɔ'
+
+[[dialect_glossary]]
+term = 'ниско'
+standard = 'ниско'
+register = 'западен/трънски диалект'
+ipa = 'ˈnis.kɔ'
+
+[[dialect_glossary]]
+term = 'мало'
+standard = 'малко'
+register = 'западен/трънски диалект'
+ipa = 'ˈma.lɔ'
+
+[[dialect_glossary]]
+term = 'малко'
+standard = 'малко'
+register = 'западен/трънски диалект'
+ipa = 'ˈmal.kɔ'
+
+[[dialect_glossary]]
+term = 'лошо'
+standard = 'лошо'
+register = 'западен/трънски диалект'
+ipa = 'ˈlɔ.ʃɔ'
+
+[[dialect_glossary]]
+term = 'благо'
+standard = 'сладко / благо'
+register = 'западен/трънски диалект'
+ipa = 'ˈbla.ɡɔ'
+
+[[dialect_glossary]]
+term = 'горко'
+standard = 'горчиво'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡɔr.kɔ'
+
+[[dialect_glossary]]
+term = 'кисело'
+standard = 'кисело'
+register = 'западен/трънски диалект'
+ipa = 'ˈki.sɛ.lɔ'
+
+[[dialect_glossary]]
+term = 'люто'
+standard = 'люто'
+register = 'западен/трънски диалект'
+ipa = 'ˈʎu.tɔ'
+
+[[dialect_glossary]]
+term = 'слано'
+standard = 'солено'
+register = 'западен/трънски диалект'
+ipa = 'ˈsla.nɔ'
+
+[[dialect_glossary]]
+term = 'вруке'
+standard = 'горещо'
+register = 'западен/трънски диалект'
+ipa = 'ˈvru.cɛ'
+
+[[dialect_glossary]]
+term = 'ладнo'
+standard = 'хладно / студено'
+register = 'западен/трънски диалект'
+ipa = 'ˈlad.nɔ'
+
+[[dialect_glossary]]
+term = 'студено'
+standard = 'студено'
+register = 'западен/трънски диалект'
+ipa = 'stu.ˈdɛ.nɔ'
+
+[[dialect_glossary]]
+term = 'суво'
+standard = 'сухо'
+register = 'западен/трънски диалект'
+ipa = 'ˈsu.vɔ'
+
+[[dialect_glossary]]
+term = 'мокро'
+standard = 'мокро'
+register = 'западен/трънски диалект'
+ipa = 'ˈmɔ.krɔ'
+
+[[dialect_glossary]]
+term = 'влажно'
+standard = 'влажно'
+register = 'западен/трънски диалект'
+ipa = 'ˈvlaʒ.nɔ'
+
+[[dialect_glossary]]
+term = 'чисто'
+standard = 'чисто'
+register = 'западен/трънски диалект'
+ipa = 'ˈtʃis.tɔ'
+
+[[dialect_glossary]]
+term = 'кално'
+standard = 'кално / мръсно'
+register = 'западен/трънски диалект'
+ipa = 'ˈkal.nɔ'
+
+[[dialect_glossary]]
+term = 'право'
+standard = 'право'
+register = 'западен/трънски диалект'
+ipa = 'ˈpra.vɔ'
+
+[[dialect_glossary]]
+term = 'криво'
+standard = 'криво'
+register = 'западен/трънски диалект'
+ipa = 'ˈkri.vɔ'
+
+[[dialect_glossary]]
+term = 'равно'
+standard = 'равно'
+register = 'западен/трънски диалект'
+ipa = 'ˈrav.nɔ'
+
+[[dialect_glossary]]
+term = 'стръмно'
+standard = 'стръмно'
+register = 'западен/трънски диалект'
+ipa = 'ˈstrɤm.nɔ'
+
+[[dialect_glossary]]
+term = 'остро'
+standard = 'остро'
+register = 'западен/трънски диалект'
+ipa = 'ˈɔ.strɔ'
+
+[[dialect_glossary]]
+term = 'тупо'
+standard = 'тъпо'
+register = 'западен/трънски диалект'
+ipa = 'ˈtu.pɔ'
+
+[[dialect_glossary]]
+term = 'меко'
+standard = 'меко'
+register = 'западен/трънски диалект'
+ipa = 'ˈmɛ.kɔ'
+
+[[dialect_glossary]]
+term = 'твърдо'
+standard = 'твърдо'
+register = 'западен/трънски диалект'
+ipa = 'ˈtvɤr.dɔ'
+
+[[dialect_glossary]]
+term = 'леко'
+standard = 'леко'
+register = 'западен/трънски диалект'
+ipa = 'ˈlɛ.kɔ'
+
+[[dialect_glossary]]
+term = 'тежко'
+standard = 'тежко'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɛʃ.kɔ'
+
+[[dialect_glossary]]
+term = 'полеко'
+standard = 'бавно / полека'
+register = 'западен/трънски диалект'
+ipa = 'pɔ.ˈlɛ.kɔ'
+
+[[dialect_glossary]]
+term = 'яко'
+standard = 'силно / много'
+register = 'западен/трънски диалект'
+ipa = 'ˈja.kɔ'
+
+[[dialect_glossary]]
+term = 'слабо'
+standard = 'слабо'
+register = 'западен/трънски диалект'
+ipa = 'ˈsla.bɔ'
+
+[[dialect_glossary]]
+term = 'здраво'
+standard = 'здраво'
+register = 'западен/трънски диалект'
+ipa = 'ˈzdra.vɔ'
+
+[[dialect_glossary]]
+term = 'болно'
+standard = 'болно'
+register = 'западен/трънски диалект'
+ipa = 'ˈbɔl.nɔ'
+
+[[dialect_glossary]]
+term = 'живо'
+standard = 'живо'
+register = 'западен/трънски диалект'
+ipa = 'ˈʒi.vɔ'
+
+[[dialect_glossary]]
+term = 'мъртво'
+standard = 'мъртво'
+register = 'западен/трънски диалект'
+ipa = 'ˈmɤrt.vɔ'
+
+[[dialect_glossary]]
+term = 'старо'
+standard = 'старо'
+register = 'западен/трънски диалект'
+ipa = 'ˈsta.rɔ'
+
+[[dialect_glossary]]
+term = 'младо'
+standard = 'младо'
+register = 'западен/трънски диалект'
+ipa = 'ˈmla.dɔ'
+
+[[dialect_glossary]]
+term = 'ново'
+standard = 'ново'
+register = 'западен/трънски диалект'
+ipa = 'ˈnɔ.vɔ'
+
+[[dialect_glossary]]
+term = 'вехто'
+standard = 'вехто / старо'
+register = 'западен/трънски диалект'
+ipa = 'ˈvɛx.tɔ'
+
+[[dialect_glossary]]
+term = 'богато'
+standard = 'богато'
+register = 'западен/трънски диалект'
+ipa = 'bɔ.ˈɡa.tɔ'
+
+[[dialect_glossary]]
+term = 'сиромашко'
+standard = 'бедно'
+register = 'западен/трънски диалект'
+ipa = 'si.rɔ.ˈmaʃ.kɔ'
+
+[[dialect_glossary]]
+term = 'скупо'
+standard = 'скъпо'
+register = 'западен/трънски диалект'
+ipa = 'ˈsku.pɔ'
+
+[[dialect_glossary]]
+term = 'евтино'
+standard = 'евтино'
+register = 'западен/трънски диалект'
+ipa = 'ˈɛf.ti.nɔ'
+
+[[dialect_glossary]]
+term = 'бело'
+standard = 'бяло'
+register = 'западен/трънски диалект'
+ipa = 'ˈbɛ.lɔ'
+
+[[dialect_glossary]]
+term = 'църно'
+standard = 'черно'
+register = 'западен/трънски диалект'
+ipa = 'ˈt͡sɤr.nɔ'
+
+[[dialect_glossary]]
+term = 'цръвено'
+standard = 'червено'
+register = 'западен/трънски диалект'
+ipa = 't͡srɤ.ˈvɛ.nɔ'
+
+[[dialect_glossary]]
+term = 'зелено'
+standard = 'зелено'
+register = 'западен/трънски диалект'
+ipa = 'zɛ.ˈlɛ.nɔ'
+
+[[dialect_glossary]]
+term = 'синьо'
+standard = 'синьо'
+register = 'западен/трънски диалект'
+ipa = 'ˈsi.ɲɔ'
+
+[[dialect_glossary]]
+term = 'сиво'
+standard = 'сиво'
+register = 'западен/трънски диалект'
+ipa = 'ˈsi.vɔ'
+
+[[dialect_glossary]]
+term = 'шарено'
+standard = 'шарено'
+register = 'западен/трънски диалект'
+ipa = 'ˈʃa.rɛ.nɔ'
+
+[[dialect_glossary]]
+term = 'светло'
+standard = 'светло'
+register = 'западен/трънски диалект'
+ipa = 'ˈsvɛt.lɔ'
+
+[[dialect_glossary]]
+term = 'тъмно'
+standard = 'тъмно'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɤm.nɔ'
+
+[[dialect_glossary]]
+term = 'мътно'
+standard = 'мътно'
+register = 'западен/трънски диалект'
+ipa = 'ˈmɤt.nɔ'
+
+[[dialect_glossary]]
+term = 'бистро'
+standard = 'бистро'
+register = 'западен/трънски диалект'
+ipa = 'ˈbi.strɔ'
+
+[[dialect_glossary]]
+term = 'гладно'
+standard = 'гладно'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡlad.nɔ'
+
+[[dialect_glossary]]
+term = 'сито'
+standard = 'сито'
+register = 'западен/трънски диалект'
+ipa = 'ˈsi.tɔ'
+
+[[dialect_glossary]]
+term = 'жедно'
+standard = 'жадно'
+register = 'западен/трънски диалект'
+ipa = 'ˈʒɛd.nɔ'
+
+[[dialect_glossary]]
+term = 'голо'
+standard = 'голо'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡɔ.lɔ'
+
+[[dialect_glossary]]
+term = 'босо'
+standard = 'босо'
+register = 'западен/трънски диалект'
+ipa = 'ˈbɔ.sɔ'
+
+[[dialect_glossary]]
+term = 'обуено'
+standard = 'обуто'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈbu.jɛ.nɔ'
+
+[[dialect_glossary]]
+term = 'облечено'
+standard = 'облечено'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈblɛ.tʃɛ.nɔ'
+
+[[dialect_glossary]]
+term = 'слепо'
+standard = 'сляпо'
+register = 'западен/трънски диалект'
+ipa = 'ˈslɛ.pɔ'
+
+[[dialect_glossary]]
+term = 'глуво'
+standard = 'глухо'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡlu.vɔ'
+
+[[dialect_glossary]]
+term = 'немо'
+standard = 'нямо'
+register = 'западен/трънски диалект'
+ipa = 'ˈnɛ.mɔ'
+
+[[dialect_glossary]]
+term = 'куцо'
+standard = 'куцо'
+register = 'западен/трънски диалект'
+ipa = 'ˈku.t͡sɔ'
+
+[[dialect_glossary]]
+term = 'кьораво'
+standard = 'сляпо с едно око'
+register = 'западен/трънски диалект'
+ipa = 'ˈcɔ.ra.vɔ'
+
+[[dialect_glossary]]
+term = 'кьопаво'
+standard = 'сакато / несръчно'
+register = 'западен/трънски диалект'
+ipa = 'ˈcɔ.pa.vɔ'
+
+[[dialect_glossary]]
+term = 'лудо'
+standard = 'лудо'
+register = 'западен/трънски диалект'
+ipa = 'ˈlu.dɔ'
+
+[[dialect_glossary]]
+term = 'умно'
+standard = 'умно'
+register = 'западен/трънски диалект'
+ipa = 'ˈum.nɔ'
+
+[[dialect_glossary]]
+term = 'просто'
+standard = 'просто / глупаво'
+register = 'западен/трънски диалект'
+ipa = 'ˈprɔ.stɔ'
+
+[[dialect_glossary]]
+term = 'итро'
+standard = 'хитро'
+register = 'западен/трънски диалект'
+ipa = 'ˈi.trɔ'
+
+[[dialect_glossary]]
+term = 'мирно'
+standard = 'мирно'
+register = 'западен/трънски диалект'
+ipa = 'ˈmir.nɔ'
+
+[[dialect_glossary]]
+term = 'кротко'
+standard = 'кротко'
+register = 'западен/трънски диалект'
+ipa = 'ˈkrɔt.kɔ'
+
+[[dialect_glossary]]
+term = 'диво'
+standard = 'диво'
+register = 'западен/трънски диалект'
+ipa = 'ˈdi.vɔ'
+
+[[dialect_glossary]]
+term = 'питомо'
+standard = 'питомно'
+register = 'западен/трънски диалект'
+ipa = 'ˈpi.tɔ.mɔ'
+
+[[dialect_glossary]]
+term = 'укя'
+standard = 'вуйчо'
+register = 'западен/трънски диалект'
+ipa = 'ˈu.ca'
+
+[[dialect_glossary]]
+term = 'стрина'
+standard = 'стринка'
+register = 'западен/трънски диалект'
+ipa = 'ˈstri.na'
+
+[[dialect_glossary]]
+term = 'уйна'
+standard = 'вуйна'
+register = 'западен/трънски диалект'
+ipa = 'ˈuj.na'
+
+[[dialect_glossary]]
+term = 'леля'
+standard = 'леля'
+register = 'западен/трънски диалект'
+ipa = 'ˈlɛ.ʎa'
+
+[[dialect_glossary]]
+term = 'тетин'
+standard = 'лелин мъж / свако'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɛ.tin'
+
+[[dialect_glossary]]
+term = 'деда'
+standard = 'дядо'
+register = 'западен/трънски диалект'
+ipa = 'ˈdɛ.da'
+
+[[dialect_glossary]]
+term = 'баба'
+standard = 'баба'
+register = 'западен/трънски диалект'
+ipa = 'ˈba.ba'
+
+[[dialect_glossary]]
+term = 'брат'
+standard = 'брат'
+register = 'западен/трънски диалект'
+ipa = 'brat'
+
+[[dialect_glossary]]
+term = 'сестра'
+standard = 'сестра'
+register = 'западен/трънски диалект'
+ipa = 'sɛ.ˈstra'
+
+[[dialect_glossary]]
+term = 'братучед'
+standard = 'братовчед'
+register = 'западен/трънски диалект'
+ipa = 'bra.tu.ˈtʃɛd'
+
+[[dialect_glossary]]
+term = 'зет'
+standard = 'зет'
+register = 'западен/трънски диалект'
+ipa = 'zɛt'
+
+[[dialect_glossary]]
+term = 'свекър'
+standard = 'свекър'
+register = 'западен/трънски диалект'
+ipa = 'ˈsvɛ.kɤr'
+
+[[dialect_glossary]]
+term = 'свекърва'
+standard = 'свекърва'
+register = 'западен/трънски диалект'
+ipa = 'svɛ.ˈkɤr.va'
+
+[[dialect_glossary]]
+term = 'тъст'
+standard = 'тъст'
+register = 'западен/трънски диалект'
+ipa = 'tɤst'
+
+[[dialect_glossary]]
+term = 'тъща'
+standard = 'тъща'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɤ.ʃta'
+
+[[dialect_glossary]]
+term = 'девер'
+standard = 'девер'
+register = 'западен/трънски диалект'
+ipa = 'ˈdɛ.vɛr'
+
+[[dialect_glossary]]
+term = 'зълва'
+standard = 'зълва'
+register = 'западен/трънски диалект'
+ipa = 'ˈzɤl.va'
+
+[[dialect_glossary]]
+term = 'етърва'
+standard = 'етърва'
+register = 'западен/трънски диалект'
+ipa = 'ˈɛ.tɤr.va'
+
+[[dialect_glossary]]
+term = 'шурей'
+standard = 'шурей'
+register = 'западен/трънски диалект'
+ipa = 'ˈʃu.rɛj'
+
+[[dialect_glossary]]
+term = 'шурнайка'
+standard = 'шуренайка'
+register = 'западен/трънски диалект'
+ipa = 'ʃur.ˈnaj.ka'
+
+[[dialect_glossary]]
+term = 'баджанак'
+standard = 'баджанак'
+register = 'западен/трънски диалект'
+ipa = 'ba.dʒa.ˈnak'
+
+[[dialect_glossary]]
+term = 'сват'
+standard = 'сват'
+register = 'западен/трънски диалект'
+ipa = 'svat'
+
+[[dialect_glossary]]
+term = 'сватя'
+standard = 'сватя'
+register = 'западен/трънски диалект'
+ipa = 'ˈsva.ca'
+
+[[dialect_glossary]]
+term = 'кум'
+standard = 'кум'
+register = 'западен/трънски диалект'
+ipa = 'kum'
+
+[[dialect_glossary]]
+term = 'кума'
+standard = 'кума'
+register = 'западен/трънски диалект'
+ipa = 'ˈku.ma'
+
+[[dialect_glossary]]
+term = 'кумица'
+standard = 'кумица'
+register = 'западен/трънски диалект'
+ipa = 'ku.ˈmi.t͡sa'
+
+[[dialect_glossary]]
+term = 'кумец'
+standard = 'кумец'
+register = 'западен/трънски диалект'
+ipa = 'ku.ˈmɛt͡s'
+
+[[dialect_glossary]]
+term = 'побратим'
+standard = 'побратим'
+register = 'западен/трънски диалект'
+ipa = 'pɔ.bra.ˈtim'
+
+[[dialect_glossary]]
+term = 'посестрима'
+standard = 'посестрима'
+register = 'западен/трънски диалект'
+ipa = 'pɔ.sɛ.ˈstri.ma'
+
+[[dialect_glossary]]
+term = 'маане'
+standard = 'махане / оставяне'
+register = 'западен/трънски диалект'
+ipa = 'ˈma.a.nɛ'
+
+[[dialect_glossary]]
+term = 'връвим'
+standard = 'вървя'
+register = 'западен/трънски диалект'
+ipa = 'ˈvrɤ.vim'
+
+[[dialect_glossary]]
+term = 'идем'
+standard = 'идвам / отивам'
+register = 'западен/трънски диалект'
+ipa = 'ˈi.dɛm'
+
+[[dialect_glossary]]
+term = 'дойдем'
+standard = 'дойда'
+register = 'западен/трънски диалект'
+ipa = 'ˈdɔj.dɛm'
+
+[[dialect_glossary]]
+term = 'бегам'
+standard = 'бягам'
+register = 'западен/трънски диалект'
+ipa = 'ˈbɛ.ɡam'
+
+[[dialect_glossary]]
+term = 'лазим'
+standard = 'пълзя / лазя'
+register = 'западен/трънски диалект'
+ipa = 'ˈla.zim'
+
+[[dialect_glossary]]
+term = 'пливам'
+standard = 'плувам'
+register = 'западен/трънски диалект'
+ipa = 'ˈpli.vam'
+
+[[dialect_glossary]]
+term = 'тонем'
+standard = 'потъвам'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɔ.nɛm'
+
+[[dialect_glossary]]
+term = 'сънувам'
+standard = 'сънувам'
+register = 'западен/трънски диалект'
+ipa = 'sɤ.ˈnu.vam'
+
+[[dialect_glossary]]
+term = 'станем'
+standard = 'стана'
+register = 'западен/трънски диалект'
+ipa = 'ˈsta.nɛm'
+
+[[dialect_glossary]]
+term = 'паднем'
+standard = 'падна'
+register = 'западен/трънски диалект'
+ipa = 'ˈpad.nɛm'
+
+[[dialect_glossary]]
+term = 'дигнем'
+standard = 'вдигна'
+register = 'западен/трънски диалект'
+ipa = 'ˈdiɡ.nɛm'
+
+[[dialect_glossary]]
+term = 'узнем'
+standard = 'взема'
+register = 'западен/трънски диалект'
+ipa = 'ˈuz.nɛm'
+
+[[dialect_glossary]]
+term = 'дадем'
+standard = 'дам'
+register = 'западен/трънски диалект'
+ipa = 'ˈda.dɛm'
+
+[[dialect_glossary]]
+term = 'носим'
+standard = 'нося'
+register = 'западен/трънски диалект'
+ipa = 'ˈnɔ.sim'
+
+[[dialect_glossary]]
+term = 'караме'
+standard = 'караме / возим'
+register = 'западен/трънски диалект'
+ipa = 'ˈka.ra.mɛ'
+
+[[dialect_glossary]]
+term = 'влечем'
+standard = 'влека / влача'
+register = 'западен/трънски диалект'
+ipa = 'vlɛ.ˈtʃɛm'
+
+[[dialect_glossary]]
+term = 'бутам'
+standard = 'бутам'
+register = 'западен/трънски диалект'
+ipa = 'ˈbu.tam'
+
+[[dialect_glossary]]
+term = 'теглим'
+standard = 'тегля'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɛ.ɡlim'
+
+[[dialect_glossary]]
+term = 'вържем'
+standard = 'вържа'
+register = 'западен/трънски диалект'
+ipa = 'ˈvɤr.ʒɛm'
+
+[[dialect_glossary]]
+term = 'одвържем'
+standard = 'отвържа'
+register = 'западен/трънски диалект'
+ipa = 'ɔd.ˈvɤr.ʒɛm'
+
+[[dialect_glossary]]
+term = 'сечем'
+standard = 'сека / режа'
+register = 'западен/трънски диалект'
+ipa = 'sɛ.ˈtʃɛm'
+
+[[dialect_glossary]]
+term = 'режем'
+standard = 'режа'
+register = 'западен/трънски диалект'
+ipa = 'ˈrɛ.ʒɛm'
+
+[[dialect_glossary]]
+term = 'цепим'
+standard = 'цепя'
+register = 'западен/трънски диалект'
+ipa = 'ˈt͡sɛ.pim'
+
+[[dialect_glossary]]
+term = 'трошим'
+standard = 'чупя / троша'
+register = 'западен/трънски диалект'
+ipa = 'trɔ.ˈʃim'
+
+[[dialect_glossary]]
+term = 'строшим'
+standard = 'счупя'
+register = 'западен/трънски диалект'
+ipa = 'strɔ.ˈʃim'
+
+[[dialect_glossary]]
+term = 'кинем'
+standard = 'късам'
+register = 'западен/трънски диалект'
+ipa = 'ˈki.nɛm'
+
+[[dialect_glossary]]
+term = 'скинем'
+standard = 'скъсам'
+register = 'западен/трънски диалект'
+ipa = 'ˈski.nɛm'
+
+[[dialect_glossary]]
+term = 'шием'
+standard = 'шия'
+register = 'западен/трънски диалект'
+ipa = 'ˈʃi.jɛm'
+
+[[dialect_glossary]]
+term = 'перем'
+standard = 'пера'
+register = 'западен/трънски диалект'
+ipa = 'pɛ.ˈrɛm'
+
+[[dialect_glossary]]
+term = 'мием'
+standard = 'мия'
+register = 'западен/трънски диалект'
+ipa = 'ˈmi.jɛm'
+
+[[dialect_glossary]]
+term = 'бришем'
+standard = 'бърша'
+register = 'западен/трънски диалект'
+ipa = 'ˈbri.ʃɛm'
+
+[[dialect_glossary]]
+term = 'готвим'
+standard = 'готвя'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡɔt.vim'
+
+[[dialect_glossary]]
+term = 'варим'
+standard = 'варя'
+register = 'западен/трънски диалект'
+ipa = 'va.ˈrim'
+
+[[dialect_glossary]]
+term = 'пържим'
+standard = 'пържа'
+register = 'западен/трънски диалект'
+ipa = 'ˈpɤr.ʒim'
+
+[[dialect_glossary]]
+term = 'месим'
+standard = 'меся'
+register = 'западен/трънски диалект'
+ipa = 'ˈmɛ.sim'
+
+[[dialect_glossary]]
+term = 'ядем'
+standard = 'ям'
+register = 'западен/трънски диалект'
+ipa = 'ja.ˈdɛm'
+
+[[dialect_glossary]]
+term = 'гълтам'
+standard = 'гълтам'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡɤl.tam'
+
+[[dialect_glossary]]
+term = 'джукам'
+standard = 'дъвча'
+register = 'западен/трънски диалект'
+ipa = 'ˈdʒu.kam'
+
+[[dialect_glossary]]
+term = 'лижем'
+standard = 'лижа'
+register = 'западен/трънски диалект'
+ipa = 'ˈli.ʒɛm'
+
+[[dialect_glossary]]
+term = 'апим'
+standard = 'хапя'
+register = 'западен/трънски диалект'
+ipa = 'ˈa.pim'
+
+[[dialect_glossary]]
+term = 'уапим'
+standard = 'ухапя'
+register = 'западен/трънски диалект'
+ipa = 'u.ˈa.pim'
+
+[[dialect_glossary]]
+term = 'мушкам'
+standard = 'мушкам'
+register = 'западен/трънски диалект'
+ipa = 'ˈmuʃ.kam'
+
+[[dialect_glossary]]
+term = 'бием'
+standard = 'бия'
+register = 'западен/трънски диалект'
+ipa = 'ˈbi.jɛm'
+
+[[dialect_glossary]]
+term = 'тепам'
+standard = 'бия / удрям'
+register = 'западен/трънски диалект'
+ipa = 'ˈtɛ.pam'
+
+[[dialect_glossary]]
+term = 'утепам'
+standard = 'убия / пребия'
+register = 'западен/трънски диалект'
+ipa = 'u.ˈtɛ.pam'
+
+[[dialect_glossary]]
+term = 'ровим'
+standard = 'ровя'
+register = 'западен/трънски диалект'
+ipa = 'ˈrɔ.vim'
+
+[[dialect_glossary]]
+term = 'сейем'
+standard = 'сея'
+register = 'западен/трънски диалект'
+ipa = 'ˈsɛ.jɛm'
+
+[[dialect_glossary]]
+term = 'жньем'
+standard = 'жъна'
+register = 'западен/трънски диалект'
+ipa = 'ʒɲɛm'
+
+[[dialect_glossary]]
+term = 'вършем'
+standard = 'вършея'
+register = 'западен/трънски диалект'
+ipa = 'ˈvɤr.ʃɛm'
+
+[[dialect_glossary]]
+term = 'косим'
+standard = 'кося'
+register = 'западен/трънски диалект'
+ipa = 'kɔ.ˈsim'
+
+[[dialect_glossary]]
+term = 'пластим'
+standard = 'трупам сено на пластове'
+register = 'западен/трънски диалект'
+ipa = 'pla.ˈstim'
+
+[[dialect_glossary]]
+term = 'поливам'
+standard = 'поливам'
+register = 'западен/трънски диалект'
+ipa = 'pɔ.ˈli.vam'
+
+[[dialect_glossary]]
+term = 'музем'
+standard = 'доя'
+register = 'западен/трънски диалект'
+ipa = 'ˈmu.zɛm'
+
+[[dialect_glossary]]
+term = 'раним'
+standard = 'храня'
+register = 'западен/трънски диалект'
+ipa = 'ˈra.nim'
+
+[[dialect_glossary]]
+term = 'поим'
+standard = 'поя'
+register = 'западен/трънски диалект'
+ipa = 'pɔ.ˈim'
+
+[[dialect_glossary]]
+term = 'гледам'
+standard = 'гледам'
+register = 'западен/трънски диалект'
+ipa = 'ˈɡlɛ.dam'
+
+[[dialect_glossary]]
+term = 'слушам'
+standard = 'слушам'
+register = 'западен/трънски диалект'
+ipa = 'ˈslu.ʃam'
+
+[[dialect_glossary]]
+term = 'чуем'
+standard = 'чувам / чуя'
+register = 'западен/трънски диалект'
+ipa = 'ˈtʃu.jɛm'
+
+[[dialect_glossary]]
+term = 'пипам'
+standard = 'пипам'
+register = 'западен/трънски диалект'
+ipa = 'ˈpi.pam'
+
+[[dialect_glossary]]
+term = 'барам'
+standard = 'пипам / търся'
+register = 'западен/трънски диалект'
+ipa = 'ˈba.ram'
+
+[[dialect_glossary]]
+term = 'найдем'
+standard = 'намеря'
+register = 'западен/трънски диалект'
+ipa = 'ˈnaj.dɛm'
+
+[[dialect_glossary]]
+term = 'изгубим'
+standard = 'изгубя'
+register = 'западен/трънски диалект'
+ipa = 'iz.ˈɡu.bim'
+
+[[dialect_glossary]]
+term = 'крием'
+standard = 'крия'
+register = 'западен/трънски диалект'
+ipa = 'ˈkri.jɛm'
+
+[[dialect_glossary]]
+term = 'скрием'
+standard = 'скрия'
+register = 'западен/трънски диалект'
+ipa = 'ˈskri.jɛm'
+
+[[dialect_glossary]]
+term = 'кажем'
+standard = 'кажа'
+register = 'западен/трънски диалект'
+ipa = 'ˈka.ʒɛm'
+
+[[dialect_glossary]]
+term = 'вравим'
+standard = 'говоря / приказвам'
+register = 'западен/трънски диалект'
+ipa = 'ˈvra.vim'
+
+[[dialect_glossary]]
+term = 'оратим'
+standard = 'говоря / разговарям'
+register = 'западен/трънски диалект'
+ipa = 'ɔ.ˈra.tim'
+
+[[dialect_glossary]]
+term = 'бъбрем'
+standard = 'бъбря / говоря си'
+register = 'западен/трънски диалект'
+ipa = 'ˈbɤ.brɛm'
+
+[[dialect_glossary]]
+term = 'викам'
+standard = 'викам / плача'
+register = 'западен/трънски диалект'
+ipa = 'ˈvi.kam'
+
+[[dialect_glossary]]
+term = 'ревем'
+standard = 'рева'
+register = 'западен/трънски диалект'
+ipa = 'rɛ.ˈvɛm'
+
+[[dialect_glossary]]
+term = 'смеем се'
+standard = 'смея се'
+register = 'западен/трънски диалект'
+ipa = 'ˈsmɛ.jɛm sɛ'
+
+[[dialect_glossary]]
+term = 'поем'
+standard = 'пея'
+register = 'западен/трънски диалект'
+ipa = 'ˈpɔ.jɛm'
+
+[[dialect_glossary]]
+term = 'свирим'
+standard = 'свиря'
+register = 'западен/трънски диалект'
+ipa = 'ˈsvi.rim'
+
+[[dialect_glossary]]
+term = 'играм'
+standard = 'играя / танцувам'
+register = 'западен/трънски диалект'
+ipa = 'i.ˈɡram'
+
+[[dialect_glossary]]
+term = 'рипам оро'
+standard = 'играя хоро'
+register = 'западен/трънски диалект'
+ipa = 'ˈri.pam ˈɔ.rɔ'
+
 [[acronyms]]
 abbr = 'ДДС'
 expansion = 'Данък върху добавената стойност'

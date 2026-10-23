@@ -138,11 +138,11 @@
       {card.top_claim_text || (currentLang === 'bg' ? 'Няма намерени проверими фактически твърдения.' : 'No factual claims found.')}
     </div>
 
-    {#if card.progress_pct !== null && card.progress_pct !== undefined && card.progress_pct < 100}
-      <div class="card-progress-track" title={`${card.stage_desc || ''} - ${card.progress_pct}%`}>
-        <div class="card-progress-fill" style="width: {card.progress_pct}%"></div>
+    {#if (card.progress_pct !== null && card.progress_pct !== undefined && card.progress_pct < 100) || card.top_claim_verdict === 'PROCESSING' || card.research_running}
+      <div class="card-progress-track active" title={`${card.stage_desc || 'В обработка'} - ${card.progress_pct ?? 50}%`}>
+        <div class="card-progress-fill animated-progress" style="width: {Math.max(12, card.progress_pct ?? 50)}%"></div>
         <span class="card-progress-label">
-          {card.stage_desc || 'В обработка...'} ({card.progress_pct}%)
+          ⚙️ {card.stage_desc || (currentLang === 'bg' ? 'В обработка...' : 'Processing...')} ({card.progress_pct ?? 50}%)
           {#if card.etr_seconds !== null && card.etr_seconds !== undefined && card.etr_seconds > 0}
             • ~{card.etr_seconds}s
           {/if}
@@ -182,7 +182,15 @@
         <button class="action-btn btn-keep" title={t.keepAction} onclick={() => onKeep(card.id)} aria-label="Запази">
           ✓
         </button>
-        <button class="action-btn btn-discard" title={t.discardAction} onclick={() => onDiscard(card.id)} aria-label="Отхвърли">
+        <button
+          class="action-btn btn-discard"
+          title={currentLang === 'bg' ? 'Премахни / Отхвърли видеото (✕)' : 'Remove / Discard video (✕)'}
+          onclick={(e) => {
+            e.stopPropagation();
+            onDiscard(card.id);
+          }}
+          aria-label="Премахни"
+        >
           ✕
         </button>
         <button class="action-btn btn-research" title={t.researchAction} onclick={() => onResearchMore(card.id)} aria-label="Проучи">
@@ -497,7 +505,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 1px 0;
+    margin: 2px 0;
+  }
+
+  .card-progress-track.active {
+    height: 16px;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.08);
   }
 
   .card-progress-fill {
@@ -509,12 +523,37 @@
     transition: width 0.3s ease;
   }
 
+  .animated-progress {
+    background-image: linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.25) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.25) 50%,
+      rgba(255, 255, 255, 0.25) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 1rem 1rem;
+    animation: progressStripe 1.2s linear infinite;
+  }
+
+  @keyframes progressStripe {
+    0% {
+      background-position: 1rem 0;
+    }
+    100% {
+      background-position: 0 0;
+    }
+  }
+
   .card-progress-label {
     position: relative;
-    font-size: 0.65rem;
-    font-weight: 700;
+    font-size: 0.68rem;
+    font-weight: 800;
     color: var(--text-heading);
     z-index: 1;
     line-height: 1;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
   }
 </style>
