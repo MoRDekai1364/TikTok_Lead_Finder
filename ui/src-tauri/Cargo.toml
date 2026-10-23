@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "leadfinder-desktop"
 version = "0.1.0"
 edition = "2021"
@@ -12,5 +12,5 @@ serde_json = "1.0"
 tauri = { version = "2", features = [] }
 
 [features]
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
-

@@ -20,7 +20,7 @@ Write-Host "`n[2/4] Building Backend Engine (leadfinder.exe)..." -ForegroundColo
 cargo build --release --manifest-path "$root\Cargo.toml" -p leadfinder-cli
 
 Write-Host "`n[3/4] Building Desktop App (leadfinder-desktop.exe)..." -ForegroundColor Yellow
-cargo build --release --manifest-path "$root\ui\src-tauri\Cargo.toml"
+cargo build --release --manifest-path "$root\ui\src-tauri\Cargo.toml" --features custom-protocol
 
 Write-Host "`n[4/4] Staging release binaries..." -ForegroundColor Yellow
 if (-not (Test-Path "$root\release_stage")) {
