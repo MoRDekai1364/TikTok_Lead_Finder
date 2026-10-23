@@ -6450,6 +6450,2010 @@ standard = 'прозорец'
 register = 'видинско-ломски/северозападен диалект'
 ipa = 'ˈpɛn.dʒɛr'
 
+[[dialect_glossary]]
+term = 'благат'
+standard = 'сладък / благ (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈbla.ɡɐt'
+
+[[dialect_glossary]]
+term = 'благата'
+standard = 'сладката / благата (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈbla.ɡɐ.tɐ'
+
+[[dialect_glossary]]
+term = 'благато'
+standard = 'сладкото / благото (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈbla.ɡɐ.tu'
+
+[[dialect_glossary]]
+term = 'бално'
+standard = 'мъчно / тъжно / болно (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈbal.nu'
+
+[[dialect_glossary]]
+term = 'балнъ'
+standard = 'мъчна / тъжна (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈbal.nɤ'
+
+[[dialect_glossary]]
+term = 'болну'
+standard = 'болно (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈbɔl.nu'
+
+[[dialect_glossary]]
+term = 'врет'
+standard = 'всички / навсякъде (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'vrɛt'
+
+[[dialect_glossary]]
+term = 'вьодра'
+standard = 'ведра (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈvʲɔ.drɐ'
+
+[[dialect_glossary]]
+term = 'вьодро'
+standard = 'ведро / дървен съд за вода (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈvʲɔ.dru'
+
+[[dialect_glossary]]
+term = 'гаче'
+standard = 'сякаш / като че ли (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡa.tʃɛ'
+
+[[dialect_glossary]]
+term = 'гале'
+standard = 'галено дете / любимец (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡa.lɛ'
+
+[[dialect_glossary]]
+term = 'гальовник'
+standard = 'любовник / изгоря (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ɡɐ.ˈlʲɔv.nik'
+
+[[dialect_glossary]]
+term = 'гальовница'
+standard = 'любовница / изгора (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ɡɐ.ˈlʲɔv.ni.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'галям'
+standard = 'галя / обичам (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡa.lʲɐm'
+
+[[dialect_glossary]]
+term = 'гльодам'
+standard = 'гледам (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡlʲɔ.dɐm'
+
+[[dialect_glossary]]
+term = 'гльодаш'
+standard = 'гледаш (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡlʲɔ.dɐʃ'
+
+[[dialect_glossary]]
+term = 'гльода'
+standard = 'гледа (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡlʲɔ.dɐ'
+
+[[dialect_glossary]]
+term = 'гльодат'
+standard = 'гледат (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡlʲɔ.dɐt'
+
+[[dialect_glossary]]
+term = 'гльодай'
+standard = 'гледай (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɡlʲɔ.dɐj'
+
+[[dialect_glossary]]
+term = 'гуляма'
+standard = 'голяма (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ɡu.ˈlʲa.mɐ'
+
+[[dialect_glossary]]
+term = 'гуляму'
+standard = 'голямо (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ɡu.ˈlʲa.mu'
+
+[[dialect_glossary]]
+term = 'двьо'
+standard = 'две (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'dvʲɔ'
+
+[[dialect_glossary]]
+term = 'девойкя'
+standard = 'девойка / мома (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'dɛ.ˈvɔj.kʲɐ'
+
+[[dialect_glossary]]
+term = 'девойкьо'
+standard = 'девойко (звателна форма - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'dɛ.ˈvɔj.kʲu'
+
+[[dialect_glossary]]
+term = 'день'
+standard = 'ден (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'dɛnʲ'
+
+[[dialect_glossary]]
+term = 'дене'
+standard = 'дни (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈdɛ.nɛ'
+
+[[dialect_glossary]]
+term = 'деньос'
+standard = 'този ден (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈdɛ.nʲɔs'
+
+[[dialect_glossary]]
+term = 'деньот'
+standard = 'денят (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈdɛ.nʲɔt'
+
+[[dialect_glossary]]
+term = 'деньон'
+standard = 'онзи ден (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈdɛ.nʲɔn'
+
+[[dialect_glossary]]
+term = 'дьоркам'
+standard = 'дърпам / скубя (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈdʲɔr.kɐm'
+
+[[dialect_glossary]]
+term = 'ега'
+standard = 'когато / дано (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɛ.ɡɐ'
+
+[[dialect_glossary]]
+term = 'еце'
+standard = 'яйце (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɛ.t͡sɛ'
+
+[[dialect_glossary]]
+term = 'еца'
+standard = 'яйца (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ɛ.ˈt͡sa'
+
+[[dialect_glossary]]
+term = 'жьолт'
+standard = 'жълт (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ʒʲɔlt'
+
+[[dialect_glossary]]
+term = 'жьолта'
+standard = 'жълта (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈʒʲɔl.tɐ'
+
+[[dialect_glossary]]
+term = 'жьолто'
+standard = 'жълто (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈʒʲɔl.tu'
+
+[[dialect_glossary]]
+term = 'запрягам'
+standard = 'впрягам (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'zɐ.ˈprʲa.ɡɐm'
+
+[[dialect_glossary]]
+term = 'запрягаш'
+standard = 'впрягаш (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'zɐ.ˈprʲa.ɡɐʃ'
+
+[[dialect_glossary]]
+term = 'земам'
+standard = 'вземам (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈzɛ.mɐm'
+
+[[dialect_glossary]]
+term = 'земаш'
+standard = 'вземаш (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈzɛ.mɐʃ'
+
+[[dialect_glossary]]
+term = 'зьолен'
+standard = 'зелен (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈzʲɔ.lɛn'
+
+[[dialect_glossary]]
+term = 'зьолена'
+standard = 'зелена (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'zʲu.ˈlɛ.nɐ'
+
+[[dialect_glossary]]
+term = 'зьолено'
+standard = 'зелено (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'zʲu.ˈlɛ.nu'
+
+[[dialect_glossary]]
+term = 'ище'
+standard = 'иска (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈi.ʃtɛ'
+
+[[dialect_glossary]]
+term = 'ищат'
+standard = 'искат (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈi.ʃtɐt'
+
+[[dialect_glossary]]
+term = 'йе'
+standard = 'е (спомагателен глагол - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'jɛ'
+
+[[dialect_glossary]]
+term = 'каматна'
+standard = 'красива / хубава (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈka.mɐt.nɐ'
+
+[[dialect_glossary]]
+term = 'каматен'
+standard = 'красив / хубав (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈka.mɐ.tɛn'
+
+[[dialect_glossary]]
+term = 'каматно'
+standard = 'красиво / хубаво (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈka.mɐt.nu'
+
+[[dialect_glossary]]
+term = 'каматни'
+standard = 'красиви / хубави (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈka.mɐt.ni'
+
+[[dialect_glossary]]
+term = 'картоп'
+standard = 'картоф (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'kɐr.ˈtɔp'
+
+[[dialect_glossary]]
+term = 'картопе'
+standard = 'картофи (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'kɐr.ˈtɔ.pɛ'
+
+[[dialect_glossary]]
+term = 'кльотва'
+standard = 'клетва (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈklʲɔt.vɐ'
+
+[[dialect_glossary]]
+term = 'копел'
+standard = 'момче / син (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈkɔ.pɛl'
+
+[[dialect_glossary]]
+term = 'кочь'
+standard = 'овен (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'kɔtʃʲ'
+
+[[dialect_glossary]]
+term = 'кравьо'
+standard = 'краве (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈkra.vʲu'
+
+[[dialect_glossary]]
+term = 'кугату'
+standard = 'когато (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ku.ˈɡa.tu'
+
+[[dialect_glossary]]
+term = 'кьопек'
+standard = 'куче (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'kʲu.ˈpɛk'
+
+[[dialect_glossary]]
+term = 'лакам'
+standard = 'викам / плача (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈla.kɐm'
+
+[[dialect_glossary]]
+term = 'льок'
+standard = 'лек (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'lʲɔk'
+
+[[dialect_glossary]]
+term = 'льока'
+standard = 'лека (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲɔ.kɐ'
+
+[[dialect_glossary]]
+term = 'льоко'
+standard = 'леко (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲɔ.ku'
+
+[[dialect_glossary]]
+term = 'льоки'
+standard = 'леки (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲɔ.ki'
+
+[[dialect_glossary]]
+term = 'льоля'
+standard = 'леля (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲɔ.lʲɐ'
+
+[[dialect_glossary]]
+term = 'льольо'
+standard = 'лельо (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲɔ.lʲu'
+
+[[dialect_glossary]]
+term = 'льоща'
+standard = 'леща (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲɔ.ʃtɐ'
+
+[[dialect_glossary]]
+term = 'лю'
+standard = 'само / сал (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'lʲu'
+
+[[dialect_glossary]]
+term = 'люде'
+standard = 'хора (Смолянски / Широколъшки / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲu.dɛ'
+
+[[dialect_glossary]]
+term = 'людете'
+standard = 'хората (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲu.dɛ.tɛ'
+
+[[dialect_glossary]]
+term = 'людето'
+standard = 'хората (събирателно - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲu.dɛ.tu'
+
+[[dialect_glossary]]
+term = 'людье'
+standard = 'хора (Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈlʲu.dʲɛ'
+
+[[dialect_glossary]]
+term = 'майкя'
+standard = 'майка (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmaj.kʲɐ'
+
+[[dialect_glossary]]
+term = 'майкьо'
+standard = 'майко (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmaj.kʲu'
+
+[[dialect_glossary]]
+term = 'максус'
+standard = 'нарочно / специално (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'mɐk.ˈsus'
+
+[[dialect_glossary]]
+term = 'мижо'
+standard = 'чичо (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmi.ʒu'
+
+[[dialect_glossary]]
+term = 'мижовица'
+standard = 'стринка / чинка (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmi.ʒu.vi.t͡sɐ'
+
+[[dialect_glossary]]
+term = 'мльоко'
+standard = 'мляко (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmlʲɔ.ku'
+
+[[dialect_glossary]]
+term = 'мъжот'
+standard = 'мъжът (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmɤ.ʒɔt'
+
+[[dialect_glossary]]
+term = 'мъжос'
+standard = 'този мъж (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmɤ.ʒɔs'
+
+[[dialect_glossary]]
+term = 'мъжон'
+standard = 'онзи мъж (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈmɤ.ʒɔn'
+
+[[dialect_glossary]]
+term = 'ниваса'
+standard = 'тази нива (близка определена форма - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈni.vɐ.sɐ'
+
+[[dialect_glossary]]
+term = 'нивана'
+standard = 'онази нива (далечна определена форма - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈni.vɐ.nɐ'
+
+[[dialect_glossary]]
+term = 'ноги'
+standard = 'крака (Смолянски / Широколъшки / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈnɔ.ɡi'
+
+[[dialect_glossary]]
+term = 'ньога'
+standard = 'него (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈnʲɔ.ɡɐ'
+
+[[dialect_glossary]]
+term = 'ньой'
+standard = 'ней / на нея (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'nʲɔj'
+
+[[dialect_glossary]]
+term = 'ньом'
+standard = 'нему / на него (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'nʲɔm'
+
+[[dialect_glossary]]
+term = 'облакот'
+standard = 'облакът (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɔ.blɐ.kɔt'
+
+[[dialect_glossary]]
+term = 'облакос'
+standard = 'този облак (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɔ.blɐ.kɔs'
+
+[[dialect_glossary]]
+term = 'облакон'
+standard = 'онзи облак (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɔ.blɐ.kɔn'
+
+[[dialect_glossary]]
+term = 'овчарь'
+standard = 'овчар (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'uv.ˈtʃarʲ'
+
+[[dialect_glossary]]
+term = 'огънь'
+standard = 'огън (Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈɔ.ɡɤnʲ'
+
+[[dialect_glossary]]
+term = 'оджик'
+standard = 'огнище / комин (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'u.ˈdʒik'
+
+[[dialect_glossary]]
+term = 'парясвам'
+standard = 'изоставям / напускам (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'pɐ.ˈrʲas.vɐm'
+
+[[dialect_glossary]]
+term = 'патат'
+standard = 'картоф (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'pɐ.ˈtat'
+
+[[dialect_glossary]]
+term = 'патате'
+standard = 'картофи (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'pɐ.ˈta.tɛ'
+
+[[dialect_glossary]]
+term = 'пататник'
+standard = 'родопски баник с картофи (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'pɐ.ˈtat.nik'
+
+[[dialect_glossary]]
+term = 'пьоя'
+standard = 'пея (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈpʲɔ.jɐ'
+
+[[dialect_glossary]]
+term = 'планинаса'
+standard = 'тази планина (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'plɐ.ni.ˈna.sɐ'
+
+[[dialect_glossary]]
+term = 'планинана'
+standard = 'онази планина (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'plɐ.ni.ˈna.nɐ'
+
+[[dialect_glossary]]
+term = 'пльот'
+standard = 'плет / ограда (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'plʲɔt'
+
+[[dialect_glossary]]
+term = 'подник'
+standard = 'обор за добитък на долния етаж (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈpɔd.nik'
+
+[[dialect_glossary]]
+term = 'попрелка'
+standard = 'седянка (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'pu.ˈprɛl.kɐ'
+
+[[dialect_glossary]]
+term = 'потон'
+standard = 'таван / коридор на втория етаж (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'pu.ˈtɔn'
+
+[[dialect_glossary]]
+term = 'пресна'
+standard = 'прясна (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈprɛs.nɐ'
+
+[[dialect_glossary]]
+term = 'пъть'
+standard = 'път (Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'pɤtʲ'
+
+[[dialect_glossary]]
+term = 'пътьот'
+standard = 'пътят (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈpɤ.tʲɔt'
+
+[[dialect_glossary]]
+term = 'пътьос'
+standard = 'този път (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈpɤ.tʲɔs'
+
+[[dialect_glossary]]
+term = 'пътьон'
+standard = 'онзи път (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈpɤ.tʲɔn'
+
+[[dialect_glossary]]
+term = 'ракам'
+standard = 'искам / рача (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈra.kɐm'
+
+[[dialect_glossary]]
+term = 'руба'
+standard = 'дреха / премяна (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈru.bɐ'
+
+[[dialect_glossary]]
+term = 'рукаш'
+standard = 'викаш (Смолянски / Широколъшки / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈru.kɐʃ'
+
+[[dialect_glossary]]
+term = 'рукат'
+standard = 'викат (Смолянски / Широколъшки / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈru.kɐt'
+
+[[dialect_glossary]]
+term = 'рукай'
+standard = 'викай (Смолянски / Широколъшки / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈru.kɐj'
+
+[[dialect_glossary]]
+term = 'ръки'
+standard = 'ръце (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈrɤ.ki'
+
+[[dialect_glossary]]
+term = 'ряка'
+standard = 'река (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈrʲa.kɐ'
+
+[[dialect_glossary]]
+term = 'сакаш'
+standard = 'искаш (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsa.kɐʃ'
+
+[[dialect_glossary]]
+term = 'сака'
+standard = 'иска (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsa.kɐ'
+
+[[dialect_glossary]]
+term = 'сва'
+standard = 'това (тук до мен - Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'sva'
+
+[[dialect_glossary]]
+term = 'свази'
+standard = 'това (тук - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsva.zi'
+
+[[dialect_glossary]]
+term = 'свьокрва'
+standard = 'свекърва (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsvʲɔ.kr̩.vɐ'
+
+[[dialect_glossary]]
+term = 'сьоло'
+standard = 'село (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsʲɔ.lu'
+
+[[dialect_glossary]]
+term = 'сьолото'
+standard = 'селото (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsʲɔ.lu.tu'
+
+[[dialect_glossary]]
+term = 'сьолосо'
+standard = 'това село (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsʲɔ.lu.su'
+
+[[dialect_glossary]]
+term = 'сьолоно'
+standard = 'онова село (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsʲɔ.lu.nu'
+
+[[dialect_glossary]]
+term = 'сьостра'
+standard = 'сестра (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsʲɔ.strɐ'
+
+[[dialect_glossary]]
+term = 'синь'
+standard = 'син (прилагателно - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'sinʲ'
+
+[[dialect_glossary]]
+term = 'сичко'
+standard = 'всичко (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsitʃ.ku'
+
+[[dialect_glossary]]
+term = 'сички'
+standard = 'всички (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsitʃ.ki'
+
+[[dialect_glossary]]
+term = 'сланце'
+standard = 'слънце (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈslan.t͡sɛ'
+
+[[dialect_glossary]]
+term = 'слонце'
+standard = 'слънце (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈslɔn.t͡sɛ'
+
+[[dialect_glossary]]
+term = 'слунце'
+standard = 'слънце (Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈslun.t͡sɛ'
+
+[[dialect_glossary]]
+term = 'сольта'
+standard = 'солта (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'sulʲ.ˈta'
+
+[[dialect_glossary]]
+term = 'спида'
+standard = 'скала / камък / зъбер (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈspi.dɐ'
+
+[[dialect_glossary]]
+term = 'срьобро'
+standard = 'сребро (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsrʲɔ.bru'
+
+[[dialect_glossary]]
+term = 'сенка'
+standard = 'сянка (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈsɛŋ.kɐ'
+
+[[dialect_glossary]]
+term = 'тьогло'
+standard = 'тегло / мъка (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʲɔ.ɡlu'
+
+[[dialect_glossary]]
+term = 'тель'
+standard = 'тел (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'tɛlʲ'
+
+[[dialect_glossary]]
+term = 'тикла'
+standard = 'каменна плоча за покрив (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈti.klɐ'
+
+[[dialect_glossary]]
+term = 'тикли'
+standard = 'каменни плочи за покрив (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈti.kli'
+
+[[dialect_glossary]]
+term = 'тва'
+standard = 'това (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'tva'
+
+[[dialect_glossary]]
+term = 'тогас'
+standard = 'тогава (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'tu.ˈɡas'
+
+[[dialect_glossary]]
+term = 'торник'
+standard = 'вторник (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtɔr.nik'
+
+[[dialect_glossary]]
+term = 'трьова'
+standard = 'трева (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtrʲɔ.vɐ'
+
+[[dialect_glossary]]
+term = 'трява'
+standard = 'трева (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtrʲa.vɐ'
+
+[[dialect_glossary]]
+term = 'тъвно'
+standard = 'тъмно (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtɤv.nu'
+
+[[dialect_glossary]]
+term = 'тъвна'
+standard = 'тъмна (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtɤv.nɐ'
+
+[[dialect_glossary]]
+term = 'тьомно'
+standard = 'тъмно (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʲɔm.nu'
+
+[[dialect_glossary]]
+term = 'тьонко'
+standard = 'тънко (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʲɔŋ.ku'
+
+[[dialect_glossary]]
+term = 'тьонка'
+standard = 'тънка (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʲɔŋ.kɐ'
+
+[[dialect_glossary]]
+term = 'тьожко'
+standard = 'тежко (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʲɔʃ.ku'
+
+[[dialect_glossary]]
+term = 'тьожка'
+standard = 'тежка / бременна (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʲɔʃ.kɐ'
+
+[[dialect_glossary]]
+term = 'убава'
+standard = 'хубава (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈu.bɐ.vɐ'
+
+[[dialect_glossary]]
+term = 'уджак'
+standard = 'огнище (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'u.ˈdʒak'
+
+[[dialect_glossary]]
+term = 'уйко'
+standard = 'вуйчо (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈuj.ku'
+
+[[dialect_glossary]]
+term = 'уйна'
+standard = 'вуйна (Смолянски / Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈuj.nɐ'
+
+[[dialect_glossary]]
+term = 'хльоп'
+standard = 'хляб (Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'xlʲɔp'
+
+[[dialect_glossary]]
+term = 'хми'
+standard = 'им (кратка дателна форма - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'xmi'
+
+[[dialect_glossary]]
+term = 'хмя'
+standard = 'тях (кратка винителна форма - Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'xmʲa'
+
+[[dialect_glossary]]
+term = 'цвьоте'
+standard = 'цвете (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈt͡svʲɔ.tɛ'
+
+[[dialect_glossary]]
+term = 'цървен'
+standard = 'червен (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 't͡sər.ˈvɛn'
+
+[[dialect_glossary]]
+term = 'цървена'
+standard = 'червена (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 't͡sər.ˈvɛ.nɐ'
+
+[[dialect_glossary]]
+term = 'цървено'
+standard = 'червено (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 't͡sər.ˈvɛ.nu'
+
+[[dialect_glossary]]
+term = 'църн'
+standard = 'черен (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 't͡sɤrn'
+
+[[dialect_glossary]]
+term = 'църна'
+standard = 'черна (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈt͡sɤr.nɐ'
+
+[[dialect_glossary]]
+term = 'църно'
+standard = 'черно (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈt͡sɤr.nu'
+
+[[dialect_glossary]]
+term = 'чьодо'
+standard = 'чедо / дете (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʃʲɔ.du'
+
+[[dialect_glossary]]
+term = 'чекай'
+standard = 'чакай (Чепински)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʃɛ.kɐj'
+
+[[dialect_glossary]]
+term = 'челяк'
+standard = 'човек (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'tʃɛ.ˈlʲak'
+
+[[dialect_glossary]]
+term = 'челякот'
+standard = 'човекът (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'tʃɛ.ˈlʲa.kɔt'
+
+[[dialect_glossary]]
+term = 'челякос'
+standard = 'този човек (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'tʃɛ.ˈlʲa.kɔs'
+
+[[dialect_glossary]]
+term = 'челякон'
+standard = 'онзи човек (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'tʃɛ.ˈlʲa.kɔn'
+
+[[dialect_glossary]]
+term = 'чьорга'
+standard = 'черга (Смолянски)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʃʲɔr.ɡɐ'
+
+[[dialect_glossary]]
+term = 'чьорен'
+standard = 'черен (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʃʲɔ.rɛn'
+
+[[dialect_glossary]]
+term = 'чьорна'
+standard = 'черна (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʃʲɔr.nɐ'
+
+[[dialect_glossary]]
+term = 'чьорно'
+standard = 'черно (Смолянски / Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'ˈtʃʲɔr.nu'
+
+[[dialect_glossary]]
+term = 'чувяк'
+standard = 'човек (Широколъшки)'
+register = 'родопски/смолянски диалект'
+ipa = 'tʃu.ˈvʲak'
+
+[[dialect_glossary]]
+term = 'снего'
+standard = 'снегът'
+register = 'шуменски/мизийски диалект'
+ipa = 'sni.ˈɡo'
+
+[[dialect_glossary]]
+term = 'дъждо'
+standard = 'дъждът'
+register = 'шуменски/мизийски диалект'
+ipa = 'dɤʒ.ˈdo'
+
+[[dialect_glossary]]
+term = 'гробо'
+standard = 'гробът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈɡro.bu'
+
+[[dialect_glossary]]
+term = 'гърбо'
+standard = 'гърбът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ɡɤr.ˈbo'
+
+[[dialect_glossary]]
+term = 'пътьо'
+standard = 'пътят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpɤ.tʲu'
+
+[[dialect_glossary]]
+term = 'коню'
+standard = 'конят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈko.nʲu'
+
+[[dialect_glossary]]
+term = 'деню'
+standard = 'денят'
+register = 'шуменски/мизийски диалект'
+ipa = 'di.ˈnʲo'
+
+[[dialect_glossary]]
+term = 'огъню'
+standard = 'огънят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.ɡɐ.nʲu'
+
+[[dialect_glossary]]
+term = 'зетю'
+standard = 'зетят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈzɛ.tʲu'
+
+[[dialect_glossary]]
+term = 'овчарю'
+standard = 'овчарят'
+register = 'шуменски/мизийски диалект'
+ipa = 'uf.ˈt͡ʃa.rʲu'
+
+[[dialect_glossary]]
+term = 'косачо'
+standard = 'косачът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ku.ˈsa.t͡ʃu'
+
+[[dialect_glossary]]
+term = 'мъжо'
+standard = 'мъжът'
+register = 'шуменски/мизийски диалект'
+ipa = 'mɐ.ˈʒo'
+
+[[dialect_glossary]]
+term = 'ножо'
+standard = 'ножът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈno.ʒu'
+
+[[dialect_glossary]]
+term = 'кошо'
+standard = 'кошът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈko.ʃu'
+
+[[dialect_glossary]]
+term = 'орачо'
+standard = 'орачът'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.ˈra.t͡ʃu'
+
+[[dialect_glossary]]
+term = 'воло'
+standard = 'волът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvo.lu'
+
+[[dialect_glossary]]
+term = 'столо'
+standard = 'столът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsto.lu'
+
+[[dialect_glossary]]
+term = 'дворо'
+standard = 'дворът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈdvo.ru'
+
+[[dialect_glossary]]
+term = 'градо'
+standard = 'градът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ɡrɐ.ˈdo'
+
+[[dialect_glossary]]
+term = 'брего'
+standard = 'брегът'
+register = 'шуменски/мизийски диалект'
+ipa = 'bri.ˈɡo'
+
+[[dialect_glossary]]
+term = 'рого'
+standard = 'рогът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈro.ɡu'
+
+[[dialect_glossary]]
+term = 'сино'
+standard = 'синът'
+register = 'шуменски/мизийски диалект'
+ipa = 'si.ˈno'
+
+[[dialect_glossary]]
+term = 'мосто'
+standard = 'мостът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈmos.tu'
+
+[[dialect_glossary]]
+term = 'пръсто'
+standard = 'пръстът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈprɤs.tu'
+
+[[dialect_glossary]]
+term = 'кръсто'
+standard = 'кръстът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈkrɤs.tu'
+
+[[dialect_glossary]]
+term = 'госто'
+standard = 'гостът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈɡos.tu'
+
+[[dialect_glossary]]
+term = 'гласо'
+standard = 'гласът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ɡlɐ.ˈso'
+
+[[dialect_glossary]]
+term = 'класо'
+standard = 'класът'
+register = 'шуменски/мизийски диалект'
+ipa = 'klɐ.ˈso'
+
+[[dialect_glossary]]
+term = 'медо'
+standard = 'медът'
+register = 'шуменски/мизийски диалект'
+ipa = 'mi.ˈdo'
+
+[[dialect_glossary]]
+term = 'ледо'
+standard = 'ледът'
+register = 'шуменски/мизийски диалект'
+ipa = 'li.ˈdo'
+
+[[dialect_glossary]]
+term = 'редо'
+standard = 'редът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ri.ˈdo'
+
+[[dialect_glossary]]
+term = 'гладо'
+standard = 'гладът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ɡlɐ.ˈdo'
+
+[[dialect_glossary]]
+term = 'студо'
+standard = 'студът'
+register = 'шуменски/мизийски диалект'
+ipa = 'stu.ˈdo'
+
+[[dialect_glossary]]
+term = 'срамо'
+standard = 'срамът'
+register = 'шуменски/мизийски диалект'
+ipa = 'srɐ.ˈmo'
+
+[[dialect_glossary]]
+term = 'съню'
+standard = 'сънят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsɤ.nʲu'
+
+[[dialect_glossary]]
+term = 'нокътю'
+standard = 'нокътят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈno.kɐ.tʲu'
+
+[[dialect_glossary]]
+term = 'лакътю'
+standard = 'лакътят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈla.kɐ.tʲu'
+
+[[dialect_glossary]]
+term = 'камъко'
+standard = 'камъкът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈka.mɐ.ku'
+
+[[dialect_glossary]]
+term = 'пламъко'
+standard = 'пламъкът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpla.mɐ.ku'
+
+[[dialect_glossary]]
+term = 'работнико'
+standard = 'работникът'
+register = 'шуменски/мизийски диалект'
+ipa = 'rɐ.ˈbot.ni.ku'
+
+[[dialect_glossary]]
+term = 'пътнико'
+standard = 'пътникът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpɤt.ni.ku'
+
+[[dialect_glossary]]
+term = 'вятъро'
+standard = 'вятърът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvʲa.tɐ.ru'
+
+[[dialect_glossary]]
+term = 'свекъро'
+standard = 'свекърът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsvɛ.kɐ.ru'
+
+[[dialect_glossary]]
+term = 'орело'
+standard = 'орелът'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.ˈrɛ.lu'
+
+[[dialect_glossary]]
+term = 'котело'
+standard = 'котелът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ku.ˈtɛ.lu'
+
+[[dialect_glossary]]
+term = 'петело'
+standard = 'петелът'
+register = 'шуменски/мизийски диалект'
+ipa = 'pi.ˈtɛ.lu'
+
+[[dialect_glossary]]
+term = 'овесо'
+standard = 'овесът'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.ˈvɛ.su'
+
+[[dialect_glossary]]
+term = 'коньо'
+standard = 'конят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈko.nʲu'
+
+[[dialect_glossary]]
+term = 'кувичо'
+standard = 'кувецът'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈku.vi.t͡ʃu'
+
+[[dialect_glossary]]
+term = 'обичайо'
+standard = 'обичаят'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.bi.ˈt͡ʃa.ju'
+
+[[dialect_glossary]]
+term = 'случайо'
+standard = 'случаят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈslu.t͡ʃɐ.ju'
+
+[[dialect_glossary]]
+term = 'поройо'
+standard = 'пороят'
+register = 'шуменски/мизийски диалект'
+ipa = 'pu.ˈro.ju'
+
+[[dialect_glossary]]
+term = 'славейо'
+standard = 'славеят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsla.vi.ju'
+
+[[dialect_glossary]]
+term = 'ратайо'
+standard = 'ратаят'
+register = 'шуменски/мизийски диалект'
+ipa = 'rɐ.ˈta.ju'
+
+[[dialect_glossary]]
+term = 'геройо'
+standard = 'героят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ɡi.ˈro.ju'
+
+[[dialect_glossary]]
+term = 'ногата'
+standard = 'кракът'
+register = 'шуменски/мизийски диалект'
+ipa = 'nu.ˈɡa.tɐ'
+
+[[dialect_glossary]]
+term = 'солту'
+standard = 'солта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsol.tu'
+
+[[dialect_glossary]]
+term = 'кръвту'
+standard = 'кръвта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈkrɤf.tu'
+
+[[dialect_glossary]]
+term = 'пещту'
+standard = 'пещта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpɛʃ.tu'
+
+[[dialect_glossary]]
+term = 'нощту'
+standard = 'нощта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈnoʃ.tu'
+
+[[dialect_glossary]]
+term = 'радостту'
+standard = 'радостта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈra.dus.tu'
+
+[[dialect_glossary]]
+term = 'младостту'
+standard = 'младостта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈmla.dus.tu'
+
+[[dialect_glossary]]
+term = 'старостту'
+standard = 'старостта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsta.rus.tu'
+
+[[dialect_glossary]]
+term = 'болестту'
+standard = 'болестта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈbo.lis.tu'
+
+[[dialect_glossary]]
+term = 'костту'
+standard = 'костта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈkos.tu'
+
+[[dialect_glossary]]
+term = 'пръстту'
+standard = 'пръстта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈprɤs.tu'
+
+[[dialect_glossary]]
+term = 'медту'
+standard = 'медта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈmɛt.tu'
+
+[[dialect_glossary]]
+term = 'смъртту'
+standard = 'смъртта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsmɤrt.tu'
+
+[[dialect_glossary]]
+term = 'лою'
+standard = 'лойта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈlo.ju'
+
+[[dialect_glossary]]
+term = 'калю'
+standard = 'калта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈka.lʲu'
+
+[[dialect_glossary]]
+term = 'газю'
+standard = 'газта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈɡa.zʲu'
+
+[[dialect_glossary]]
+term = 'мастю'
+standard = 'маста'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈmas.tʲu'
+
+[[dialect_glossary]]
+term = 'остю'
+standard = 'оста'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈos.tʲu'
+
+[[dialect_glossary]]
+term = 'вечърту'
+standard = 'вечерта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvɛ.t͡ʃɐr.tu'
+
+[[dialect_glossary]]
+term = 'сутринту'
+standard = 'сутринта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsu.trin.tu'
+
+[[dialect_glossary]]
+term = 'есенту'
+standard = 'есента'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈɛ.sin.tu'
+
+[[dialect_glossary]]
+term = 'пролетту'
+standard = 'пролетта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpro.lit.tu'
+
+[[dialect_glossary]]
+term = 'пепелту'
+standard = 'пепелта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpɛ.pil.tu'
+
+[[dialect_glossary]]
+term = 'мисълту'
+standard = 'мисълта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈmi.sɐl.tu'
+
+[[dialect_glossary]]
+term = 'жлъчту'
+standard = 'жлъчта'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈʒlɤt͡ʃ.tu'
+
+[[dialect_glossary]]
+term = 'назе'
+standard = 'нас'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈna.zi'
+
+[[dialect_glossary]]
+term = 'вазе'
+standard = 'вас'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈva.zi'
+
+[[dialect_glossary]]
+term = 'тязе'
+standard = 'тях'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈtʲa.zi'
+
+[[dialect_glossary]]
+term = 'онуй'
+standard = 'онова'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.ˈnuj'
+
+[[dialect_glossary]]
+term = 'инак'
+standard = 'иначе'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈi.nɐk'
+
+[[dialect_glossary]]
+term = 'тяхнту'
+standard = 'тяхното'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈtʲax.nɐ.tu'
+
+[[dialect_glossary]]
+term = 'мойте'
+standard = 'моите'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈmoj.ti'
+
+[[dialect_glossary]]
+term = 'твойте'
+standard = 'твоите'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈtvoj.ti'
+
+[[dialect_glossary]]
+term = 'наште'
+standard = 'нашите'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈnaʃ.ti'
+
+[[dialect_glossary]]
+term = 'ваште'
+standard = 'вашите'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvaʃ.ti'
+
+[[dialect_glossary]]
+term = 'сякой'
+standard = 'всеки'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsʲa.kuj'
+
+[[dialect_glossary]]
+term = 'сяка'
+standard = 'всяка'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsʲa.kɐ'
+
+[[dialect_glossary]]
+term = 'сяко'
+standard = 'всяко'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsʲa.ku'
+
+[[dialect_glossary]]
+term = 'куя'
+standard = 'коя'
+register = 'шуменски/мизийски диалект'
+ipa = 'ku.ˈja'
+
+[[dialect_glossary]]
+term = 'куе'
+standard = 'кое'
+register = 'шуменски/мизийски диалект'
+ipa = 'ku.ˈɛ'
+
+[[dialect_glossary]]
+term = 'куи'
+standard = 'кои'
+register = 'шуменски/мизийски диалект'
+ipa = 'ku.ˈi'
+
+[[dialect_glossary]]
+term = 'чийо'
+standard = 'чие'
+register = 'шуменски/мизийски диалект'
+ipa = 't͡ʃi.ˈjo'
+
+[[dialect_glossary]]
+term = 'одиш'
+standard = 'ходиш'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.diʃ'
+
+[[dialect_glossary]]
+term = 'оди'
+standard = 'ходи'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.di'
+
+[[dialect_glossary]]
+term = 'одите'
+standard = 'ходите'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.di.ti'
+
+[[dialect_glossary]]
+term = 'одят'
+standard = 'ходят'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.dʲɐt'
+
+[[dialect_glossary]]
+term = 'прайте'
+standard = 'правите'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpraj.ti'
+
+[[dialect_glossary]]
+term = 'мойм'
+standard = 'можем'
+register = 'шуменски/мизийски диалект'
+ipa = 'mojm'
+
+[[dialect_glossary]]
+term = 'кайш'
+standard = 'кажеш'
+register = 'шуменски/мизийски диалект'
+ipa = 'kajʃ'
+
+[[dialect_glossary]]
+term = 'кай'
+standard = 'каже'
+register = 'шуменски/мизийски диалект'
+ipa = 'kaj'
+
+[[dialect_glossary]]
+term = 'кайм'
+standard = 'кажем'
+register = 'шуменски/мизийски диалект'
+ipa = 'kajm'
+
+[[dialect_glossary]]
+term = 'кайте'
+standard = 'кажете'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈkaj.ti'
+
+[[dialect_glossary]]
+term = 'земиш'
+standard = 'вземеш'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈzɛ.miʃ'
+
+[[dialect_glossary]]
+term = 'земим'
+standard = 'вземем'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈzɛ.mim'
+
+[[dialect_glossary]]
+term = 'земат'
+standard = 'вземат'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈzɛ.mɐt'
+
+[[dialect_glossary]]
+term = 'дада'
+standard = 'дам'
+register = 'шуменски/мизийски диалект'
+ipa = 'dɐ.ˈdɐ'
+
+[[dialect_glossary]]
+term = 'яда'
+standard = 'ям'
+register = 'шуменски/мизийски диалект'
+ipa = 'jɐ.ˈdɐ'
+
+[[dialect_glossary]]
+term = 'идиш'
+standard = 'дойдеш / отидеш'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈi.diʃ'
+
+[[dialect_glossary]]
+term = 'идим'
+standard = 'дойдем / отидем'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈi.dim'
+
+[[dialect_glossary]]
+term = 'идите'
+standard = 'дойдете / отидете'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈi.di.ti'
+
+[[dialect_glossary]]
+term = 'влезиш'
+standard = 'влезеш'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvlɛ.ziʃ'
+
+[[dialect_glossary]]
+term = 'влези'
+standard = 'влезе'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvlɛ.zi'
+
+[[dialect_glossary]]
+term = 'влезим'
+standard = 'влезем'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvlɛ.zim'
+
+[[dialect_glossary]]
+term = 'влезите'
+standard = 'влезете'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈvlɛ.zi.ti'
+
+[[dialect_glossary]]
+term = 'излезиш'
+standard = 'излезеш'
+register = 'шуменски/мизийски диалект'
+ipa = 'iz.ˈlɛ.ziʃ'
+
+[[dialect_glossary]]
+term = 'излези'
+standard = 'излезе'
+register = 'шуменски/мизийски диалект'
+ipa = 'iz.ˈlɛ.zi'
+
+[[dialect_glossary]]
+term = 'чуйш'
+standard = 'чуеш'
+register = 'шуменски/мизийски диалект'
+ipa = 't͡ʃujʃ'
+
+[[dialect_glossary]]
+term = 'ший'
+standard = 'шие'
+register = 'шуменски/мизийски диалект'
+ipa = 'ʃij'
+
+[[dialect_glossary]]
+term = 'пяхми'
+standard = 'пяхме'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpʲax.mi'
+
+[[dialect_glossary]]
+term = 'пяхти'
+standard = 'пяхте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈpʲax.ti'
+
+[[dialect_glossary]]
+term = 'беши'
+standard = 'беше'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈbɛ.ʃi'
+
+[[dialect_glossary]]
+term = 'бяхми'
+standard = 'бяхме'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈbʲax.mi'
+
+[[dialect_glossary]]
+term = 'бяхти'
+standard = 'бяхте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈbʲax.ti'
+
+[[dialect_glossary]]
+term = 'одих'
+standard = 'ходих'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.dix'
+
+[[dialect_glossary]]
+term = 'одихми'
+standard = 'ходихме'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.dix.mi'
+
+[[dialect_glossary]]
+term = 'одихти'
+standard = 'ходихте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.dix.ti'
+
+[[dialect_glossary]]
+term = 'одиха'
+standard = 'ходиха'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈo.di.xɐ'
+
+[[dialect_glossary]]
+term = 'додох'
+standard = 'дойдох'
+register = 'шуменски/мизийски диалект'
+ipa = 'du.ˈdox'
+
+[[dialect_glossary]]
+term = 'доди'
+standard = 'дойде'
+register = 'шуменски/мизийски диалект'
+ipa = 'du.ˈdɛ'
+
+[[dialect_glossary]]
+term = 'додохми'
+standard = 'дойдохме'
+register = 'шуменски/мизийски диалект'
+ipa = 'du.ˈdox.mi'
+
+[[dialect_glossary]]
+term = 'додохти'
+standard = 'дойдохте'
+register = 'шуменски/мизийски диалект'
+ipa = 'du.ˈdox.ti'
+
+[[dialect_glossary]]
+term = 'додоха'
+standard = 'дойдоха'
+register = 'шуменски/мизийски диалект'
+ipa = 'du.ˈdo.xɐ'
+
+[[dialect_glossary]]
+term = 'отидохми'
+standard = 'отидохме'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.ˈti.dux.mi'
+
+[[dialect_glossary]]
+term = 'отидохти'
+standard = 'отидохте'
+register = 'шуменски/мизийски диалект'
+ipa = 'u.ˈti.dux.ti'
+
+[[dialect_glossary]]
+term = 'рекохми'
+standard = 'рекохме'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈrɛ.kux.mi'
+
+[[dialect_glossary]]
+term = 'рекохти'
+standard = 'рекохте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈrɛ.kux.ti'
+
+[[dialect_glossary]]
+term = 'секох'
+standard = 'сякох'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈsɛ.kux'
+
+[[dialect_glossary]]
+term = 'жъ'
+standard = 'ще'
+register = 'шуменски/мизийски диалект'
+ipa = 'ʒɤ'
+
+[[dialect_glossary]]
+term = 'нидейти'
+standard = 'недейте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ni.ˈdɛj.ti'
+
+[[dialect_glossary]]
+term = 'идети'
+standard = 'идете'
+register = 'шуменски/мизийски диалект'
+ipa = 'i.ˈdɛ.ti'
+
+[[dialect_glossary]]
+term = 'елати'
+standard = 'елате'
+register = 'шуменски/мизийски диалект'
+ipa = 'i.ˈla.ti'
+
+[[dialect_glossary]]
+term = 'вижти'
+standard = 'вижте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈviʃ.ti'
+
+[[dialect_glossary]]
+term = 'яжти'
+standard = 'яжте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈjaʃ.ti'
+
+[[dialect_glossary]]
+term = 'дръжти'
+standard = 'дръжте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈdrɤʃ.ti'
+
+[[dialect_glossary]]
+term = 'мълчети'
+standard = 'мълчете'
+register = 'шуменски/мизийски диалект'
+ipa = 'mɐl.ˈt͡ʃɛ.ti'
+
+[[dialect_glossary]]
+term = 'седети'
+standard = 'седете'
+register = 'шуменски/мизийски диалект'
+ipa = 'si.ˈdɛ.ti'
+
+[[dialect_glossary]]
+term = 'бягайти'
+standard = 'бягайте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈbʲa.ɡɐj.ti'
+
+[[dialect_glossary]]
+term = 'слушайти'
+standard = 'слушайте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈslu.ʃɐj.ti'
+
+[[dialect_glossary]]
+term = 'земети'
+standard = 'вземете'
+register = 'шуменски/мизийски диалект'
+ipa = 'zi.ˈmɛ.ti'
+
+[[dialect_glossary]]
+term = 'дайти'
+standard = 'дайте'
+register = 'шуменски/мизийски диалект'
+ipa = 'ˈdaj.ti'
+
+[[dialect_glossary]]
+term = 'пуснети'
+standard = 'пуснете'
+register = 'шуменски/мизийски диалект'
+ipa = 'pus.ˈnɛ.ti'
+
+[[dialect_glossary]]
+term = 'фанети'
+standard = 'хванете'
+register = 'шуменски/мизийски диалект'
+ipa = 'fɐ.ˈnɛ.ti'
+
+[[dialect_glossary]]
+term = 'фърлети'
+standard = 'хвърлете'
+register = 'шуменски/мизийски диалект'
+ipa = 'fɐr.ˈlɛ.ti'
+
 [[acronyms]]
 abbr = 'ДДС'
 expansion = 'Данък върху добавената стойност'
