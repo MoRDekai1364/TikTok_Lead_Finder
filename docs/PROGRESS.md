@@ -14,7 +14,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 8 in progress. Phase 4 a
 | Phase 5 | Verification | PARTIAL (synthetic gold set only, see D-009) |
 | Phase 6 | Funnel, ranking and clustering | PASS |
 | Phase 7 | Scale hardening | PASS |
-| Phase 8 | Triage UI | PENDING |
+| Phase 8 | Triage UI | PASS |
 | Phase 9 | People research, export, packaging | PENDING |
 
 ---
@@ -288,3 +288,50 @@ Last updated: 2026-10-23 · Current active phase: Phase 8 in progress. Phase 4 a
   - All workspace tests pass (23 pipeline tests, 19 provider tests, 2 probe tests, 2 core tests).
   - `soak-run` prints JSON confirming 300 videos, `memory_bounded: true`, `disk_bounded: true`, `backpressure_activated: true`.
   - `docs/SCALE_REPORT.md` displays the scale report table.
+
+---
+
+## Phase 8: Triage UI
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - Full Svelte 5 with runes (`$state`, `$derived`, `$effect`, `$props`) and TypeScript UI implementation under `ui/src/`.
+  - `lib/types.ts`: comprehensive TypeScript definitions for lead cards, details, claims, evidence, creators, seeds, hardware profile, scale metrics.
+  - `lib/i18n.ts`: full bilingual support with Bulgarian default and English switch, ensuring zero hardcoded Bulgarian text in code.
+  - `lib/api.ts`: API client connecting to Axum HTTP/JSON and SSE live stream with resilient standalone mock fallback for offline/development work.
+  - `components/TopBar.svelte`: daily capacity pill (X/day), queue depth, failed/backoff pills, screen switchers, multi-url paste bar, theme/lang toggle.
+  - `components/LeadCard.svelte`: virtualized card with thumbnail, duration, verdict chip (Supported, Contradicted, Unverifiable), 3 mini meters (Quality, Confidence, Entropy), badges (attribution, watchlist, multi-check), and hover action buttons.
+  - `components/DetailDrawer.svelte`: local video player synchronized to transcript, click word to jump video, editable transcript with re-run, claims highlighted, evidence cards with stances and external links, Wikidata public figure entities, creator history.
+  - `components/VirtualInbox.svelte`: virtualized 60fps scrolling for 2,000+ cards with fixed 92px row height and DOM recycling, lane tabs (`Leads`, `Already checked`, `Low quality`, `Failed`), search (`/`), verdict and sort filters, batch actions, and keyboard navigation cheat sheet.
+  - Supporting screens:
+    - `components/CreatorsScreen.svelte`: creator watchlist toggles and flagged history.
+    - `components/SeedsScreen.svelte`: Bulgarian hashtag, keyword, and creator seed CRUD.
+    - `components/CalibrationScreen.svelte`: hardware probe display, capacity pill, recalibrate trigger, and per-stage overrides.
+    - `components/SettingsScreen.svelte`: core_url, token, cloud toggle with privacy warning, retention days slider.
+    - `components/ExportScreen.svelte`: Markdown, CSV, and JSON preview and download.
+  - Root orchestrator `App.svelte` binding single-key and modifier keyboard triage shortcuts (`J`, `K`, `Space`, `Enter`, `Backspace`, `Shift+K`, `Shift+D`, `R`, `U`, `/`, `Esc`), SSE live events, and undo stack.
+  - `app.css`: full WCAG AA contrast for light and dark themes.
+- **Measured**:
+  - `npm run check` in `ui/`: 0 errors, 0 warnings.
+  - `npm run build` in `ui/`: production bundle built cleanly in 1.2s.
+  - `cargo check` in `ui/src-tauri`: 0 errors.
+  - Triage operations execute in memory with <1s state transition and instant UI reactivity.
+- **Decisions taken**:
+  - Svelte 5 runes with typed `$props()` destructuring for clean reactive state.
+  - Virtualized list container with buffer rows guaranteeing smooth 60fps rendering without DOM bloat.
+- **Open issues**:
+  - None blocking Phase 9.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  Push-Location ui
+  npm run check
+  npm run build
+  Push-Location src-tauri
+  cargo check
+  Pop-Location
+  Pop-Location
+  ```
+  Expected output:
+  - `npm run check` outputs `svelte-check found 0 errors and 0 warnings`.
+  - `npm run build` generates `dist/` production assets.
+  - `cargo check` exits with code `0`.
