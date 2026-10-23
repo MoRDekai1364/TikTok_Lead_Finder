@@ -138,45 +138,42 @@
       {card.top_claim_text || (currentLang === 'bg' ? 'Няма намерени проверими фактически твърдения.' : 'No factual claims found.')}
     </div>
 
-    {#if (card.progress_pct !== null && card.progress_pct !== undefined && card.progress_pct < 100) || card.top_claim_verdict === 'PROCESSING' || card.research_running}
-      <div class="card-progress-track active" title={`${card.stage_desc || 'В обработка'} - ${card.progress_pct ?? 50}%`}>
-        <div class="card-progress-fill animated-progress" style="width: {Math.max(12, card.progress_pct ?? 50)}%"></div>
-        <span class="card-progress-label">
-          ⚙️ {card.stage_desc || (currentLang === 'bg' ? 'В обработка...' : 'Processing...')} ({card.progress_pct ?? 50}%)
-          {#if card.etr_seconds !== null && card.etr_seconds !== undefined && card.etr_seconds > 0}
-            • ~{card.etr_seconds}s
-          {/if}
-        </span>
-      </div>
-    {/if}
-
     <div class="card-footer">
-      <div class="meters-row">
-        <div class="meter-item" title={`${t.meterTranscript}: ${Math.round((card.transcript_quality || 0) * 100)}%`}>
-          <span class="meter-label">Q</span>
-          <div class="meter-bar">
-            <div class="meter-fill" style="width: {Math.round((card.transcript_quality || 0) * 100)}%"></div>
+      {#if card.progress_pct !== null && card.progress_pct !== undefined && card.progress_pct < 100}
+        <div class="card-progress-track active" title={`${card.stage_desc || 'В обработка'} - ${card.progress_pct ?? 50}%`}>
+          <div class="card-progress-fill animated-progress" style="width: {Math.max(12, card.progress_pct ?? 50)}%"></div>
+          <span class="card-progress-label">
+            ⚙️ {card.stage_desc || (currentLang === 'bg' ? 'В обработка...' : 'Processing...')} ({card.progress_pct ?? 50}%)
+          </span>
+        </div>
+      {:else}
+        <div class="meters-row">
+          <div class="meter-item" title={`${t.meterTranscript}: ${Math.round((card.transcript_quality || 0) * 100)}%`}>
+            <span class="meter-label">Q</span>
+            <div class="meter-bar">
+              <div class="meter-fill" style="width: {Math.round((card.transcript_quality || 0) * 100)}%"></div>
+            </div>
+          </div>
+
+          <div class="meter-item" title={`${t.meterCheckworthiness}: ${Math.round((card.max_checkworthiness || 0) * 100)}%`}>
+            <span class="meter-label">C</span>
+            <div class="meter-bar">
+              <div class="meter-fill fill-check" style="width: {Math.round((card.max_checkworthiness || 0) * 100)}%"></div>
+            </div>
+          </div>
+
+          <div class="meter-item" title={`${t.meterEvidence}: ${Math.round((card.max_evidence_strength || 0) * 100)}%`}>
+            <span class="meter-label">E</span>
+            <div class="meter-bar">
+              <div class="meter-fill fill-evidence" style="width: {Math.round((card.max_evidence_strength || 0) * 100)}%"></div>
+            </div>
           </div>
         </div>
 
-        <div class="meter-item" title={`${t.meterCheckworthiness}: ${Math.round((card.max_checkworthiness || 0) * 100)}%`}>
-          <span class="meter-label">C</span>
-          <div class="meter-bar">
-            <div class="meter-fill fill-check" style="width: {Math.round((card.max_checkworthiness || 0) * 100)}%"></div>
-          </div>
+        <div class="reason-flagged" title={card.reason_flagged}>
+          {card.reason_flagged}
         </div>
-
-        <div class="meter-item" title={`${t.meterEvidence}: ${Math.round((card.max_evidence_strength || 0) * 100)}%`}>
-          <span class="meter-label">E</span>
-          <div class="meter-bar">
-            <div class="meter-fill fill-evidence" style="width: {Math.round((card.max_evidence_strength || 0) * 100)}%"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="reason-flagged" title={card.reason_flagged}>
-        {card.reason_flagged}
-      </div>
+      {/if}
 
       <div class="hover-actions" onclick={(e) => e.stopPropagation()} role="none">
         <button class="action-btn btn-keep" title={t.keepAction} onclick={() => onKeep(card.id)} aria-label="Запази">
@@ -205,12 +202,15 @@
   .lead-card {
     display: flex;
     align-items: center;
-    gap: 0.85rem;
-    padding: 0.65rem 0.85rem;
+    gap: 0.7rem;
+    padding: 0.45rem 0.7rem;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    margin-bottom: 0.45rem;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    margin: 0;
     cursor: pointer;
     transition: all 0.12s ease-in-out;
     position: relative;
@@ -236,9 +236,10 @@
 
   .thumb-col {
     position: relative;
-    width: 68px;
-    height: 68px;
-    min-width: 68px;
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    flex-shrink: 0;
     border-radius: 6px;
     overflow: hidden;
     background: #000;
@@ -276,7 +277,8 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.2rem;
+    overflow: hidden;
   }
 
   .card-header {
@@ -284,6 +286,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    min-width: 0;
   }
 
   .creator-meta {
@@ -292,20 +295,28 @@
     gap: 0.35rem;
     font-size: 0.78rem;
     font-weight: 600;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .creator-handle {
     color: var(--primary-accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .views-count {
     color: var(--text-muted);
+    flex-shrink: 0;
   }
 
   .badges-row {
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    flex-shrink: 0;
   }
 
   .badge {
@@ -393,14 +404,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.6rem;
     font-size: 0.75rem;
+    min-width: 0;
+    height: 24px;
   }
 
   .meters-row {
     display: flex;
     align-items: center;
     gap: 0.4rem;
+    flex-shrink: 0;
   }
 
   .meter-item {
@@ -448,6 +462,7 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    flex-shrink: 0;
     opacity: 0.4;
     transition: opacity 0.15s ease;
   }
@@ -497,15 +512,15 @@
 
   .card-progress-track {
     position: relative;
-    width: 100%;
-    height: 14px;
+    flex: 1;
+    min-width: 0;
+    height: 16px;
     background: rgba(0, 0, 0, 0.08);
     border-radius: 999px;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 2px 0;
   }
 
   .card-progress-track.active {
@@ -554,6 +569,12 @@
     color: var(--text-heading);
     z-index: 1;
     line-height: 1;
+    max-width: 100%;
+    padding: 0 0.4rem;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
   }
 </style>

@@ -137,6 +137,29 @@ impl PasteLinkSource {
         if let Some(oembed_ref) = self.fetch_oembed_fallback(&resolved, discovered_via).await {
             return oembed_ref;
         }
+        Self::minimal_ref(resolved, discovered_via)
+    }
+
+    pub async fn resolve_single_url_fast(&self, raw_url: &str, discovered_via: &str) -> VideoRef {
+        let resolved = tokio::time::timeout(Duration::from_secs(5), self.resolve_short_link(raw_url))
+            .await
+            .unwrap_or_else(|_| raw_url.to_string());
+        if let Ok(Some(oembed_ref)) = tokio::time::timeout(
+            Duration::from_secs(5),
+            self.fetch_oembed_fallback(&resolved, discovered_via),
+        )
+        .await
+        {
+            return oembed_ref;
+        }
+        Self::minimal_ref(resolved, discovered_via)
+    }
+
+    pub async fn enrich_metadata(&self, url: &str, discovered_via: &str) -> Option<VideoRef> {
+        self.ytdlp.fetch_metadata(url, discovered_via).await.ok()
+    }
+
+    fn minimal_ref(resolved: String, discovered_via: &str) -> VideoRef {
         let fallback_id = extract_video_id_from_url(&resolved).unwrap_or_else(|| {
             let mut h = Sha256::new();
             h.update(resolved.as_bytes());
@@ -257,10 +280,10 @@ impl VideoSource for PasteLinkSource {
             }
         };
 
-        let mut out = Vec::with_capacity(urls.len());
-        for url in urls {
-            out.push(self.resolve_single_url(&url, &via).await);
-        }
+        let out = futures::future::join_all(
+            urls.iter().map(|url| self.resolve_single_url_fast(url, &via)),
+        )
+        .await;
         Ok(out)
     }
 }

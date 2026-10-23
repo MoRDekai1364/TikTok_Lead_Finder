@@ -250,11 +250,14 @@ async fn handle_paste(
     Json(body): Json<PasteRequest>,
 ) -> Response {
     match ctx.paste_urls(&body.text).await {
-        Ok(videos) => Json(serde_json::json!({
-            "ingested": videos.len(),
-            "videos": videos
-        }))
-        .into_response(),
+        Ok(videos) => {
+            ctx.spawn_metadata_enrichment(&videos);
+            Json(serde_json::json!({
+                "ingested": videos.len(),
+                "videos": videos
+            }))
+            .into_response()
+        }
         Err(e) => (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({ "error": e.to_string() })),

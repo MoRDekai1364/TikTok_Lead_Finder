@@ -134,6 +134,29 @@ impl PipelineContext {
         self.ingest_video_refs(refs, 0, true).await
     }
 
+    pub fn spawn_metadata_enrichment(self: &Arc<Self>, videos: &[Video]) {
+        for video in videos {
+            let ctx = Arc::clone(self);
+            let video_id = video.id.clone();
+            let url = video.url.clone();
+            tokio::spawn(async move {
+                let Some(vref) = ctx.paste_source.enrich_metadata(&url, "paste").await else {
+                    return;
+                };
+                if vref.id != video_id {
+                    return;
+                }
+                if let Ok((updated, _)) = ctx.db.upsert_video_discovered(&vref, 0).await {
+                    ctx.emit(CoreEvent::VideoUpdated {
+                        video_id: updated.id.clone(),
+                        state: updated.state.clone(),
+                        lane: updated.lane.clone(),
+                    });
+                }
+            });
+        }
+    }
+
     pub async fn import_partner_file(&self, file_path: &Path) -> Result<Vec<Video>> {
         let query = DiscoveryQuery::PartnerImport {
             file_path: file_path.to_path_buf(),

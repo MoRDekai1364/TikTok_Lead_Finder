@@ -131,17 +131,22 @@
 
   async function handlePasteUrls(text: string): Promise<any> {
     const res = await pasteLinks(text);
-    if (res && typeof res.ingested === 'number' && res.ingested === 0) {
+    if (!res || typeof res.ingested !== 'number') {
+      throw new Error('Core unreachable');
+    }
+    if (res.ingested === 0) {
       throw new Error('No valid TikTok links found');
     }
-    await loadInitialData();
-    if (res?.videos && res.videos.length > 0) {
-      const vid = res.videos[0];
+    const vid = res.videos?.[0];
+    if (vid) {
       activeLane = 'pasted';
       selectedId = vid.id;
-      return vid;
+      if (isVideoFeedOpen) {
+        drawerVideoId = vid.id;
+      }
     }
-    return null;
+    void loadInitialData();
+    return vid ?? null;
   }
 
   function handleJumpToVideo(id: string) {

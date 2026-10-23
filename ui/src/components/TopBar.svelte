@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { getCoreUrl } from '../lib/api';
+  import { onMount } from 'svelte';
+  import { fetchVideoDetail, getCoreUrl } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { QueueCounts, ScaleStatus, Screen } from '../lib/types';
@@ -47,9 +48,80 @@
     progress_pct?: number | null;
     etr_seconds?: number | null;
     stage_desc?: string | null;
+    done?: boolean;
+    failed?: boolean;
   } | null>(null);
 
   const t = $derived(translations[currentLang]);
+
+  const TERMINAL_STATES = ['VERIFIED', 'READY', 'KEPT', 'FAILED', 'SCREENED_OUT', 'DISCARDED'];
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  onMount(() => () => stopPolling());
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function describeState(state: string): { pct: number; desc: string } {
+    const bg = currentLang === 'bg';
+    switch (state) {
+      case 'ACQUIRED':
+        return { pct: 50, desc: bg ? 'Свалено съдържание...' : 'Media downloaded...' };
+      case 'EXTRACTED':
+        return { pct: 70, desc: bg ? 'Извлечен говор...' : 'Speech extracted...' };
+      case 'CLAIMS_DONE':
+        return { pct: 85, desc: bg ? 'Проверка на твърдения...' : 'Verifying claims...' };
+      default:
+        return { pct: 25, desc: bg ? 'В опашка...' : 'Queued...' };
+    }
+  }
+
+  function startPolling(id: string) {
+    stopPolling();
+    let ticks = 0;
+    const run = async () => {
+      ticks += 1;
+      if (!lastPasted || lastPasted.id !== id || lastPasted.done) {
+        stopPolling();
+        return;
+      }
+      try {
+        const detail = await fetchVideoDetail(id);
+        const v = detail?.video;
+        if (!v || v.id !== id || !lastPasted || lastPasted.id !== id) return;
+        const state = String(v.state || '');
+        const finished = TERMINAL_STATES.includes(state);
+        const info = describeState(state);
+        lastPasted = {
+          ...lastPasted,
+          creator_handle: v.creator_handle || lastPasted.creator_handle,
+          creator_display_name: v.creator_display_name || lastPasted.creator_display_name,
+          caption: v.caption || lastPasted.caption,
+          duration_s: v.duration_s || lastPasted.duration_s,
+          views: v.views || lastPasted.views,
+          state,
+          progress_pct: finished ? 100 : info.pct,
+          etr_seconds: null,
+          stage_desc: info.desc,
+          done: finished,
+          failed: state === 'FAILED',
+        };
+        if (finished) stopPolling();
+      } catch {}
+      if (ticks > 450) stopPolling();
+    };
+    pollTimer = setInterval(run, 2000);
+    run();
+  }
+
+  function dismissPreview() {
+    stopPolling();
+    lastPasted = null;
+  }
 
   function inspectUrlImmediately(text: string) {
     const raw = text.trim();
@@ -59,9 +131,8 @@
       lastPasted = {
         id: tiktokMatch[2],
         creator_handle: tiktokMatch[1],
-        caption: currentLang === 'bg' ? 'Зареждане на видео данни...' : 'Loading video details...',
-        progress_pct: 15,
-        etr_seconds: 25,
+        caption: currentLang === 'bg' ? 'Добавяне...' : 'Adding...',
+        progress_pct: 10,
       };
       return;
     }
@@ -72,7 +143,6 @@
         creator_handle: 'tiktok_user',
         caption: currentLang === 'bg' ? 'Разрешаване на кратък линк...' : 'Resolving shortlink...',
         progress_pct: 10,
-        etr_seconds: 30,
       };
       return;
     }
@@ -82,7 +152,6 @@
         creator_handle: 'tiktok_user',
         caption: raw,
         progress_pct: 10,
-        etr_seconds: 30,
       };
     }
   }
@@ -102,6 +171,7 @@
 
   async function handlePaste() {
     if (!pasteText.trim() || isPasting) return;
+    stopPolling();
     inspectUrlImmediately(pasteText);
     isPasting = true;
     toastMessage = currentLang === 'bg' ? 'Добавяне на линк...' : 'Adding link...';
@@ -110,6 +180,7 @@
       const res = await onPasteUrls(pasteText);
       pasteText = '';
       if (res) {
+        const finished = TERMINAL_STATES.includes(String(res.state || ''));
         lastPasted = {
           ...lastPasted,
           ...res,
@@ -119,10 +190,13 @@
           duration_s: res.duration_s || lastPasted?.duration_s,
           views: res.views || lastPasted?.views,
           thumbnail_url: res.id ? `${getCoreUrl()}/api/media/${res.id}/thumb.jpg` : null,
-          progress_pct: res.progress_pct ?? 30,
-          etr_seconds: res.etr_seconds ?? 20,
-          stage_desc: res.stage_desc ?? 'В обработка...',
+          progress_pct: finished ? 100 : 25,
+          etr_seconds: null,
+          stage_desc: currentLang === 'bg' ? 'В опашка...' : 'Queued...',
+          done: finished,
+          failed: res.state === 'FAILED',
         };
+        if (!finished && res.id) startPolling(String(res.id));
       }
       toastMessage = currentLang === 'bg' ? '✓ Линкът е добавен в опашката!' : '✓ Added to processing queue!';
       setTimeout(() => { toastMessage = null; }, 3500);
@@ -255,18 +329,27 @@
         </div>
 
         <div class="preview-status-line">
-          <div class="preview-progress-track">
-            <div
-              class="preview-progress-fill"
-              style="width: {Math.max(12, lastPasted.progress_pct ?? 25)}%"
-            ></div>
-          </div>
-          <span class="preview-progress-label">
-            ⚙️ {lastPasted.stage_desc || 'В обработка...'} ({lastPasted.progress_pct ?? 25}%)
-            {#if lastPasted.etr_seconds}
-              • ~{lastPasted.etr_seconds}s
-            {/if}
-          </span>
+          {#if lastPasted.done}
+            <span class="preview-done-label" class:preview-failed-label={lastPasted.failed}>
+              {lastPasted.failed ? '✕' : '✓'}
+              {lastPasted.failed
+                ? currentLang === 'bg' ? 'Анализът не успя' : 'Analysis failed'
+                : currentLang === 'bg' ? 'Анализът е завършен' : 'Analysis complete'}
+            </span>
+          {:else}
+            <div class="preview-progress-track">
+              <div
+                class="preview-progress-fill"
+                style="width: {Math.max(12, lastPasted.progress_pct ?? 25)}%"
+              ></div>
+            </div>
+            <span class="preview-progress-label">
+              ⚙️ {lastPasted.stage_desc || (currentLang === 'bg' ? 'В обработка...' : 'Processing...')} ({lastPasted.progress_pct ?? 25}%)
+              {#if lastPasted.etr_seconds}
+                • ~{lastPasted.etr_seconds}s
+              {/if}
+            </span>
+          {/if}
         </div>
       </div>
 
@@ -276,8 +359,9 @@
             👁 {t.jumpToVideo}
           </button>
         {/if}
-        <button class="preview-dismiss" onclick={() => (lastPasted = null)} aria-label="Close">✕</button>
+        <button class="preview-dismiss" onclick={dismissPreview} aria-label="Close">✕</button>
       </div>
+
     </div>
   {/if}
 
@@ -318,7 +402,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
     min-height: 48px;
   }
 
@@ -342,6 +427,7 @@
   .paste-bar {
     display: flex;
     flex: 1;
+    min-width: 260px;
     max-width: 680px;
     gap: 0.5rem;
   }
@@ -577,6 +663,16 @@
     font-size: 0.72rem;
     color: var(--text-muted);
     font-weight: 600;
+  }
+
+  .preview-done-label {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--verdict-supported);
+  }
+
+  .preview-failed-label {
+    color: var(--verdict-contradicted);
   }
 
   .preview-actions-col {
