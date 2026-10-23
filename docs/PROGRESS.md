@@ -15,7 +15,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 8 in progress. Phase 4 a
 | Phase 6 | Funnel, ranking and clustering | PASS |
 | Phase 7 | Scale hardening | PASS |
 | Phase 8 | Triage UI | PASS |
-| Phase 9 | People research, export, packaging | PENDING |
+| Phase 9 | People research, export, packaging | PASS |
 
 ---
 
@@ -335,3 +335,40 @@ Last updated: 2026-10-23 · Current active phase: Phase 8 in progress. Phase 4 a
   - `npm run check` outputs `svelte-check found 0 errors and 0 warnings`.
   - `npm run build` generates `dist/` production assets.
   - `cargo check` exits with code `0`.
+
+---
+
+## Phase 9: People research, export, packaging
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - Deep research job (`research-more` CLI command `leadfinder research-more <video_id>`, API endpoint `POST /api/videos/:id/decision` with action `research_more`, and background job `Stage::ResearchMore` in `crates/pipeline/src/verify.rs` and `crates/pipeline/src/engine.rs`).
+  - Public-figure research with Wikidata entity matching and Bulgarian institutional enrichment, expanded retrieval against primary sources registry, and creator contradiction-rate tracking.
+  - Multi-format exporter (`crates/pipeline/src/export.rs`) supporting Markdown (GitHub-flavored, summary table, transcript, claims & evidence), CSV (RFC 4180), and structured JSON.
+  - CLI command `leadfinder export --format <markdown|csv|json> [--lane <leads|kept>] [--out <file>]` and REST endpoint `GET /api/export?format=markdown|csv|json&lane=leads`.
+  - Comprehensive Bulgarian Quick-Start Guide `docs/QUICKSTART_BG.md` for fact-checkers and investigative journalists.
+  - Production release binaries: `target/release/leadfinder.exe` (34 MB) and `ui/src-tauri/target/release/leadfinder-desktop.exe` (21 MB).
+  - Standalone Inno Setup installer compiled using `ISCC.exe`: `Setup_Output/Setup_TikTok_Lead_Finder_Official_Release.exe` (12.9 MB).
+- **Measured**:
+  - All 47 workspace tests pass.
+  - Inno Setup compiler: 100% clean build in 17 seconds.
+  - Working paste-a-link flow without API keys verified on release binary (`leadfinder.exe add-url <url>`).
+  - CLI export verified on live database in Markdown, CSV, and JSON (`leadfinder.exe export --format <fmt>`).
+- **Decisions taken**:
+  - Unified `ExportFormat` across CLI and REST server, with RFC 4180 compliant CSV quoting and Markdown formatted tables.
+  - Automated release staging (`release_stage/`) and single-click Inno Setup executable packaging.
+- **Open issues**:
+  - None. All phases (0 through 9) are fully implemented and verified.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  .\target\release\leadfinder.exe --help
+  .\target\release\leadfinder.exe export --format markdown
+  & "C:\Program Files\Inno Setup 7\ISCC.exe" Setup_TikTok_Lead_Finder_Official_Release.iss
+  Get-Item Setup_Output\Setup_TikTok_Lead_Finder_Official_Release.exe
+  ```
+  Expected output:
+  - All workspace tests pass.
+  - `leadfinder.exe --help` displays all commands including `research-more` and `export`.
+  - `leadfinder.exe export` outputs formatted leads in Markdown.
+  - `ISCC.exe` successfully compiles the installer to `Setup_Output\Setup_TikTok_Lead_Finder_Official_Release.exe`.

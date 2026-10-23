@@ -22,6 +22,12 @@ pub struct TokenQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ExportQuery {
+    pub format: Option<String>,
+    pub lane: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct PasteRequest {
     pub text: String,
 }
@@ -134,6 +140,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/calibrate", post(handle_calibrate))
         .route("/api/calibrate/overrides", post(handle_calibrate_overrides))
         .route("/api/settings", get(handle_list_settings).post(handle_update_settings))
+        .route("/api/export", get(handle_export))
         .route("/api/scale/status", get(handle_scale_status))
         .route_layer(middleware::from_fn_with_state(ctx.clone(), auth_middleware));
 
@@ -676,4 +683,48 @@ async fn handle_metrics(State(ctx): State<Arc<PipelineContext>>) -> impl IntoRes
     }
 
     ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], text)
+}
+
+async fn handle_export(
+    State(ctx): State<Arc<PipelineContext>>,
+    Query(q): Query<ExportQuery>,
+) -> Response {
+    let fmt_str = q.format.as_deref().unwrap_or("markdown");
+    let fmt = match crate::export::ExportFormat::parse_str(fmt_str) {
+        Ok(f) => f,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response()
+        }
+    };
+    match ctx.export_leads(q.lane.as_deref(), fmt).await {
+        Ok(out) => match fmt {
+            crate::export::ExportFormat::Markdown => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
+                out,
+            )
+                .into_response(),
+            crate::export::ExportFormat::Csv => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "text/csv; charset=utf-8")],
+                out,
+            )
+                .into_response(),
+            crate::export::ExportFormat::Json => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                out,
+            )
+                .into_response(),
+        },
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
 }

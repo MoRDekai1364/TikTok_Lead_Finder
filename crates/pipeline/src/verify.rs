@@ -476,6 +476,84 @@ impl PipelineContext {
         Ok(())
     }
 
+    pub async fn run_research_more_job(&self, video_id: &str) -> Result<()> {
+        let claims = self.db.get_claims_for_video(video_id).await?;
+        for claim in &claims {
+            self.verify_claim_with_retrieval(video_id, claim.id).await?;
+        }
+
+        let cfg: AppConfig = self.config.read().await.clone();
+        let lex = global_lexicon(&self.paths, &cfg.normalisation.lexicon_config_file);
+        let people_resolver =
+            leadfinder_providers::PeopleResolver::new(cfg.normalisation.clone(), lex.clone(), self.guard.clone());
+
+        let people = self.db.get_people_for_video(video_id).await?;
+        for p in people {
+            if p.wikidata_id.is_none() {
+                if let Ok(Some(matched)) = people_resolver.lookup_wikidata(&p.canonical_name, &p.variants).await {
+                    let summary = matched.description;
+                    let _ = self
+                        .db
+                        .upsert_person_for_video(
+                            video_id,
+                            &p.canonical_name,
+                            &p.variants,
+                            p.role.as_deref(),
+                            true,
+                            Some(&matched.wikidata_id),
+                            summary.as_deref(),
+                            p.mentions.unwrap_or(1),
+                            p.found_in.as_deref().unwrap_or("research_more"),
+                        )
+                        .await;
+                }
+            }
+        }
+
+        if let Some(video) = self.db.get_video(video_id).await? {
+            if let Some(creator_id) = &video.creator_id {
+                let filter = leadfinder_core::VideoFilter {
+                    creator_id: Some(creator_id.clone()),
+                    lane: None,
+                    state: None,
+                    verdict: None,
+                    label: None,
+                    search_query: None,
+                    min_score: None,
+                    min_views: None,
+                    limit: Some(100),
+                    offset: Some(0),
+                };
+                let creator_vids = self.db.list_videos(&filter).await?;
+                let mut contradicted_claims = 0;
+                let mut total_claims = 0;
+                for cv in &creator_vids {
+                    if let Ok(c_list) = self.db.get_claims_for_video(&cv.id).await {
+                        for c in c_list {
+                            total_claims += 1;
+                            if c.verdict.as_deref() == Some("CONTRADICTED") {
+                                contradicted_claims += 1;
+                            }
+                        }
+                    }
+                }
+                if contradicted_claims >= 2 || (total_claims >= 3 && contradicted_claims > 0) {
+                    let _ = self.db.set_creator_watchlist(creator_id, true).await;
+                }
+            }
+        }
+
+        let _ = self.rank_all().await;
+        if let Some(v) = self.db.get_video(video_id).await? {
+            self.emit(CoreEvent::VideoUpdated {
+                video_id: video_id.to_string(),
+                state: v.state,
+                lane: v.lane,
+            });
+        }
+        Ok(())
+    }
+
     async fn check_and_mark_video_verified(&self, video_id: &str) -> Result<()> {
         let claims = self.db.get_claims_for_video(video_id).await?;
         let all_verified = !claims.is_empty() && claims.iter().all(|c| c.verdict.is_some());

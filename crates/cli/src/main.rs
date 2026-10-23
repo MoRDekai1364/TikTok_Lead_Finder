@@ -158,6 +158,18 @@ enum Commands {
         #[arg(long, default_value = "docs/SCALE_REPORT.md")]
         out_report: PathBuf,
     },
+    ResearchMore {
+        #[arg(required = true)]
+        video_id: String,
+    },
+    Export {
+        #[arg(long, default_value = "markdown")]
+        format: String,
+        #[arg(long)]
+        lane: Option<String>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
 }
 
 #[tokio::main]
@@ -526,6 +538,30 @@ async fn main() -> Result<()> {
             }
             std::fs::write(&out_report, md)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::ResearchMore { video_id } => {
+            println!("leadfinder: running research-more on video {video_id}...");
+            ctx.run_research_more_job(&video_id).await?;
+            if let Some(detail) = ctx.db.get_video_detail(&video_id).await? {
+                println!(
+                    "leadfinder: research-more complete for {video_id}. Claims: {}, People: {}",
+                    detail.claims.len(),
+                    detail.people.len()
+                );
+            }
+        }
+        Commands::Export { format, lane, out } => {
+            let fmt = leadfinder_pipeline::ExportFormat::parse_str(&format)?;
+            let content = ctx.export_leads(lane.as_deref(), fmt).await?;
+            if let Some(out_path) = out {
+                if let Some(parent) = out_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                std::fs::write(&out_path, &content)?;
+                println!("leadfinder: exported {} bytes to {}", content.len(), out_path.display());
+            } else {
+                print!("{}", content);
+            }
         }
         Commands::VerifyVideo { video_id } => {
             ctx.run_verify_job(&video_id).await?;

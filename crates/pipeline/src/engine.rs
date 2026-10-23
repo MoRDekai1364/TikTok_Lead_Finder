@@ -605,7 +605,7 @@ impl PipelineContext {
                             Some(Stage::ScreenCheap) => AimdStage::ScreenCheap,
                             Some(Stage::Acquire) | Some(Stage::Extract) => AimdStage::Acquire,
                             Some(Stage::Claims) | Some(Stage::Checkworthy) => AimdStage::Claims,
-                            Some(Stage::Verify) => AimdStage::Verify,
+                            Some(Stage::Verify) | Some(Stage::ResearchMore) => AimdStage::Verify,
                             _ => AimdStage::Extract,
                         };
 
@@ -636,6 +636,13 @@ impl PipelineContext {
                             Some(Stage::Verify) => {
                                 if let Some(vid) = &job.video_id {
                                     self.run_verify_job(vid).await
+                                } else {
+                                    Ok(())
+                                }
+                            }
+                            Some(Stage::ResearchMore) => {
+                                if let Some(vid) = &job.video_id {
+                                    self.run_research_more_job(vid).await
                                 } else {
                                     Ok(())
                                 }

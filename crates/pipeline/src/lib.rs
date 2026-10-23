@@ -1,6 +1,7 @@
 pub mod claims;
 pub mod concurrency;
 pub mod engine;
+pub mod export;
 pub mod funnel;
 pub mod gold;
 pub mod janitor;
@@ -13,6 +14,7 @@ pub mod verify;
 pub use claims::*;
 pub use concurrency::*;
 pub use engine::*;
+pub use export::*;
 pub use funnel::*;
 pub use gold::*;
 pub use janitor::*;
