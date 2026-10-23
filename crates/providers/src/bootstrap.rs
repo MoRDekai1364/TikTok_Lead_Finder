@@ -269,6 +269,30 @@ pub async fn install_missing_dependencies(
             tokio::task::spawn_blocking(move || compile_wiktionary_jsonl_to_tsv(&jsonl_clone, &out_tsv))
                 .await??;
         }
+        let has_any_gguf = std::fs::read_dir(paths.models_dir.join("llm"))
+            .ok()
+            .into_iter()
+            .flatten()
+            .flatten()
+            .any(|e| e.path().extension().and_then(|s| s.to_str()) == Some("gguf"))
+            || std::fs::read_dir(paths.static_root.join("models").join("llm"))
+                .ok()
+                .into_iter()
+                .flatten()
+                .flatten()
+                .any(|e| e.path().extension().and_then(|s| s.to_str()) == Some("gguf"));
+        if !has_any_gguf {
+            let gguf_dest = paths
+                .models_dir
+                .join("llm")
+                .join("BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf");
+            download_file(
+                &client,
+                "https://huggingface.co/INSAIT-Institute/BgGPT-Gemma-3-4B-IT-GGUF/resolve/main/BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf",
+                &gguf_dest,
+            )
+            .await?;
+        }
     }
 
     Ok(inspect_dependencies(paths))

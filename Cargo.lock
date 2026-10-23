@@ -1390,6 +1390,7 @@ dependencies = [
  "chrono",
  "leadfinder-core",
  "leadfinder-providers",
+ "reqwest",
  "serde",
  "serde_json",
  "sysinfo",

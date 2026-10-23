@@ -9,6 +9,9 @@ use leadfinder_pipeline::{
     build_router, render_spike_markdown, run_discovery_spike, run_media_retention_janitor,
     PipelineContext,
 };
+use leadfinder_probe::{
+    apply_calibration_overrides, run_calibration, CalibrationOverrides,
+};
 use leadfinder_providers::{
     global_lexicon, inspect_dependencies, install_missing_dependencies,
 };
@@ -90,6 +93,20 @@ enum Commands {
         #[arg(long)]
         text: Option<String>,
     },
+    Calibrate {
+        #[arg(long)]
+        force_cpu: bool,
+        #[arg(long)]
+        override_asr: Option<String>,
+        #[arg(long)]
+        override_llm_provider: Option<String>,
+        #[arg(long)]
+        override_llm_model: Option<String>,
+        #[arg(long)]
+        override_ocr: Option<String>,
+        #[arg(long)]
+        clear_overrides: bool,
+    },
 }
 
 #[tokio::main]
@@ -140,6 +157,7 @@ async fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&detail)?);
         }
         Commands::ProcessBatch { limit } => {
+            let batch_started = std::time::Instant::now();
             let videos = ctx
                 .db
                 .list_videos(&VideoFilter {
@@ -165,11 +183,26 @@ async fn main() -> Result<()> {
                     })),
                 }
             }
+            let elapsed_s = batch_started.elapsed().as_secs_f64();
+            let sec_per_video = if processed.is_empty() {
+                0.0
+            } else {
+                elapsed_s / processed.len() as f64
+            };
+            let window_s = ctx.config.read().await.capacity.processing_window_hours * 3600.0;
+            let extrapolated_per_day = if sec_per_video > 0.0 {
+                (window_s / sec_per_video * 10.0).round() / 10.0
+            } else {
+                0.0
+            };
             println!(
                 "{}",
                 serde_json::to_string_pretty(&serde_json::json!({
                     "processed_count": processed.len(),
                     "error_count": errors.len(),
+                    "elapsed_seconds": (elapsed_s * 100.0).round() / 100.0,
+                    "mean_seconds_per_video": (sec_per_video * 100.0).round() / 100.0,
+                    "measured_capacity_per_day": extrapolated_per_day,
                     "results": processed,
                     "errors": errors,
                 }))?
@@ -220,7 +253,7 @@ async fn main() -> Result<()> {
             non_interactive: _,
             ensure_webview2,
             with_models,
-            calibrate: _,
+            calibrate,
             check_only,
         } => {
             let status = if check_only {
@@ -228,6 +261,10 @@ async fn main() -> Result<()> {
             } else {
                 install_missing_dependencies(&ctx.paths, ensure_webview2, with_models).await?
             };
+            if calibrate && !check_only {
+                let cfg = ctx.config.read().await.clone();
+                let _ = run_calibration(&ctx.paths, &cfg, &ctx.db, false).await?;
+            }
             println!("{}", serde_json::to_string_pretty(&status)?);
         }
         Commands::LexiconInspect { text } => {
@@ -249,6 +286,43 @@ async fn main() -> Result<()> {
                     "llm_context": analysis,
                 }))?
             );
+        }
+        Commands::Calibrate {
+            force_cpu,
+            override_asr,
+            override_llm_provider,
+            override_llm_model,
+            override_ocr,
+            clear_overrides,
+        } => {
+            let cfg = ctx.config.read().await.clone();
+            let has_override_flags = clear_overrides
+                || override_asr.is_some()
+                || override_llm_provider.is_some()
+                || override_llm_model.is_some()
+                || override_ocr.is_some();
+
+            if has_override_flags {
+                let ov = if clear_overrides {
+                    CalibrationOverrides::default()
+                } else {
+                    CalibrationOverrides {
+                        asr_model: override_asr,
+                        llm_provider: override_llm_provider,
+                        llm_model: override_llm_model,
+                        ocr_engine: override_ocr,
+                        asr_concurrency: None,
+                        llm_concurrency: None,
+                    }
+                };
+                if let Some(updated) = apply_calibration_overrides(&ctx.db, &cfg, ov).await? {
+                    println!("{}", serde_json::to_string_pretty(&updated)?);
+                    return Ok(());
+                }
+            }
+
+            let profile = run_calibration(&ctx.paths, &cfg, &ctx.db, force_cpu).await?;
+            println!("{}", serde_json::to_string_pretty(&profile)?);
         }
     }
 

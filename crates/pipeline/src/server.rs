@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
 use tower_http::cors::CorsLayer;
 use leadfinder_core::{CoreEvent, Stage, VideoFilter};
+use leadfinder_probe::{apply_calibration_overrides, run_calibration, CalibrationOverrides};
 use crate::engine::PipelineContext;
 
 #[derive(Debug, Deserialize)]
@@ -92,6 +93,12 @@ pub struct WatchlistRequest {
     pub watchlist: bool,
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct CalibrateRequest {
+    #[serde(default)]
+    pub force_cpu: bool,
+}
+
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
@@ -121,6 +128,8 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/creators", get(handle_list_creators))
         .route("/api/creators/watchlist", post(handle_set_watchlist))
         .route("/api/profile", get(handle_get_profile))
+        .route("/api/calibrate", post(handle_calibrate))
+        .route("/api/calibrate/overrides", post(handle_calibrate_overrides))
         .route("/api/settings", get(handle_list_settings).post(handle_update_settings))
         .route_layer(middleware::from_fn_with_state(ctx.clone(), auth_middleware));
 
@@ -434,6 +443,36 @@ async fn handle_set_watchlist(
 
 async fn handle_get_profile(State(ctx): State<Arc<PipelineContext>>) -> Response {
     match ctx.db.get_profile().await {
+        Ok(prof) => Json(prof).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_calibrate(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<CalibrateRequest>,
+) -> Response {
+    let cfg = ctx.config.read().await.clone();
+    match run_calibration(&ctx.paths, &cfg, &ctx.db, body.force_cpu).await {
+        Ok(prof) => Json(prof).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_calibrate_overrides(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(overrides): Json<CalibrationOverrides>,
+) -> Response {
+    let cfg = ctx.config.read().await.clone();
+    match apply_calibration_overrides(&ctx.db, &cfg, overrides).await {
         Ok(prof) => Json(prof).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,

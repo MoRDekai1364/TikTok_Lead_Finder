@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-10-23 · Current active phase: Phase 2 complete, ready for Phase 3.
+Last updated: 2026-10-23 · Current active phase: Phase 3 complete, ready for Phase 4.
 
 ## Phase Summary
 
@@ -9,7 +9,7 @@ Last updated: 2026-10-23 · Current active phase: Phase 2 complete, ready for Ph
 | Phase 0 | Owner decisions and scaffold | PASS |
 | Phase 1 | Core skeleton, paste-a-link, discovery spike (go/no-go) | PASS |
 | Phase 2 | Bulgarian single-video pipeline | PASS |
-| Phase 3 | Calibration | PENDING |
+| Phase 3 | Calibration | PASS |
 | Phase 4 | Claims and people | PENDING |
 | Phase 5 | Verification | PENDING |
 | Phase 6 | Funnel, ranking and clustering | PENDING |
@@ -121,3 +121,36 @@ Last updated: 2026-10-23 · Current active phase: Phase 2 complete, ready for Ph
   - `lexicon-inspect` outputs `"valid_wordforms": 922137`, `"ipa_transcriptions": 75930`, normalized Bulgarian sentence, and populated `llm_context` glossary/acronym notes.
   - `wer-report fixtures/phase2_wer_references.json` prints `"clips_evaluated": 12` and `"mean_wer": 0.195`.
   - `docs/OCR_BENCHMARK.md` and `docs/WER_REPORT.md` display the committed benchmark and WER tables.
+
+---
+
+## Phase 3: Calibration
+
+- **Status**: COMPLETE (all acceptance criteria met)
+- **What was built**:
+  - Hardware & compute probe (`crates/probe/src/lib.rs`): automatically detects CPU brand, physical/logical cores, total/available RAM, free disk on data mount, GPU vendor/name/VRAM (`nvidia-smi` + Win32 `Win32_VideoController` fallback), and compute backends (`vulkan`, `cuda`, `cpu`, plus `--force-cpu`).
+  - Redistributable calibration assets (`assets/calibration/`): `sample_bg_30s.wav` (`30.0 s`, `16 kHz` mono native Bulgarian speech compiled from Wikimedia Commons Lingua Libre under `CC BY-SA 4.0`), `sample_bg_30s.txt`, `ATTRIBUTION.md`, and `llm_cases.json` (3 Bulgarian claim-extraction cases).
+  - Empirical candidate benchmarker & selector:
+    - Whisper candidates (`tiny`, `base`, `small-q5_1`, `small`, `medium`, `large-v3`): measures RTF, WER against `sample_bg_30s.txt`, and `raw_capacity_per_day`; selects lowest-WER candidate meeting `target_videos_per_day` (default `300`) with deterministic quality-tier tie-breaking, or flags shortfall + cloud assist.
+    - Local LLM candidates via ephemeral `llama-server` subprocesses with JSON-schema constrained decoding over 3 cases x 3 runs (`9` runs/model): measures `tokens_per_second` and `json_validity_rate`; selects largest GGUF meeting `>= 8.0 tok/s` and `>= 95%` JSON validity (`BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` at `53.71 tok/s` and `100.0%` `9/9` validity on Vulkan GPU; `12.89 tok/s` and `100.0%` `9/9` validity on forced CPU-only), falling back to cloud (when enabled) or heuristics-only banner mode.
+  - Persistent `profile` storage (`id = 1`), per-stage overrides (`calibrate --override-asr`, `--override-llm-provider`, `--override-llm-model`, `--override-ocr`, `--clear-overrides`), and `/api/profile`, `/api/calibrate`, `/api/calibrate/overrides` HTTP endpoints.
+  - Measured accuracy of capacity estimate against the 20-video pipeline run:
+    - Measured 20-video run (`process-batch --limit 20`): `32.15 s/video` -> `1,343.9 videos/day` (`1,161.3/day` including `5.05 s` LLM call).
+    - Calibrated `capacity_per_day`: `1,241.0 videos/day` on GPU (`7.7%` delta vs raw 20-video run, well within the `<= 25%` acceptance bound) and `1,160.4 videos/day` on forced CPU-only.
+- **Decisions taken**:
+  - `D-007`: Verified latest INSAIT BgGPT GGUF family (`BgGPT-Gemma-3-{4B,12B,27B}-IT-GGUF`, Google Gemma Terms of Use, un-gated) and selected `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` (`100%` first-try JSON validity vs `66.7%` on `BgGPT-Gemma-2-2B`).
+- **Open issues**:
+  - None blocking Phase 4.
+- **Exact PowerShell verification commands and expected output**:
+  ```powershell
+  cargo test --workspace
+  .\target\release\leadfinder.exe calibrate --force-cpu
+  .\target\release\leadfinder.exe calibrate
+  .\target\release\leadfinder.exe calibrate --override-asr base
+  .\target\release\leadfinder.exe calibrate --clear-overrides
+  ```
+  Expected output:
+  - `cargo test --workspace` passes all workspace tests including `leadfinder-probe` selection & fallback tests.
+  - `calibrate --force-cpu` outputs JSON with `"compute_backends": ["cpu"]`, `"asr_model": "small"`, `"llm_model": "BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf"`, and `"capacity_per_day"` around `1000–1200`.
+  - `calibrate` (GPU) outputs JSON with `"compute_backend": "vulkan"`, `"asr_model": "small"`, `"llm_model": "BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf"`, `"json_validity_rate": 1.0`, and `"capacity_per_day"` within 25% of the measured 20-video throughput; running `calibrate` a second time produces the exact same `recommended` configuration and updates the single `profile` (`id = 1`) row idempotently.
+  - `calibrate --override-asr base` sets `chosen_json.effective.asr_model = "base"` and `--clear-overrides` restores `chosen_json.effective.asr_model = "small"`.

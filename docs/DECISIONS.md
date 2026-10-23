@@ -53,3 +53,17 @@ Every deviation from `docs/PLAN.md` and every resolution of a deferred decision 
   - Implement a 100% config-driven lexicon & phonetic/grammar engine (`config/lexicon.bg.toml` + `crates/providers/src/lexicon.rs`, zero hardcoded Bulgarian constants in Rust) backed by `models/lexicon/{bg_50k.txt,bg_BG.dic,bg_BG.aff,bg_mfa_ipa.dict,bg_wiktionary_lexicon.tsv}` (`922,137` inflected wordforms, `75,930` IPA phonetic transcriptions, `149,148` phonetic skeleton keys, `1,241` dialect/informal entries), auto-provisioned by `leadfinder setup-deps`.
   - Feed Whisper `--prompt` conditioning + post-ASR orthographic, enclitic/proclitic, comparative `по-`/`най-`, and IPA/phonetic OOV repair, reducing 12-clip real TikTok WER from `0.224` (`22.4%`) to `0.195` (`19.5%`, `-12.9%` relative error reduction, `docs/WER_REPORT.md`), while exposing `analyze_for_llm` linguistic context notes (dialect/informal glosses with IPA, institutional acronyms, and renarrated-mood `преизказно наклонение` hearsay markers) for Phase 4–5 LLM models.
 - **Reason**: Improves real Bulgarian TikTok transcription accuracy measurably while enabling downstream LLM claim/entity/attribution models to handle regional dialects, informal speech, and Bulgarian grammatical evidentiality offline.
+
+## D-007: Latest INSAIT BgGPT Release, License Verification, and Calibration Model Selection
+- **Date**: 2026-10-23
+- **Phase**: 3
+- **Context**: Section 2, Section 10, and Section 18 require verifying the latest INSAIT BgGPT GGUF release and its license terms at implementation time and selecting the default local LLM via calibration (`>= 8 tok/s` and `>= 95%` JSON schema validity over 3 prompts x 3 runs).
+- **Verified Findings**:
+  - Latest official INSAIT HuggingFace GGUF family (`INSAIT-Institute`) as of October 2026 is **`BgGPT-Gemma-3-{4B,12B,27B}-IT-GGUF`** (`gated: false`), succeeding `BgGPT-Gemma-2-{2.6B,9B,27B}-IT-v1.0-GGUF`.
+  - **License**: Distributed under the **Google Gemma Terms of Use** (`gemma` license tag on HuggingFace, un-gated download; permits local research and commercial/organizational inference subject to the Gemma Prohibited Use Policy; weights are downloaded locally per install via `leadfinder setup-deps --with-models` rather than redistributed inside third-party source trees).
+  - **Empirical Calibration (`llama-server b11836`, Vulkan on RTX 5070 Ti 12 GB)**:
+    - `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` (`2.49 GB`): **`48.97 tok/s`**, **`100.0%` JSON schema validity (`9/9`)**, `5.05 s` mean call latency -> **PASSES** (`>= 95%` validity & `>= 8 tok/s`).
+    - `BgGPT-Gemma-2-2B-IT-v1.0.Q4_K_M.gguf` (`1.71 GB`): `63.24 tok/s`, `66.7%` JSON schema validity (`6/9`), `6.02 s` mean call latency -> rejected by the `95%` validity gate.
+  - **Redistributable Calibration Audio**: Bundled `assets/calibration/sample_bg_30s.wav` (`30.0 s`, `16 kHz` mono PCM WAV) compiled from Wikimedia Commons Lingua Libre native Bulgarian recordings (`CC BY-SA 4.0`, attribution in `assets/calibration/ATTRIBUTION.md`).
+- **Decision**: Default local LLM bootstrapper and config to `BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf` (while supporting larger `9B`/`12B`/`27B` GGUFs when present in `models/llm/` and falling back to CPU or heuristics-only banner mode on low-power machines).
+- **Reason**: `BgGPT-Gemma-3-4B-IT-Q4_K_M` is un-gated, fits comfortably in 4–12 GB VRAM or 8+ GB RAM, and achieves 100% first-try JSON validity on Bulgarian claim extraction.
