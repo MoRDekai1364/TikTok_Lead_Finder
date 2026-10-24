@@ -8,6 +8,7 @@
     fetchVideosByCreator,
     getCoreUrl,
     googleAiFixTranscript,
+    googleAudioTranscribe,
     logDecision,
     openExternalUrl,
     queryGoogleAi,
@@ -49,6 +50,7 @@
   let isSavingTranscript = $state(false);
   let isAiChecking = $state(false);
   let isGoogleAiFixing = $state(false);
+  let isGoogleAudioTranscribing = $state(false);
   let isRetranscribing = $state(false);
   let copyToast = $state<string | null>(null);
   let videoElement = $state<HTMLVideoElement | null>(null);
@@ -433,6 +435,40 @@
     }
   }
 
+  async function handleGoogleAudioTranscribe() {
+    if (!detail?.video?.id || isGoogleAudioTranscribing) return;
+    isGoogleAudioTranscribing = true;
+    copyToast = currentLang === 'bg' ? '🎙️ Google AI аудио транскрибиране...' : '🎙️ Google AI transcribing audio...';
+    try {
+      const res = await googleAudioTranscribe(detail.video.id);
+      if (res && res.corrected_text) {
+        if (!detail.transcript) {
+          detail.transcript = {
+            video_id: detail.video.id,
+            source: 'google_audio',
+            engine: 'google_web_speech',
+            model: null,
+            language: 'bg',
+            quality: null,
+            text: res.corrected_text,
+            segments: [],
+            edited_text: res.corrected_text,
+          };
+        } else {
+          detail.transcript.edited_text = res.corrected_text;
+        }
+        editedText = res.corrected_text;
+        copyToast = currentLang === 'bg' ? '✓ Google AI транскрипцията е готова!' : '✓ Google AI transcription ready!';
+        await loadDetail(detail.video.id);
+      }
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при Google AI транскрибиране' : 'Google AI transcription error';
+    } finally {
+      isGoogleAudioTranscribing = false;
+      setTimeout(() => (copyToast = null), 3000);
+    }
+  }
+
   function togglePlayPause() {
     if (!videoElement) return;
     if (videoElement.paused) {
@@ -782,6 +818,14 @@
               title="Поправя фонетични грешки и имена в готовия транскрипт (без презаписване на клипборда)"
             >
               {isGoogleAiFixing ? '...' : '✨ AI Поправка'}
+            </button>
+            <button
+              class="btn btn-secondary btn-sm btn-google-audio"
+              onclick={handleGoogleAudioTranscribe}
+              disabled={isGoogleAudioTranscribing}
+              title="Директно транскрибиране на гласа от видеото с Google AI Speech"
+            >
+              {isGoogleAudioTranscribing ? '...' : '🎙️ Google AI'}
             </button>
             <button
               class="btn btn-secondary btn-sm"
@@ -1844,6 +1888,17 @@
     background: var(--primary-accent);
     color: #fff;
     font-weight: 600;
+  }
+
+  .btn-google-audio {
+    background: rgba(37, 99, 235, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(37, 99, 235, 0.35);
+    font-weight: 600;
+  }
+
+  .btn-google-audio:hover {
+    background: rgba(37, 99, 235, 0.25);
   }
 
   .editing-banner {

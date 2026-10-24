@@ -187,6 +187,12 @@ export async function googleAiFixTranscript(id: string): Promise<{ ok: boolean; 
   });
 }
 
+export async function googleAudioTranscribe(id: string): Promise<{ ok: boolean; video_id: string; corrected_text: string }> {
+  return fetchJson<{ ok: boolean; video_id: string; corrected_text: string }>(`/api/videos/${encodeURIComponent(id)}/google-audio-transcribe`, {
+    method: 'POST',
+  });
+}
+
 export interface GoogleAiQueryResult {
   ok: boolean;
   query: string;

@@ -203,6 +203,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id/retranscribe", post(handle_retranscribe))
         .route("/api/videos/:id/ai-check", post(handle_ai_check_transcript))
         .route("/api/videos/:id/google-ai-fix", post(handle_google_ai_fix))
+        .route("/api/videos/:id/google-audio-transcribe", post(handle_google_audio_transcribe))
         .route("/api/google-ai/query", post(handle_google_ai_query))
         .route("/api/evidence/preview", get(handle_evidence_preview))
         .route("/api/open-browser", post(handle_open_browser))
@@ -1035,6 +1036,102 @@ async fn handle_google_ai_fix(
         "video_id": id,
         "corrected_text": final_text,
         "source": "google_ai_mode"
+    }))
+    .into_response()
+}
+
+async fn handle_google_audio_transcribe(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+) -> Response {
+    let py_script = if std::path::Path::new("scripts/google_audio_transcribe.py").exists() {
+        Some("scripts/google_audio_transcribe.py")
+    } else if std::path::Path::new("tools/google_audio_transcribe.py").exists() {
+        Some("tools/google_audio_transcribe.py")
+    } else {
+        None
+    };
+
+    let Some(script_path) = py_script else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": "Transcription script not found" })),
+        )
+            .into_response();
+    };
+
+    let cfg = ctx.config.read().await.clone();
+    let lex = leadfinder_providers::global_lexicon(
+        &ctx.paths,
+        &cfg.normalisation.lexicon_config_file,
+    );
+
+    let py_res = tokio::process::Command::new("python")
+        .env("PYTHONIOENCODING", "utf-8")
+        .arg(script_path)
+        .arg("--video-id")
+        .arg(&id)
+        .output()
+        .await;
+
+    let output = match py_res {
+        Ok(o) if o.status.success() => o,
+        Ok(o) => {
+            let err_msg = String::from_utf8_lossy(&o.stderr);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Script failed: {err_msg}") })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let val: serde_json::Value = match serde_json::from_slice(&output.stdout) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Invalid JSON output: {e}") })),
+            )
+                .into_response();
+        }
+    };
+
+    let corrected = val
+        .get("corrected_text")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+
+    let normalized = lex.normalize_text(corrected);
+
+    let parsed_segs = val
+        .get("segments")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| serde_json::from_value::<Vec<leadfinder_core::TranscriptSegment>>(serde_json::Value::Array(arr.clone())).ok())
+        .unwrap_or_default();
+
+    if let Ok(Some(mut tr)) = ctx.db.get_transcript(&id).await {
+        tr.edited_text = Some(normalized.clone());
+        if !parsed_segs.is_empty() {
+            tr.segments = parsed_segs;
+        }
+        let _ = ctx.db.save_transcript(&tr).await;
+    } else {
+        let _ = ctx.db.update_transcript_edited_text(&id, &normalized).await;
+    }
+
+    Json(serde_json::json!({
+        "ok": true,
+        "video_id": id,
+        "corrected_text": normalized,
+        "source": val.get("source").and_then(|v| v.as_str()).unwrap_or("google_audio")
     }))
     .into_response()
 }
