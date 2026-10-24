@@ -411,6 +411,10 @@ pub struct Evidence {
     pub retrieved_at: String,
 }
 
+fn default_person_rating() -> i64 {
+    50
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Person {
     pub id: i64,
@@ -423,6 +427,13 @@ pub struct Person {
     pub researched_at: Option<String>,
     pub mentions: Option<i64>,
     pub found_in: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default = "default_person_rating")]
+    pub rating: i64,
+    pub category: Option<String>,
+    pub notes: Option<String>,
+    pub detailed_profile_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

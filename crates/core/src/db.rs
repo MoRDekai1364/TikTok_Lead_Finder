@@ -54,6 +54,17 @@ impl Database {
 
         sqlx::raw_sql(INITIAL_SCHEMA_SQL).execute(&pool).await?;
 
+        let migrations = [
+            "ALTER TABLE people ADD COLUMN tags_json TEXT DEFAULT '[]'",
+            "ALTER TABLE people ADD COLUMN rating INTEGER DEFAULT 50",
+            "ALTER TABLE people ADD COLUMN category TEXT",
+            "ALTER TABLE people ADD COLUMN notes TEXT",
+            "ALTER TABLE people ADD COLUMN detailed_profile_json TEXT",
+        ];
+        for mig in migrations {
+            let _ = sqlx::raw_sql(mig).execute(&pool).await;
+        }
+
         Ok(Self { pool })
     }
 
@@ -1021,6 +1032,12 @@ impl Database {
                     .flatten()
                     .and_then(|s| serde_json::from_str(&s).ok())
                     .unwrap_or_default();
+                let tags: Vec<String> = r
+                    .try_get::<Option<String>, _>("tags_json")
+                    .ok()
+                    .flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default();
                 Person {
                     id: r.get("id"),
                     canonical_name: r.get("canonical_name"),
@@ -1032,6 +1049,11 @@ impl Database {
                     researched_at: r.try_get("researched_at").ok().flatten(),
                     mentions: r.try_get("mentions").ok(),
                     found_in: r.try_get("found_in").ok().flatten(),
+                    tags,
+                    rating: r.try_get::<i64, _>("rating").unwrap_or(50),
+                    category: r.try_get("category").ok().flatten(),
+                    notes: r.try_get("notes").ok().flatten(),
+                    detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
                 }
             })
             .collect())
@@ -1161,6 +1183,301 @@ impl Database {
         let contradicted: i64 = row.try_get("contradicted").unwrap_or(0);
         let supported: i64 = row.try_get("supported").unwrap_or(0);
         Ok((total, contradicted, supported))
+    }
+
+    pub async fn list_all_people(
+        &self,
+        query: Option<&str>,
+        tag: Option<&str>,
+        category: Option<&str>,
+        sort_by: Option<&str>,
+    ) -> Result<Vec<Person>> {
+        let rows = sqlx::query(
+            "SELECT p.*,
+                    COALESCE((SELECT SUM(vp.mentions) FROM video_people vp WHERE vp.person_id = p.id), 0) AS total_mentions
+             FROM people p
+             ORDER BY p.rating DESC, total_mentions DESC, p.canonical_name ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let q_lower = query.map(|q| q.trim().to_lowercase()).filter(|q| !q.is_empty());
+        let cat_lower = category.map(|c| c.trim().to_lowercase()).filter(|c| !c.is_empty() && c != "all");
+        let tag_lower = tag.map(|t| t.trim().to_lowercase()).filter(|t| !t.is_empty());
+
+        let mut res = Vec::new();
+        for r in rows {
+            let vars: Vec<String> = r
+                .try_get::<Option<String>, _>("variants_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            let tags: Vec<String> = r
+                .try_get::<Option<String>, _>("tags_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            let canonical_name: String = r.get("canonical_name");
+            let role: Option<String> = r.try_get("role").ok().flatten();
+            let cat: Option<String> = r.try_get("category").ok().flatten();
+
+            if let Some(ref q) = q_lower {
+                let match_name = canonical_name.to_lowercase().contains(q);
+                let match_role = role.as_deref().map(|s| s.to_lowercase().contains(q)).unwrap_or(false);
+                let match_tag = tags.iter().any(|t| t.to_lowercase().contains(q));
+                if !match_name && !match_role && !match_tag {
+                    continue;
+                }
+            }
+            if let Some(ref c) = cat_lower {
+                if !cat.as_deref().map(|s| s.eq_ignore_ascii_case(c)).unwrap_or(false) {
+                    continue;
+                }
+            }
+            if let Some(ref t) = tag_lower {
+                if !tags.iter().any(|item| item.to_lowercase().contains(t)) {
+                    continue;
+                }
+            }
+
+            let mentions: i64 = r.try_get("total_mentions").unwrap_or(0);
+            res.push(Person {
+                id: r.get("id"),
+                canonical_name,
+                variants: vars,
+                role,
+                public_figure: r.get::<i64, _>("public_figure") != 0,
+                wikidata_id: r.try_get("wikidata_id").ok().flatten(),
+                summary: r.try_get("summary").ok().flatten(),
+                researched_at: r.try_get("researched_at").ok().flatten(),
+                mentions: Some(mentions),
+                found_in: None,
+                tags,
+                rating: r.try_get::<i64, _>("rating").unwrap_or(50),
+                category: cat,
+                notes: r.try_get("notes").ok().flatten(),
+                detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
+            });
+        }
+
+        if let Some(sort) = sort_by {
+            match sort {
+                "name" => res.sort_by(|a, b| a.canonical_name.cmp(&b.canonical_name)),
+                "mentions" => res.sort_by(|a, b| b.mentions.unwrap_or(0).cmp(&a.mentions.unwrap_or(0))),
+                "researched" => res.sort_by(|a, b| b.researched_at.cmp(&a.researched_at)),
+                _ => res.sort_by(|a, b| b.rating.cmp(&a.rating)),
+            }
+        }
+
+        Ok(res)
+    }
+
+    pub async fn get_person_by_id(&self, person_id: i64) -> Result<Option<Person>> {
+        let row_opt = sqlx::query("SELECT * FROM people WHERE id = ?1")
+            .bind(person_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        let Some(r) = row_opt else {
+            return Ok(None);
+        };
+        let vars: Vec<String> = r
+            .try_get::<Option<String>, _>("variants_json")
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        let tags: Vec<String> = r
+            .try_get::<Option<String>, _>("tags_json")
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        Ok(Some(Person {
+            id: r.get("id"),
+            canonical_name: r.get("canonical_name"),
+            variants: vars,
+            role: r.try_get("role").ok().flatten(),
+            public_figure: r.get::<i64, _>("public_figure") != 0,
+            wikidata_id: r.try_get("wikidata_id").ok().flatten(),
+            summary: r.try_get("summary").ok().flatten(),
+            researched_at: r.try_get("researched_at").ok().flatten(),
+            mentions: None,
+            found_in: None,
+            tags,
+            rating: r.try_get::<i64, _>("rating").unwrap_or(50),
+            category: r.try_get("category").ok().flatten(),
+            notes: r.try_get("notes").ok().flatten(),
+            detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
+        }))
+    }
+
+    pub async fn create_person(
+        &self,
+        canonical_name: &str,
+        role: Option<&str>,
+        category: Option<&str>,
+        tags: &[String],
+        rating: i64,
+        notes: Option<&str>,
+        public_figure: bool,
+    ) -> Result<i64> {
+        let tags_json = serde_json::to_string(tags)?;
+        let vars_json = serde_json::to_string(&[canonical_name])?;
+        let res = sqlx::query(
+            "INSERT INTO people (canonical_name, variants_json, role, category, tags_json, rating, notes, public_figure)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        )
+        .bind(canonical_name)
+        .bind(&vars_json)
+        .bind(role)
+        .bind(category)
+        .bind(&tags_json)
+        .bind(rating)
+        .bind(notes)
+        .bind(if public_figure { 1i64 } else { 0i64 })
+        .execute(&self.pool)
+        .await?;
+        Ok(res.last_insert_rowid())
+    }
+
+    pub async fn update_person_full(
+        &self,
+        person_id: i64,
+        canonical_name: &str,
+        role: Option<&str>,
+        category: Option<&str>,
+        tags: &[String],
+        rating: i64,
+        notes: Option<&str>,
+        public_figure: bool,
+        summary: Option<&str>,
+        detailed_profile_json: Option<&str>,
+    ) -> Result<()> {
+        let tags_json = serde_json::to_string(tags)?;
+        sqlx::query(
+            "UPDATE people SET
+               canonical_name = ?2,
+               role = ?3,
+               category = ?4,
+               tags_json = ?5,
+               rating = ?6,
+               notes = ?7,
+               public_figure = ?8,
+               summary = COALESCE(?9, summary),
+               detailed_profile_json = COALESCE(?10, detailed_profile_json)
+             WHERE id = ?1",
+        )
+        .bind(person_id)
+        .bind(canonical_name)
+        .bind(role)
+        .bind(category)
+        .bind(&tags_json)
+        .bind(rating)
+        .bind(notes)
+        .bind(if public_figure { 1i64 } else { 0i64 })
+        .bind(summary)
+        .bind(detailed_profile_json)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_person_research_data(
+        &self,
+        person_id: i64,
+        role: Option<&str>,
+        summary: Option<&str>,
+        tags: &[String],
+        detailed_profile_json: Option<&str>,
+        public_figure: bool,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let tags_json = serde_json::to_string(tags)?;
+        sqlx::query(
+            "UPDATE people SET
+               role = COALESCE(?2, role),
+               summary = COALESCE(?3, summary),
+               tags_json = CASE WHEN ?4 != '[]' THEN ?4 ELSE tags_json END,
+               detailed_profile_json = COALESCE(?5, detailed_profile_json),
+               public_figure = CASE WHEN ?6 = 1 THEN 1 ELSE public_figure END,
+               researched_at = ?7
+             WHERE id = ?1",
+        )
+        .bind(person_id)
+        .bind(role)
+        .bind(summary)
+        .bind(&tags_json)
+        .bind(detailed_profile_json)
+        .bind(if public_figure { 1i64 } else { 0i64 })
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn delete_person(&self, person_id: i64) -> Result<()> {
+        sqlx::query("DELETE FROM video_people WHERE person_id = ?1")
+            .bind(person_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM people WHERE id = ?1")
+            .bind(person_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn reassign_video_person(&self, video_id: &str, old_person_id: i64, new_person_id: i64) -> Result<()> {
+        let row_opt = sqlx::query("SELECT mentions, found_in FROM video_people WHERE video_id = ?1 AND person_id = ?2")
+            .bind(video_id)
+            .bind(old_person_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        let (mentions, found_in) = match row_opt {
+            Some(r) => (r.try_get::<i64, _>("mentions").unwrap_or(1), r.try_get::<Option<String>, _>("found_in").ok().flatten().unwrap_or_else(|| "manual_correction".to_string())),
+            None => (1i64, "manual_correction".to_string()),
+        };
+        sqlx::query("DELETE FROM video_people WHERE video_id = ?1 AND person_id = ?2")
+            .bind(video_id)
+            .bind(old_person_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query(
+            "INSERT INTO video_people (video_id, person_id, mentions, found_in) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(video_id, person_id) DO UPDATE SET mentions = excluded.mentions, found_in = excluded.found_in",
+        )
+        .bind(video_id)
+        .bind(new_person_id)
+        .bind(mentions)
+        .bind(found_in)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_person_from_video(&self, video_id: &str, person_id: i64) -> Result<()> {
+        sqlx::query("DELETE FROM video_people WHERE video_id = ?1 AND person_id = ?2")
+            .bind(video_id)
+            .bind(person_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn add_person_to_video(&self, video_id: &str, person_id: i64, mentions: i64, found_in: &str) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO video_people (video_id, person_id, mentions, found_in) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(video_id, person_id) DO UPDATE SET mentions = excluded.mentions, found_in = excluded.found_in",
+        )
+        .bind(video_id)
+        .bind(person_id)
+        .bind(mentions)
+        .bind(found_in)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn get_decisions_for_video(&self, video_id: &str) -> Result<Vec<Decision>> {
