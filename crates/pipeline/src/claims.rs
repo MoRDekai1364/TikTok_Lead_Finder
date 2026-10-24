@@ -10,7 +10,7 @@ use leadfinder_providers::{
 };
 use crate::engine::PipelineContext;
 
-const DEFAULT_SYSTEM_INSTRUCTION: &str = "Extract verifiable claims and named entities from the provided video transcript, OCR text, caption, and hashtags. Classify each entity's entity_type as 'person' (individual human), 'institution' (government body, commission, agency), 'channel' (media channel, YouTube/TikTok creator), 'country' (nation or state), or 'group' (party, coalition, community). Return strictly valid JSON with claims and people arrays.";
+const DEFAULT_SYSTEM_INSTRUCTION: &str = "Extract verifiable claims and named entities from the provided video transcript, OCR text, caption, and hashtags. Classify each entity's entity_type as 'person' (individual human), 'institution' (government body, commission, agency), 'channel' (media channel, YouTube/TikTok creator), 'country' (nation or state), 'group' (party, coalition, community), or 'event' (protest, incident, election, conference, disaster, summit). Return strictly valid JSON with claims and people arrays.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaimsStageReport {
@@ -85,7 +85,7 @@ pub fn claims_output_json_schema() -> Value {
                         "role_hint": { "type": ["string", "null"] },
                         "entity_type": {
                             "type": ["string", "null"],
-                            "enum": ["person", "institution", "channel", "country", "group", null]
+                            "enum": ["person", "institution", "channel", "country", "group", "event", null]
                         }
                     }
                 }

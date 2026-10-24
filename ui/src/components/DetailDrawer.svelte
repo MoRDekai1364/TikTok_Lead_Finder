@@ -91,6 +91,8 @@
         return { label: currentLang === 'bg' ? 'Държава' : 'Country', icon: '🌍', cssClass: 'type-country' };
       case 'group':
         return { label: currentLang === 'bg' ? 'Група / Партия' : 'Group / Party', icon: '👥', cssClass: 'type-group' };
+      case 'event':
+        return { label: currentLang === 'bg' ? 'Събитие' : 'Event', icon: '📅', cssClass: 'type-event' };
       default:
         return { label: currentLang === 'bg' ? 'Личност' : 'Person', icon: '👤', cssClass: 'type-person' };
     }
@@ -1658,6 +1660,7 @@
               <option value="channel">📺 {currentLang === 'bg' ? 'Канал / Медия (предаване, YouTube, медия)' : 'Channel / Media'}</option>
               <option value="country">🌍 {currentLang === 'bg' ? 'Държава (геополитически субект)' : 'Country'}</option>
               <option value="group">👥 {currentLang === 'bg' ? 'Група / Партия (партия, коалиция, движение)' : 'Group / Party'}</option>
+              <option value="event">📅 {currentLang === 'bg' ? 'Събитие (избори, инцидент, протест)' : 'Event'}</option>
             </select>
           </label>
           <label>
@@ -2588,6 +2591,12 @@
     background: rgba(217, 119, 6, 0.12);
     color: #d97706;
     border: 1px solid rgba(217, 119, 6, 0.3);
+  }
+
+  .person-entity-badge.type-event {
+    background: rgba(236, 72, 153, 0.12);
+    color: #ec4899;
+    border: 1px solid rgba(236, 72, 153, 0.3);
   }
 
   .person-role {

@@ -431,4 +431,16 @@ mod tests {
         assert!(private_person.wikidata_id.is_none());
         assert!(private_person.summary.is_none());
     }
+
+    #[test]
+    fn detect_entity_type_identifies_events_and_entities() {
+        assert_eq!(detect_entity_type("Парламентарни избори 2026", None), "event");
+        assert_eq!(detect_entity_type("Протест пред парламента", None), "event");
+        assert_eq!(detect_entity_type("Тежка катастрофа", None), "event");
+        assert_eq!(detect_entity_type("Европейска комисия", None), "institution");
+        assert_eq!(detect_entity_type("Румен Радев", Some("президент")), "person");
+        assert_eq!(detect_entity_type("Република България", None), "country");
+        assert_eq!(detect_entity_type("Възраждане", None), "group");
+        assert_eq!(detect_entity_type("bTV Новините", None), "channel");
+    }
 }

@@ -1771,6 +1771,7 @@ async fn handle_auto_classify_people(
             "channel" => Some("канал"),
             "country" => Some("държава"),
             "group" => Some("политическа партия"),
+            "event" => Some("събитие"),
             _ => None,
         };
 
@@ -1779,6 +1780,7 @@ async fn handle_auto_classify_people(
             "channel" => Some("медия"),
             "country" => Some("държава"),
             "group" => Some("политика"),
+            "event" => Some("събития"),
             _ => None,
         };
 

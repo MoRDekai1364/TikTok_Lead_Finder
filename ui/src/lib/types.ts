@@ -81,7 +81,7 @@ export interface DetailedPersonProfile {
   psychographic_behavioral?: string;
 }
 
-export type EntityType = 'person' | 'institution' | 'channel' | 'country' | 'group';
+export type EntityType = 'person' | 'institution' | 'channel' | 'country' | 'group' | 'event';
 
 export interface Person {
   id: number;
