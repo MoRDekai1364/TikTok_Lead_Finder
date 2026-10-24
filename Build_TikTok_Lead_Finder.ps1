@@ -28,6 +28,9 @@ if (-not (Test-Path "$root\release_stage")) {
 }
 Copy-Item -Path "$root\target\release\leadfinder.exe" -Destination "$root\release_stage\leadfinder.exe" -Force
 Copy-Item -Path "$root\ui\src-tauri\target\release\leadfinder-desktop.exe" -Destination "$root\release_stage\leadfinder-desktop.exe" -Force
+if (Test-Path "$root\ui\src-tauri\target\release\WebView2Loader.dll") {
+    Copy-Item -Path "$root\ui\src-tauri\target\release\WebView2Loader.dll" -Destination "$root\release_stage\WebView2Loader.dll" -Force
+}
 
 $iscc = 'C:\Program Files\Inno Setup 7\ISCC.exe'
 if (Test-Path $iscc) {

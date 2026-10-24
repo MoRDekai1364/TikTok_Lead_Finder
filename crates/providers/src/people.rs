@@ -34,41 +34,67 @@ pub fn detect_entity_type(name: &str, role_hint: Option<&str>) -> &'static str {
     let lower = name.trim().to_lowercase();
     let r_lower = role_hint.map(|r| r.trim().to_lowercase()).unwrap_or_default();
 
-    if lower.starts_with("република ")
-        || lower.starts_with("кралство ")
-        || lower.starts_with("държава")
-        || lower.starts_with("федерална република")
-        || lower.starts_with("съединени американски")
-        || lower == "българия"
-        || lower == "република българия"
-        || lower == "русия"
-        || lower == "руска федерация"
-        || lower == "сащ"
-        || lower == "украйна"
-        || lower == "германия"
-        || lower == "франция"
-        || lower == "великобритания"
-        || lower == "китай"
-        || lower == "турция"
-        || lower == "гърция"
-        || lower == "румъния"
-        || lower == "сърбия"
-        || lower == "северна македония"
-        || lower == "израел"
-        || lower == "палестина"
-        || lower == "иран"
-        || lower == "ирак"
-        || lower == "сирия"
-        || lower == "полша"
-        || lower == "италия"
-        || lower == "испания"
-        || r_lower.contains("държава")
-        || r_lower.contains("страна")
-    {
-        return "country";
+    let has_person_title = lower.starts_with("инж. ")
+        || lower.starts_with("инженер ")
+        || lower.starts_with("д-р ")
+        || lower.starts_with("доктор ")
+        || lower.starts_with("проф. ")
+        || lower.starts_with("професор ")
+        || lower.starts_with("доц. ")
+        || lower.starts_with("доцент ")
+        || lower.starts_with("адв. ")
+        || lower.starts_with("адвокат ");
+
+    let is_human_role = r_lower.contains("кмет")
+        || r_lower.contains("министър")
+        || r_lower.contains("съдия")
+        || r_lower.contains("прокурор")
+        || r_lower.contains("депутат")
+        || r_lower.contains("председател")
+        || r_lower.contains("директор")
+        || r_lower.contains("политик")
+        || r_lower.contains("член")
+        || r_lower.contains("лекар")
+        || r_lower.contains("журналист")
+        || r_lower.contains("водещ")
+        || r_lower.contains("автор")
+        || r_lower.contains("създател");
+
+    if has_person_title {
+        return "person";
     }
 
-    if lower.contains("комисия")
+    if lower.contains("партия")
+        || lower.contains("коалиция")
+        || lower.contains("движение")
+        || lower.contains("съюз")
+        || lower.contains("асоциация")
+        || lower.contains("синдикат")
+        || lower.contains("фондация")
+        || lower.contains("герб")
+        || lower.contains("възраждане")
+        || lower.contains("бсп")
+        || lower.contains("дпс")
+        || lower.contains("итн")
+        || lower.contains("пп-дб")
+        || lower.contains("демократична българия")
+        || lower.contains("продължаваме промяната")
+        || lower.contains("прогресивна българия")
+        || lower.contains("величие")
+        || lower.contains("мечове")
+        || lower.contains("църква")
+        || lower.contains("секта")
+        || lower.contains("организация")
+        || (!is_human_role && (r_lower.contains("партия") || r_lower.contains("движение") || r_lower.contains("коалиция")))
+    {
+        return "group";
+    }
+
+    if lower.contains("община")
+        || lower.contains("съд")
+        || lower.contains("прокуратура")
+        || lower.contains("следствие")
+        || lower.contains("комисия")
         || lower.contains("европейска комисия")
         || lower.contains("министерство")
         || lower.contains("съвет")
@@ -76,8 +102,6 @@ pub fn detect_entity_type(name: &str, role_hint: Option<&str>) -> &'static str {
         || lower.contains("парламент")
         || lower.contains("събрание")
         || lower.contains("народно събрание")
-        || lower.contains("съд")
-        || lower.contains("прокуратура")
         || lower.contains("инспекторат")
         || lower.contains("институт")
         || lower.contains("комитет")
@@ -102,26 +126,37 @@ pub fn detect_entity_type(name: &str, role_hint: Option<&str>) -> &'static str {
         || lower.contains("пентагон")
         || lower.contains("кремъл")
         || lower.contains("бял дом")
-        || r_lower.contains("институция")
-        || r_lower.contains("орган")
-        || r_lower.contains("комисия")
-        || r_lower.contains("министерство")
+        || lower.contains("болница")
+        || lower.contains("бта")
+        || lower.contains("български лев")
+        || lower.contains("еврозона")
+        || lower.contains("президентство")
+        || lower.contains("кметство")
+        || lower.contains("университет")
+        || lower.contains("академия")
+        || lower.contains("бан")
+        || (!is_human_role && (r_lower.contains("институция") || r_lower.contains("орган") || r_lower.contains("комисия") || r_lower.contains("министерство") || r_lower.contains("съд") || r_lower.contains("община") || r_lower.contains("болница")))
     {
         return "institution";
     }
 
+    let words: Vec<&str> = lower.split_whitespace().collect();
+    let has_tv_token = words.iter().any(|w| *w == "тв" || *w == "tv");
+
     if lower.contains("the clashers")
         || lower.contains("clashers")
+        || lower.ends_with(".bg")
+        || lower.contains(".bg ")
+        || lower.contains("новини софия")
+        || lower.contains("балкан президент")
         || lower.contains("канал")
         || lower.contains("телевизия")
-        || lower.contains("тв")
-        || lower.contains("tv")
+        || has_tv_token
         || lower.contains("podcast")
         || lower.contains("подкаст")
         || lower.contains("шоу")
         || lower.contains("медия")
         || lower.contains("новини")
-        || lower.contains("news")
         || lower.contains("студио")
         || lower.contains("studio")
         || lower.contains("youtube")
@@ -138,39 +173,56 @@ pub fn detect_entity_type(name: &str, role_hint: Option<&str>) -> &'static str {
         || lower.contains("дойче веле")
         || lower.contains("цанов")
         || lower.contains("господари")
-        || r_lower.contains("канал")
-        || r_lower.contains("медия")
-        || r_lower.contains("предаване")
-        || r_lower.contains("creator")
-        || r_lower.contains("youtuber")
+        || (!is_human_role && (r_lower.contains("канал") || r_lower.contains("медия") || r_lower.contains("предаване")))
     {
         return "channel";
     }
 
-    if lower.contains("партия")
-        || lower.contains("коалиция")
-        || lower.contains("движение")
-        || lower.contains("съюз")
-        || lower.contains("асоциация")
-        || lower.contains("синдикат")
-        || lower.contains("фондация")
-        || lower.contains("герб")
-        || lower.contains("възраждане")
-        || lower.contains("бсп")
-        || lower.contains("дпс")
-        || lower.contains("итн")
-        || lower.contains("пп-дб")
-        || lower.contains("демократична българия")
-        || lower.contains("продължаваме промяната")
-        || lower.contains("величие")
-        || lower.contains("мечове")
-        || lower.contains("църква")
-        || r_lower.contains("партия")
-        || r_lower.contains("движение")
-        || r_lower.contains("коалиция")
-        || r_lower.contains("общност")
+    if lower.starts_with("република ")
+        || lower.starts_with("кралство ")
+        || lower.starts_with("държава")
+        || lower.starts_with("федерална република")
+        || lower.starts_with("съединени американски")
+        || lower.contains("българия")
+        || lower.contains("русия")
+        || lower.contains("сащ")
+        || lower.contains("украйна")
+        || lower.contains("германия")
+        || lower.contains("франция")
+        || lower.contains("великобритания")
+        || lower.contains("китай")
+        || lower.contains("турция")
+        || lower.contains("гърция")
+        || lower.contains("гръцко")
+        || lower.contains("румъния")
+        || lower.contains("сърбия")
+        || lower.contains("северна македония")
+        || lower.contains("македония")
+        || lower.contains("израел")
+        || lower.contains("палестина")
+        || lower.contains("иран")
+        || lower.contains("ирак")
+        || lower.contains("сирия")
+        || lower.contains("полша")
+        || lower.contains("италия")
+        || lower.contains("испания")
+        || lower.contains("словения")
+        || lower.contains("словакия")
+        || lower.contains("унгария")
+        || lower.contains("австрия")
+        || lower.contains("швейцария")
+        || lower.contains("европа")
+        || lower.contains("холандия")
+        || lower.contains("нидерландия")
+        || lower.contains("белгия")
+        || lower.contains("чехия")
+        || lower.contains("дания")
+        || lower.contains("швеция")
+        || lower.contains("норвегия")
+        || lower.contains("финландия")
+        || (!is_human_role && (r_lower.contains("държава") || r_lower.contains("страна")))
     {
-        return "group";
+        return "country";
     }
 
     "person"
@@ -510,7 +562,14 @@ impl PeopleResolver {
             for idx in 0..words.len() - 1 {
                 let w1 = words[idx].trim_matches(|c: char| !c.is_alphabetic() && c != '-');
                 let w2 = words[idx + 1].trim_matches(|c: char| !c.is_alphabetic() && c != '-');
+                if w1.chars().count() < 3 || w2.chars().count() < 3 {
+                    continue;
+                }
                 if !is_title_cased_word(w1) || !is_title_cased_word(w2) {
+                    continue;
+                }
+                let full = format!("{w1} {w2}");
+                if is_extracted_noise(&full) {
                     continue;
                 }
                 let w2_low = w2.to_lowercase();
@@ -867,7 +926,65 @@ fn count_mentions_in_sources(variants: &[String], sources: &VideoTextSources) ->
     (total_mentions, found_in)
 }
 
+fn has_latin(s: &str) -> bool {
+    s.chars().any(|c| ('a'..='z').contains(&c) || ('A'..='Z').contains(&c))
+}
+
+pub fn is_extracted_noise(name: &str) -> bool {
+    let low = name.trim().to_lowercase();
+    if low.is_empty() {
+        return true;
+    }
+    let static_noise = [
+        "no time",
+        "time to",
+        "to die",
+        "ai vie",
+        "ly ма",
+        "my wc",
+        "ui ат",
+        "да fay",
+        "жо fy",
+        "запазен запазен",
+        "класа кове",
+        "павликеки запазен",
+        "захарсът дигнах",
+        "дигнах сътсемно",
+        "анатем мосвамви",
+        "гедебог тукбургаз",
+        "радъв бългурското",
+        "хора",
+        "охранител",
+        "водеща",
+        "пиян полицай",
+        "инфлация икономика",
+        "икономика славивасилев",
+        "желад",
+        "софия вар",
+        "стоимен врагове",
+    ];
+    if static_noise.contains(&low.as_str()) {
+        return true;
+    }
+    let words: Vec<&str> = low.split_whitespace().collect();
+    if words.is_empty() || words.len() > 4 {
+        return true;
+    }
+    let has_any_cyr = words.iter().any(|w| has_cyrillic(w));
+    let has_any_lat = words.iter().any(|w| has_latin(w));
+    if has_any_cyr && has_any_lat {
+        return true;
+    }
+    if words.len() == 2 && words.iter().any(|w| w.chars().count() < 3) {
+        return true;
+    }
+    false
+}
+
 fn is_generic_non_person(name: &str, cfg: &NormalisationConfig) -> bool {
+    if is_extracted_noise(name) {
+        return true;
+    }
     let low = name.trim().to_lowercase();
     if cfg
         .role_prefixes

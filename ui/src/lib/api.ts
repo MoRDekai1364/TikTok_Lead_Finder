@@ -296,6 +296,12 @@ export async function removePersonFromVideo(videoId: string, personId: number): 
   });
 }
 
+export async function autoClassifyPeople(): Promise<{ ok: boolean; total: number; updated: number; pruned: number }> {
+  return fetchJson<{ ok: boolean; total: number; updated: number; pruned: number }>('/api/people/auto-classify', {
+    method: 'POST',
+  });
+}
+
 export async function fetchPersonDossierMarkdown(personId: number): Promise<string> {
   const base = getCoreUrl();
   const res = await fetch(`${base}/api/people/${personId}/dossier`);

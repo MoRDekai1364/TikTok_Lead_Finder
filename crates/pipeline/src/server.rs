@@ -207,6 +207,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/evidence/preview", get(handle_evidence_preview))
         .route("/api/open-browser", post(handle_open_browser))
         .route("/api/people", get(handle_list_people).post(handle_create_person))
+        .route("/api/people/auto-classify", post(handle_auto_classify_people))
         .route("/api/people/:id", get(handle_get_person).put(handle_update_person).delete(handle_delete_person))
         .route("/api/people/:id/dossier", get(handle_get_person_dossier))
         .route("/api/people/:id/research", post(handle_research_person))
@@ -1549,6 +1550,68 @@ async fn handle_delete_person(
             Json(serde_json::json!({ "error": e.to_string() })),
         ).into_response(),
     }
+}
+
+async fn handle_auto_classify_people(
+    State(ctx): State<Arc<PipelineContext>>,
+) -> Response {
+    let all = match ctx.db.list_all_people(None, None, None, None, None).await {
+        Ok(list) => list,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            ).into_response();
+        }
+    };
+
+    let mut updated = 0usize;
+    let mut pruned = 0usize;
+    let total = all.len();
+
+    for p in all {
+        if leadfinder_providers::is_extracted_noise(&p.canonical_name) {
+            let _ = ctx.db.delete_person(p.id).await;
+            pruned += 1;
+            continue;
+        }
+
+        let detected = leadfinder_providers::detect_entity_type(&p.canonical_name, p.role.as_deref());
+        let current_type = p.entity_type.as_str();
+
+        let tag_to_add = match detected {
+            "institution" => Some("институция"),
+            "channel" => Some("канал"),
+            "country" => Some("държава"),
+            "group" => Some("политическа партия"),
+            _ => None,
+        };
+
+        let cat_to_set = match detected {
+            "institution" => Some("институция"),
+            "channel" => Some("медия"),
+            "country" => Some("държава"),
+            "group" => Some("политика"),
+            _ => None,
+        };
+
+        if detected != current_type || p.category.is_none() {
+            let _ = ctx.db.update_person_classification(
+                p.id,
+                detected,
+                cat_to_set,
+                tag_to_add,
+            ).await;
+            updated += 1;
+        }
+    }
+
+    Json(serde_json::json!({
+        "ok": true,
+        "total": total,
+        "updated": updated,
+        "pruned": pruned,
+    })).into_response()
 }
 
 async fn handle_reassign_video_person(

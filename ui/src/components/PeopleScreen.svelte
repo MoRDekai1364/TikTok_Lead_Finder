@@ -10,6 +10,7 @@
     updatePerson,
     deletePerson,
     researchPerson,
+    autoClassifyPeople,
   } from '../lib/api';
 
   let { currentLang }: { currentLang: Language } = $props();
@@ -17,6 +18,7 @@
 
   let people = $state<Person[]>([]);
   let isLoading = $state(false);
+  let isClassifying = $state(false);
   let searchQuery = $state('');
   let selectedCategory = $state('all');
   let selectedEntityType = $state('all');
@@ -100,6 +102,24 @@
 
   async function handleSearch() {
     await loadData();
+  }
+
+  async function handleAutoClassify() {
+    if (isClassifying) return;
+    isClassifying = true;
+    try {
+      const res = await autoClassifyPeople();
+      showToast(
+        currentLang === 'bg'
+          ? `Обновени: ${res.updated}, Премахнат шум: ${res.pruned} (общо ${res.total})`
+          : `Updated: ${res.updated}, Pruned noise: ${res.pruned} (total ${res.total})`
+      );
+      await loadData();
+    } catch {
+      showToast(currentLang === 'bg' ? 'Грешка при авто-класификация' : 'Auto-classify failed');
+    } finally {
+      isClassifying = false;
+    }
   }
 
   async function handleTriggerResearch(p: Person) {
@@ -220,6 +240,9 @@
       {#if toastMsg}
         <span class="screen-toast">{toastMsg}</span>
       {/if}
+      <button class="btn btn-secondary btn-sm" onclick={handleAutoClassify} disabled={isClassifying}>
+        {isClassifying ? '⏳...' : '🤖 Авто-класификация'}
+      </button>
       <button class="btn btn-primary btn-sm" onclick={() => (isCreatingNew = true)}>
         + {currentLang === 'bg' ? 'Добави личност' : 'Add Person'}
       </button>

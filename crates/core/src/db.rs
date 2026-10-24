@@ -1458,6 +1458,45 @@ impl Database {
         Ok(())
     }
 
+    pub async fn update_person_classification(
+        &self,
+        person_id: i64,
+        entity_type: &str,
+        category: Option<&str>,
+        append_tag: Option<&str>,
+    ) -> Result<()> {
+        let row_opt = sqlx::query("SELECT tags_json, category FROM people WHERE id = ?1")
+            .bind(person_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        if let Some(row) = row_opt {
+            let mut tags: Vec<String> = row
+                .try_get::<Option<String>, _>("tags_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            let current_cat: Option<String> = row.try_get("category").ok().flatten();
+            if let Some(tag) = append_tag {
+                if !tags.iter().any(|t| t.eq_ignore_ascii_case(tag)) {
+                    tags.push(tag.to_string());
+                }
+            }
+            let final_cat = category.or(current_cat.as_deref());
+            let tags_json = serde_json::to_string(&tags)?;
+            sqlx::query(
+                "UPDATE people SET entity_type = ?2, category = ?3, tags_json = ?4 WHERE id = ?1",
+            )
+            .bind(person_id)
+            .bind(entity_type)
+            .bind(final_cat)
+            .bind(&tags_json)
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
+    }
+
     pub async fn reassign_video_person(&self, video_id: &str, old_person_id: i64, new_person_id: i64) -> Result<()> {
         let row_opt = sqlx::query("SELECT mentions, found_in FROM video_people WHERE video_id = ?1 AND person_id = ?2")
             .bind(video_id)
