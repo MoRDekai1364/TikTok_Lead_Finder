@@ -689,7 +689,9 @@
           <video
             bind:this={videoElement}
             src={videoSrc}
+            poster={detail.video.thumbnail_url || undefined}
             controls
+            playsinline
             ontimeupdate={handleTimeUpdate}
             onplay={() => (isPlaying = true)}
             onpause={() => (isPlaying = false)}
@@ -1684,7 +1686,7 @@
 
   .feed-video-container {
     width: 100%;
-    max-height: 460px;
+    height: 420px;
     background: #000;
     display: flex;
     align-items: center;
@@ -1692,11 +1694,13 @@
   }
 
   .feed-vertical-player {
-    width: 100%;
-    max-height: 460px;
+    max-width: 100%;
+    max-height: 100%;
+    height: 100%;
     aspect-ratio: 9 / 16;
     object-fit: contain;
     display: block;
+    background: #000;
   }
 
   .btn-ai-fix {
