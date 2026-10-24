@@ -216,3 +216,78 @@ export interface ScaleStatus {
   media_bytes: number;
   open_breakers: number;
 }
+
+export function formatVerdictDisplay(verdict: string | null | undefined, label: string | null | undefined, lang: string = 'bg'): string {
+  const normLabel = (label || '').trim().toLowerCase();
+  const normVerdict = (verdict || '').trim().toUpperCase();
+
+  if (lang === 'bg') {
+    switch (normLabel) {
+      case 'false_claim':
+        return 'Невярно твърдение';
+      case 'misleading':
+        return 'Подвеждащо';
+      case 'missing_context':
+        return 'Липсва контекст';
+      case 'satire_or_opinion':
+        return 'Мнение / Сатира';
+      case 'supported':
+      case 'verified':
+        return 'Потвърдено';
+      case 'unverifiable':
+      case 'unknown':
+        return 'Непотвърдено';
+    }
+
+    switch (normVerdict) {
+      case 'CONTRADICTED':
+        return 'Опровергано';
+      case 'SUPPORTED':
+        return 'Потвърдено';
+      case 'UNVERIFIABLE':
+        return 'Непотвърдено';
+      case 'NOT_CHECKABLE':
+        return 'Непроверимо';
+      case 'ALREADY_CHECKED':
+        return 'Проверено в архив';
+      case 'PROCESSING':
+        return 'В обработка...';
+      default:
+        return normLabel || normVerdict || 'НОВО';
+    }
+  } else {
+    switch (normLabel) {
+      case 'false_claim':
+        return 'False claim';
+      case 'misleading':
+        return 'Misleading';
+      case 'missing_context':
+        return 'Missing context';
+      case 'satire_or_opinion':
+        return 'Opinion';
+      case 'supported':
+      case 'verified':
+        return 'Supported';
+      case 'unverifiable':
+      case 'unknown':
+        return 'Unverifiable';
+    }
+
+    switch (normVerdict) {
+      case 'CONTRADICTED':
+        return 'Contradicted';
+      case 'SUPPORTED':
+        return 'Supported';
+      case 'UNVERIFIABLE':
+        return 'Unverifiable';
+      case 'NOT_CHECKABLE':
+        return 'Not checkable';
+      case 'ALREADY_CHECKED':
+        return 'Already checked';
+      case 'PROCESSING':
+        return 'Processing...';
+      default:
+        return normLabel || normVerdict || 'NEW';
+    }
+  }
+}

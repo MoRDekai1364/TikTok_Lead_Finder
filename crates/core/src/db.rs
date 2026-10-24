@@ -1200,6 +1200,29 @@ impl Database {
         Ok((total, contradicted, supported))
     }
 
+    pub async fn get_videos_for_person(&self, person_id: i64) -> Result<Vec<(String, Option<String>, Option<String>)>> {
+        let rows = sqlx::query(
+            "SELECT v.id, v.caption, c.handle
+             FROM video_people vp
+             JOIN videos v ON v.id = vp.video_id
+             LEFT JOIN creators c ON c.id = v.creator_id
+             WHERE vp.person_id = ?1
+             LIMIT 10",
+        )
+        .bind(person_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut out = Vec::new();
+        for r in rows {
+            let id: String = r.try_get("id").unwrap_or_default();
+            let caption: Option<String> = r.try_get("caption").ok();
+            let handle: Option<String> = r.try_get("handle").ok();
+            out.push((id, caption, handle));
+        }
+        Ok(out)
+    }
+
     pub async fn list_all_people(
         &self,
         query: Option<&str>,

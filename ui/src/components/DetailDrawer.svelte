@@ -25,6 +25,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { ClaimWithEvidence, EntityType, LeadCard, Person, VideoDetail } from '../lib/types';
+  import { formatVerdictDisplay } from '../lib/types';
   import PersonDossierModal from './PersonDossierModal.svelte';
 
   let {
@@ -981,7 +982,7 @@
                 <span class="claim-index-pill">Т{cIdx + 1}</span>
                 <span class="claim-type-tag">{claim.claim_type}</span>
                 <span class="verdict-tag {claim.verdict?.toLowerCase()}">
-                  {claim.label || claim.verdict}
+                  {formatVerdictDisplay(claim.verdict, claim.label, currentLang)}
                 </span>
 
                 <button
@@ -1436,7 +1437,7 @@
                     <div class="other-vid-top">
                       <span class="other-vid-id">ID: {ov.id}</span>
                       <span class="verdict-tag {ov.top_claim_verdict?.toLowerCase()}">
-                        {ov.top_claim_label || ov.top_claim_verdict || 'НОВО'}
+                        {formatVerdictDisplay(ov.top_claim_verdict, ov.top_claim_label, currentLang)}
                       </span>
                     </div>
                     <div class="other-vid-claim">

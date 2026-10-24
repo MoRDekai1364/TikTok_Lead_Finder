@@ -79,6 +79,24 @@ impl WebAndPrimarySearch {
             }
         }
 
+        static EXPANDED_NEWS: &[&str] = &[
+            "vesti.bg", "actualno.com", "fakti.bg", "trafficnews.bg", "blitz.bg",
+            "plovdiv24.bg", "marica.bg", "flagman.bg", "focus-news.net", "novini.bg",
+            "standartnews.com", "dariknews.bg", "frognews.bg", "svobodnaevropa.bg",
+            "dw.com", "euronewsbulgaria.com", "banker.bg", "economic.bg", "investor.bg",
+            "pariteni.bg", "bg.wikipedia.org", "wikipedia.org", "bntnews.bg", "bnr.bg",
+            "bta.bg", "btvnovinite.bg", "nova.bg", "dnevnik.bg", "capital.bg", "mediapool.bg",
+            "segabg.com", "offnews.bg", "dir.bg", "24chasa.bg", "trud.bg", "clubz.bg"
+        ];
+        for d in EXPANDED_NEWS {
+            if domain_matches(clean_host, d) {
+                if *d == "wikipedia.org" || *d == "bg.wikipedia.org" {
+                    return ("primary".to_string(), Some("Уикипедия".to_string()));
+                }
+                return ("news".to_string(), Some(d.to_string()));
+            }
+        }
+
         let fallback_name = if clean_host.is_empty() {
             None
         } else {
@@ -117,7 +135,8 @@ impl WebAndPrimarySearch {
                     .and_then(|v| v.to_str().ok())
                     .map(|s| s.to_string());
                 if resp.status().is_success() {
-                    let body = resp.text().await.unwrap_or_default();
+                    let bytes = resp.bytes().await.unwrap_or_default();
+                    let body = crate::passages::decode_html_bytes(&bytes, ctype.as_deref());
                     self.guard.record_success(&host).await;
                     self.guard.put_cached(url, code, body.clone(), ctype);
                     Some(body)

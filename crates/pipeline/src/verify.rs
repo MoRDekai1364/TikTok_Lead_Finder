@@ -57,7 +57,7 @@ pub fn verification_output_json_schema() -> Value {
             },
             "label": {
                 "type": "string",
-                "enum": ["false_claim", "misleading", "missing_context", "satire_or_opinion", "unknown"]
+                "enum": ["false_claim", "misleading", "missing_context", "satire_or_opinion", "supported", "unverifiable", "unknown"]
             },
             "evidence": {
                 "type": "array",
@@ -85,7 +85,74 @@ pub fn sanitize_label(label: &str) -> String {
         "missing_context" => "missing_context".to_string(),
         "satire_or_opinion" => "satire_or_opinion".to_string(),
         "disinformation" | "fake_news" => "false_claim".to_string(),
-        _ => "unknown".to_string(),
+        "supported" | "verified" => "supported".to_string(),
+        _ => "unverifiable".to_string(),
+    }
+}
+
+pub fn distill_claim_keywords(claim_text: &str, actor: Option<&str>, context_words: &[String]) -> String {
+    static STOP_WORDS: &[&str] = &[
+        "и", "в", "на", "с", "със", "че", "да", "не", "се", "си", "ми", "му", "ни", "ви", "те", "тя", "той",
+        "то", "от", "за", "по", "до", "при", "след", "преди", "като", "нали", "всъщност", "може", "би", "това",
+        "този", "тази", "тези", "който", "която", "което", "които", "каза", "попитах", "стана", "беше", "съм",
+        "сме", "сте", "са", "е", "а", "но", "или", "ли", "ще", "бяха", "вече", "дали", "защото", "всичко",
+        "няма", "само", "тук", "там", "ме", "го", "я", "бил", "била", "било", "били", "както", "защо", "какво",
+        "кога", "къде", "кой", "коя", "кое", "кои", "все", "още", "много", "малко", "дори", "вече", "едва",
+        "пак", "така", "виж", "вижте"
+    ];
+
+    let mut tokens: Vec<String> = Vec::new();
+    let mut seen = HashSet::new();
+
+    if let Some(act) = actor {
+        let act_trim = act.trim();
+        let act_low = act_trim.to_lowercase();
+        if !act_trim.is_empty()
+            && !act_low.contains("неизвестен")
+            && !act_low.contains("някой")
+            && !act_low.contains("speaker")
+            && !act_low.contains("хората")
+            && !act_low.contains("граждани")
+        {
+            for part in act_trim.split_whitespace() {
+                if seen.insert(part.to_lowercase()) {
+                    tokens.push(part.to_string());
+                }
+            }
+        }
+    }
+
+    for cw in context_words {
+        let cw_trim = cw.trim();
+        if !cw_trim.is_empty() && cw_trim.chars().count() >= 3 && seen.insert(cw_trim.to_lowercase()) {
+            tokens.push(cw_trim.to_string());
+            if tokens.len() >= 3 {
+                break;
+            }
+        }
+    }
+
+    for word in claim_text.split(|c: char| !c.is_alphanumeric()) {
+        let w = word.trim();
+        if w.chars().count() < 3 && !w.chars().any(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let low = w.to_lowercase();
+        if STOP_WORDS.contains(&low.as_str()) {
+            continue;
+        }
+        if seen.insert(low) {
+            tokens.push(w.to_string());
+            if tokens.len() >= 7 {
+                break;
+            }
+        }
+    }
+
+    if tokens.is_empty() {
+        claim_text.chars().take(80).collect()
+    } else {
+        tokens.join(" ")
     }
 }
 
@@ -109,7 +176,7 @@ pub fn enforce_verification_rules(
     if passages.is_empty() {
         return (
             "UNVERIFIABLE".to_string(),
-            "unknown".to_string(),
+            "unverifiable".to_string(),
             Vec::new(),
             "Няма открити релевантни институционални пасажи или проверки на факти за това твърдение.".to_string(),
             0.0,
@@ -159,7 +226,7 @@ pub fn enforce_verification_rules(
         let has_factcheck_evidence = stored_evidence.iter().any(|e| e.source_kind == "factcheck");
         if !has_factcheck_evidence {
             verdict = "UNVERIFIABLE".to_string();
-            label = "unknown".to_string();
+            label = "unverifiable".to_string();
             strength = 0.0;
             forced_reason = Some("already_checked_missing_factcheck_link".to_string());
         }
@@ -177,7 +244,7 @@ pub fn enforce_verification_rules(
         let sufficient = has_primary_or_fc || news_domains.len() >= min_independent_news_outlets;
         if !sufficient {
             verdict = "UNVERIFIABLE".to_string();
-            label = "unknown".to_string();
+            label = "unverifiable".to_string();
             strength = (strength * 0.4).min(0.35);
             forced_reason = Some("insufficient_authoritative_sources_forced_unverifiable".to_string());
             reasoning = format!("{reasoning} (Липсва минимално необходимият брой независими потвърждения съгласно правилата.)");
@@ -186,7 +253,7 @@ pub fn enforce_verification_rules(
 
     if stored_evidence.is_empty() && verdict != "NOT_CHECKABLE" {
         verdict = "UNVERIFIABLE".to_string();
-        label = "unknown".to_string();
+        label = "unverifiable".to_string();
         strength = 0.0;
         forced_reason = Some("no_valid_passage_ids_forced_unverifiable".to_string());
     }
@@ -317,7 +384,30 @@ impl PipelineContext {
         let ranker = PassageExtractorAndRanker::new(self.guard.clone(), lex.clone());
         let mut candidate_hits: Vec<(SearchHit, String)> = Vec::new();
 
-        if let Ok(fc_matches) = archive.find_fact_checks(&claim.text_bg).await {
+        let video_people = self.db.get_people_for_video(video_id).await.unwrap_or_default();
+        let mut context_terms: Vec<String> = Vec::new();
+        for p in &video_people {
+            if !p.canonical_name.is_empty() {
+                context_terms.push(p.canonical_name.clone());
+            }
+        }
+        if let Some(c) = &video.caption {
+            for word in c.split_whitespace().take(5) {
+                if word.chars().count() >= 4 {
+                    context_terms.push(word.to_string());
+                }
+            }
+        }
+        for tag in &video.hashtags {
+            let clean_tag = tag.trim_start_matches('#');
+            if clean_tag.chars().count() >= 4 {
+                context_terms.push(clean_tag.to_string());
+            }
+        }
+        let actor = claim.speaker.as_deref().or_else(|| claim.attribution.first().map(|a| a.actor.as_str()));
+        let distilled_q = distill_claim_keywords(&claim.text_bg, actor, &context_terms);
+
+        if let Ok(fc_matches) = archive.find_fact_checks(&distilled_q).await {
             for m in fc_matches {
                 let hit = SearchHit {
                     url: m.url.clone(),
@@ -332,21 +422,31 @@ impl PipelineContext {
                 candidate_hits.push((hit, main_txt));
             }
         }
+        if candidate_hits.is_empty() {
+            if let Ok(fc_matches) = archive.find_fact_checks(&claim.text_bg).await {
+                for m in fc_matches {
+                    let hit = SearchHit {
+                        url: m.url.clone(),
+                        title: m.title.clone(),
+                        snippet: m.summary.clone(),
+                        source_name: Some(m.archive_name.clone()),
+                        source_kind: "factcheck".to_string(),
+                        published_at: m.published_at.clone(),
+                    };
+                    let body = ranker.fetch_html_cached(&m.url).await.unwrap_or_default();
+                    let main_txt = ranker.extract_main_text(&body);
+                    candidate_hits.push((hit, main_txt));
+                }
+            }
+        }
 
         let mut primary_domains: Vec<String> = Vec::new();
         for p in &primary_entries {
             primary_domains.push(p.domain.clone());
         }
 
-        let claim_q = if !claim.attribution.is_empty() {
-            let first = &claim.attribution[0];
-            format!("{} {}", first.actor, first.about)
-        } else {
-            claim.text_bg.clone()
-        };
-
         let primary_query = SearchQuery {
-            query: claim_q.clone(),
+            query: distilled_q.clone(),
             restrict_domains: primary_domains,
             date_from: None,
             date_to: None,
@@ -361,7 +461,7 @@ impl PipelineContext {
         }
 
         let web_query = SearchQuery {
-            query: claim_q,
+            query: distilled_q.clone(),
             restrict_domains: Vec::new(),
             date_from: None,
             date_to: None,
@@ -372,6 +472,28 @@ impl PipelineContext {
                 let body = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
                 let main_txt = ranker.extract_main_text(&body);
                 candidate_hits.push((hit, main_txt));
+            }
+        }
+
+        if candidate_hits.len() < 3 {
+            let relaxed_q = distilled_q.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+            if !relaxed_q.is_empty() {
+                let relaxed_query = SearchQuery {
+                    query: format!("{} новини", relaxed_q),
+                    restrict_domains: Vec::new(),
+                    date_from: None,
+                    date_to: None,
+                    max_results: 4,
+                };
+                if let Ok(r_hits) = search_engine.search(&relaxed_query).await {
+                    for hit in r_hits {
+                        if !candidate_hits.iter().any(|(h, _)| h.url == hit.url) {
+                            let body = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+                            let main_txt = ranker.extract_main_text(&body);
+                            candidate_hits.push((hit, main_txt));
+                        }
+                    }
+                }
             }
         }
 
@@ -391,7 +513,7 @@ impl PipelineContext {
                 let dummy = RawVerificationLlmOutput {
                     claim_id: claim.id,
                     verdict: "UNVERIFIABLE".to_string(),
-                    label: "unknown".to_string(),
+                    label: "unverifiable".to_string(),
                     evidence: Vec::new(),
                     reasoning_bg: "Няма намерени пасажи".to_string(),
                     evidence_strength: 0.0,

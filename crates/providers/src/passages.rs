@@ -74,7 +74,8 @@ impl PassageExtractorAndRanker {
                     .and_then(|v| v.to_str().ok())
                     .map(|s| s.to_string());
                 if resp.status().is_success() {
-                    let body = resp.text().await.unwrap_or_default();
+                    let bytes = resp.bytes().await.unwrap_or_default();
+                    let body = decode_html_bytes(&bytes, ctype.as_deref());
                     self.guard.record_success(&host).await;
                     self.guard.put_cached(url, code, body.clone(), ctype);
                     Some(body)
@@ -93,7 +94,11 @@ impl PassageExtractorAndRanker {
     }
 
     pub fn extract_main_text(&self, html: &str) -> String {
-        let doc = Html::parse_document(html);
+        static SCRIPT_STYLE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(r"(?is)<(script|style|iframe|noscript|svg)\b[^>]*>[\s\S]*?</\1>|<iframe\b[^>]*>").unwrap()
+        });
+        let sanitized = SCRIPT_STYLE_RE.replace_all(html, " ");
+        let doc = Html::parse_document(&sanitized);
         let article_selectors = [
             "article",
             "main",
@@ -192,7 +197,7 @@ impl PassageExtractorAndRanker {
                 }
                 let pass_lemmas = extract_lemmas(&self.lexicon, &chunk);
                 let score = compute_bm25_score(&query_lemmas, &pass_lemmas);
-                if score < 0.25 {
+                if score < 0.15 {
                     continue;
                 }
                 let kind_bonus = match hit.source_kind.as_str() {
@@ -241,6 +246,54 @@ impl PassageExtractorAndRanker {
     }
 }
 
+pub fn decode_html_bytes(bytes: &[u8], content_type: Option<&str>) -> String {
+    let mut charset_opt: Option<String> = None;
+    if let Some(ct) = content_type {
+        let low = ct.to_lowercase();
+        if let Some(idx) = low.find("charset=") {
+            let rest = &low[idx + 8..];
+            let end = rest.find(|c: char| c == ';' || c == ' ' || c == '"' || c == '\'').unwrap_or(rest.len());
+            let cs = rest[..end].trim();
+            if !cs.is_empty() {
+                charset_opt = Some(cs.to_string());
+            }
+        }
+    }
+
+    if charset_opt.is_none() {
+        let inspect_len = bytes.len().min(4096);
+        let prefix_ascii = bytes[..inspect_len].iter().map(|&b| if b < 128 { b as char } else { ' ' }).collect::<String>().to_lowercase();
+        if let Some(idx) = prefix_ascii.find("charset=") {
+            let rest = &prefix_ascii[idx + 8..];
+            let end = rest.find(|c: char| c == ';' || c == ' ' || c == '"' || c == '\'' || c == '>').unwrap_or(rest.len());
+            let cs = rest[..end].trim();
+            if !cs.is_empty() {
+                charset_opt = Some(cs.to_string());
+            }
+        }
+    }
+
+    if let Some(cs) = charset_opt {
+        if let Some(encoding) = encoding_rs::Encoding::for_label(cs.as_bytes()) {
+            let (decoded, _, _) = encoding.decode(bytes);
+            return decoded.into_owned();
+        }
+    }
+
+    if let Ok(valid_utf8) = std::str::from_utf8(bytes) {
+        return valid_utf8.to_string();
+    }
+
+    let (cp1251_text, _, _) = encoding_rs::WINDOWS_1251.decode(bytes);
+    let cyrillic_count = cp1251_text.chars().filter(|c| ('\u{0400}'..='\u{04FF}').contains(c)).count();
+    if cyrillic_count >= 10 {
+        return cp1251_text.into_owned();
+    }
+
+    let (fallback, _, _) = encoding_rs::UTF_8.decode(bytes);
+    fallback.into_owned()
+}
+
 fn clean_extracted_text(raw: &str) -> String {
     let mut lines = Vec::new();
     for l in raw.lines() {
@@ -255,6 +308,8 @@ fn clean_extracted_text(raw: &str) -> String {
             || low.contains("политика за бисквитки")
             || low.contains("абонирайте се")
             || low.contains("var ")
+            || low.contains("let ")
+            || low.contains("const ")
             || low.contains("function(")
             || low.contains("function ")
             || low.contains("window[")
@@ -266,8 +321,28 @@ fn clean_extracted_text(raw: &str) -> String {
             || low.starts_with("-- function")
             || low.starts_with("!function")
             || low.contains("display:none")
+            || low.contains("setattribute(")
+            || low.contains("appendchild(")
+            || low.contains("localstorage.")
+            || low.contains("videaplayer")
+            || low.contains("googletagmanager")
+            || low.contains("thumbnailservlet")
+            || low.contains("consentdata")
+            || low.starts_with("#shopify")
+            || low.contains("{ --")
+            || low.contains("--section-")
+            || (low.contains('{') && low.contains('}') && low.contains(':'))
+            || low.starts_with("@media")
+            || low.starts_with("<iframe")
         {
             continue;
+        }
+        let total_chars = trimmed.chars().count();
+        if total_chars > 0 {
+            let sym_count = trimmed.chars().filter(|c| *c == '{' || *c == '}' || *c == ';' || *c == '$' || *c == '<' || *c == '>').count();
+            if (sym_count as f64 / total_chars as f64) > 0.15 {
+                continue;
+            }
         }
         lines.push(trimmed);
     }
@@ -323,7 +398,7 @@ mod tests {
 
     #[test]
     fn boilerplate_lines_are_removed_from_extracted_text() {
-        let raw = "Основен текст на статията.\nCookie политика\nВсички права запазени\nvar queryParams = new URLSearchParams(window.search);\n-- function oamSetHiddenInput(formname, name, value) {\nОще текст.";
+        let raw = "Основен текст на статията.\nCookie политика\nВсички права запазени\nvar queryParams = new URLSearchParams(window.search);\n-- function oamSetHiddenInput(formname, name, value) {\nОще текст.\n#shopify-section-123 { --section-padding-top: 22px; }\n<iframe src=\"https://videa.hu/player\">\nvideaPlayerContainer.setAttribute('id', 'videa');";
         let clean = clean_extracted_text(raw);
         assert!(clean.contains("Основен текст"));
         assert!(clean.contains("Още текст"));
@@ -331,5 +406,14 @@ mod tests {
         assert!(!clean.contains("права запазени"));
         assert!(!clean.contains("queryParams"));
         assert!(!clean.contains("oamSetHiddenInput"));
+        assert!(!clean.contains("shopify-section"));
+        assert!(!clean.contains("videaPlayerContainer"));
+    }
+
+    #[test]
+    fn decode_html_bytes_handles_windows_1251() {
+        let raw_cp1251: [u8; 12] = [0xc2, 0xe8, 0xea, 0xf2, 0xee, 0xf0, 0x20, 0xc9, 0xee, 0xf7, 0xe5, 0xe2];
+        let decoded = decode_html_bytes(&raw_cp1251, Some("text/html; charset=windows-1251"));
+        assert_eq!(decoded, "Виктор Йочев");
     }
 }

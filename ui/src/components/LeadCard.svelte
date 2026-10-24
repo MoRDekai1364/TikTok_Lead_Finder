@@ -2,6 +2,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { LeadCard } from '../lib/types';
+  import { formatVerdictDisplay } from '../lib/types';
 
   let {
     card,
@@ -132,7 +133,7 @@
         {/if}
 
         <span class="verdict-chip {verdictClass(card.top_claim_verdict)}">
-          {card.top_claim_label || card.top_claim_verdict || 'NEW'}
+          {formatVerdictDisplay(card.top_claim_verdict, card.top_claim_label, currentLang)}
         </span>
       </div>
     </div>

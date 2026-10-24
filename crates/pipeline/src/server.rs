@@ -1394,6 +1394,24 @@ async fn handle_research_person(
     };
     let entity_type = existing_ent.unwrap_or_else(|| leadfinder_providers::detect_entity_type(&name, None).to_string());
 
+    let mut video_contexts: Vec<String> = Vec::new();
+    if let Ok(vids) = ctx.db.get_videos_for_person(id).await {
+        for (vid_id, caption, handle) in vids {
+            let mut line = format!("Видео ID: {}", vid_id);
+            if let Some(h) = handle {
+                if !h.is_empty() {
+                    line.push_str(&format!(" (Автор: @{})", h));
+                }
+            }
+            if let Some(c) = caption {
+                if !c.is_empty() {
+                    line.push_str(&format!(" Описание: {}", c));
+                }
+            }
+            video_contexts.push(line);
+        }
+    }
+
     let queries = match entity_type.as_str() {
         "institution" => [
             format!("{} институция ръководство структура правомощия дейност", name),
@@ -1422,6 +1440,9 @@ async fn handle_research_person(
         ],
     };
 
+    let name_low = name.to_lowercase();
+    let name_tokens: Vec<&str> = name_low.split_whitespace().filter(|t| t.chars().count() >= 3).collect();
+
     for q_str in queries {
         let sq = leadfinder_core::SearchQuery {
             query: q_str,
@@ -1436,7 +1457,15 @@ async fn handle_research_person(
                     let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
                     let txt = ranker.extract_main_text(&html);
                     if !txt.is_empty() {
-                        hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(1500).collect::<String>()));
+                        let combined = format!("{} {}", hit.title.to_lowercase(), txt.to_lowercase());
+                        let name_present = if name_tokens.len() >= 2 {
+                            combined.contains(&name_low) || name_tokens.iter().all(|t| combined.contains(t))
+                        } else {
+                            combined.contains(&name_low)
+                        };
+                        if name_present {
+                            hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(1500).collect::<String>()));
+                        }
                     }
                 }
             }
@@ -1487,9 +1516,16 @@ async fn handle_research_person(
         _ => "You are a master intelligence analyst and investigative journalist. Generate an exhaustive, deep, and complete due-diligence OSINT intelligence dossier on the subject in Bulgarian (target length: ~1,500 - 2,500 words). The field 'full_dossier_report_markdown' must be an extensive, highly detailed investigative dossier formatted with Markdown headers, full paragraphs, dates, institutions, verified facts, associates, companies, lawsuits, controversies, and narrative profiling covering all 9 OSINT categories:\n# ОСИНТ РАЗУЗНАВАТЕЛНО ДОСИЕ: {NAME}\n## 1. Идентичност и основни лични данни\n## 2. Локации, адреси и комуникационни канали\n## 3. Семейна среда, мрежа и ключови съдружници\n## 4. Образование и професионална хронология\n## 5. Финансов профил, фирми и имуществени интереси\n## 6. Правен, съдебен и регулаторен статус (PEP)\n## 7. Медийно присъствие, публикации и дигитален отпечатък\n## 8. Политически принадлежности, убеждения и лобистки връзки\n## 9. Психографски и поведенчески профил\n## 10. Оценка на риска и заключителни изводи\nDo not write a brief summary. Write extensive, multi-paragraph, professional analysis for every section. Output valid JSON in Bulgarian.",
     };
 
+    let vid_context_block = if video_contexts.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nСвързан контекст от TikTok видеа:\n{}", video_contexts.join("\n"))
+    };
+    let user_prompt = format!("Субект за пълно OSINT разследване: {} (Тип: {}){}{}\n\nСъбрани разузнавателни данни и източници от мрежата:\n{}", name, entity_type, vid_context_block, if hits_text.is_empty() { "\n(Няма намерени открити регистрови уеб страници. Направи профилен анализ на база видео контекста и идентифицираната тема.)" } else { "" }, summary_context);
+
     let llm_req = leadfinder_core::LlmJsonRequest {
         system_prompt: system_prompt_str.to_string(),
-        user_prompt: format!("Субект за пълно OSINT разследване: {} (Тип: {})\n\nСъбрани разузнавателни данни и източници от мрежата:\n{}", name, entity_type, summary_context),
+        user_prompt,
         json_schema: Some(schema_val),
         max_tokens: 4096,
         temperature: 0.1,
@@ -1536,7 +1572,37 @@ async fn handle_research_person(
     }
 
     if report_md.is_empty() {
-        report_md = format!("# OSINT ДОСИЕ: {}\n\n## Обобщение\n{}\n\n## Контекст от източници\n{}", name, res_summary.as_deref().unwrap_or(""), summary_context);
+        let clean_summary = res_summary.clone().unwrap_or_else(|| {
+            format!("Към момента за субекта '{}' няма достатъчно публични регистрови данни или официални досиета в проверените източници.", name)
+        });
+        let mut clean_srcs = Vec::new();
+        for h in &hits_text {
+            let first_line = h.lines().next().unwrap_or("");
+            if !first_line.is_empty() {
+                clean_srcs.push(format!("- {}", first_line));
+            }
+        }
+        let sources_block = if clean_srcs.is_empty() {
+            "Няма намерени потвърдени публични външни уеб публикации.".to_string()
+        } else {
+            clean_srcs.join("\n")
+        };
+        let vid_block = if video_contexts.is_empty() {
+            "Няма свързани видеа в системата.".to_string()
+        } else {
+            video_contexts.join("\n")
+        };
+        report_md = format!(
+            "# OSINT ДОСИЕ: {}\n\n## 1. Основни данни и класификация\n- **Субект**: {}\n- **Тип на субекта**: {}\n- **Роля**: {}\n- **Публична фигура**: {}\n\n## 2. Оперативно обобщение\n{}\n\n## 3. Свързан контекст от анализирани видеа\n{}\n\n## 4. Проверени източници и регистри\n{}\n\n## 5. Заключение и оценка на риска\nАнализът не установява официални съдебни присъди или компрометиращи регистрови вписвания в проверените бази.",
+            name,
+            name,
+            res_entity_type,
+            res_role.as_deref().unwrap_or("Неуточнена"),
+            if res_pub { "Да" } else { "Не" },
+            clean_summary,
+            vid_block,
+            sources_block
+        );
         let full_obj = serde_json::json!({
             "report_markdown": report_md,
             "profile": serde_json::Value::Null,
