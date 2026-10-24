@@ -19,6 +19,7 @@
   let isLoading = $state(false);
   let searchQuery = $state('');
   let selectedCategory = $state('all');
+  let selectedEntityType = $state('all');
   let selectedSort = $state('rating');
   let toastMsg = $state<string | null>(null);
 
@@ -30,9 +31,34 @@
   let newName = $state('');
   let newRole = $state('');
   let newCategory = $state('Политик');
+  let newEntityType = $state('person');
   let newRating = $state(70);
   let newTagsStr = $state('');
   let newNotes = $state('');
+
+  const ENTITY_TYPES = [
+    { id: 'all', bg: 'Всички типове субекти', en: 'All Entity Types', icon: '🌐' },
+    { id: 'person', bg: 'Личности (хора)', en: 'People (individuals)', icon: '👤' },
+    { id: 'institution', bg: 'Институции (органи, съдилища)', en: 'Institutions', icon: '🏛️' },
+    { id: 'channel', bg: 'Канали / Медии', en: 'Channels / Media', icon: '📺' },
+    { id: 'country', bg: 'Държави', en: 'Countries', icon: '🌍' },
+    { id: 'group', bg: 'Групи / Партии', en: 'Groups / Parties', icon: '👥' },
+  ];
+
+  function getEntityTypeInfo(type?: string) {
+    switch (type) {
+      case 'institution':
+        return { label: currentLang === 'bg' ? 'Институция' : 'Institution', icon: '🏛️', cssClass: 'type-institution' };
+      case 'channel':
+        return { label: currentLang === 'bg' ? 'Канал / Медия' : 'Channel / Media', icon: '📺', cssClass: 'type-channel' };
+      case 'country':
+        return { label: currentLang === 'bg' ? 'Държава' : 'Country', icon: '🌍', cssClass: 'type-country' };
+      case 'group':
+        return { label: currentLang === 'bg' ? 'Група / Партия' : 'Group / Party', icon: '👥', cssClass: 'type-group' };
+      default:
+        return { label: currentLang === 'bg' ? 'Личност' : 'Person', icon: '👤', cssClass: 'type-person' };
+    }
+  }
 
   const CATEGORIES = [
     { id: 'all', bg: 'Всички категории', en: 'All Categories' },
@@ -59,6 +85,7 @@
         query: searchQuery || undefined,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
         sort_by: selectedSort,
+        entity_type: selectedEntityType !== 'all' ? selectedEntityType : undefined,
       });
     } catch {
       showToast(currentLang === 'bg' ? 'Грешка при зареждане на списъка' : 'Error loading people');
@@ -149,6 +176,7 @@
         tags: tagsArr,
         notes: newNotes.trim() || undefined,
         public_figure: true,
+        entity_type: newEntityType,
       });
       if (res && res.id) {
         showToast(currentLang === 'bg' ? '✓ Лицето е добавено!' : '✓ Person created!');
@@ -212,6 +240,12 @@
     </div>
 
     <div class="select-group">
+      <select bind:value={selectedEntityType} onchange={loadData}>
+        {#each ENTITY_TYPES as et}
+          <option value={et.id}>{et.icon} {currentLang === 'bg' ? et.bg : et.en}</option>
+        {/each}
+      </select>
+
       <select bind:value={selectedCategory} onchange={loadData}>
         {#each CATEGORIES as cat}
           <option value={cat.id}>{currentLang === 'bg' ? cat.bg : cat.en}</option>
@@ -235,21 +269,27 @@
       </div>
     {:else if people.length === 0}
       <div class="empty-state">
-        <p>{currentLang === 'bg' ? 'Няма намерени личности според избраните критерии.' : 'No people found.'}</p>
+        <p>{currentLang === 'bg' ? 'Няма намерени субекти според избраните критерии.' : 'No entities found.'}</p>
         <button class="btn btn-secondary btn-sm" onclick={() => (isCreatingNew = true)}>
-          + {currentLang === 'bg' ? 'Създай първи запис' : 'Create first person'}
+          + {currentLang === 'bg' ? 'Създай първи запис' : 'Create first entity'}
         </button>
       </div>
     {:else}
       <div class="people-grid">
         {#each people as person (person.id)}
+          {@const entInfo = getEntityTypeInfo(person.entity_type)}
           <div class="person-card">
             <div class="card-head">
               <div class="person-identity">
                 <span class="person-avatar">{person.canonical_name.slice(0, 2).toUpperCase()}</span>
                 <div>
                   <h3 class="person-name">{person.canonical_name}</h3>
-                  <span class="person-category-badge">{person.category || 'Личност'}</span>
+                  <div class="person-badges-row">
+                    <span class="person-entity-badge {entInfo.cssClass}">{entInfo.icon} {entInfo.label}</span>
+                    {#if person.category}
+                      <span class="person-category-badge">{person.category}</span>
+                    {/if}
+                  </div>
                 </div>
               </div>
 
@@ -355,8 +395,17 @@
 
       <div class="modal-body">
         <label>
+          <span>{currentLang === 'bg' ? 'Тип на субекта' : 'Entity Type'}</span>
+          <select bind:value={newEntityType}>
+            {#each ENTITY_TYPES.filter((e) => e.id !== 'all') as e}
+              <option value={e.id}>{e.icon} {currentLang === 'bg' ? e.bg : e.en}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label>
           <span>{currentLang === 'bg' ? 'Канонично име' : 'Canonical Name'} *</span>
-          <input type="text" bind:value={newName} placeholder="напр. Бойко Борисов, д-р Иван Иванов" />
+          <input type="text" bind:value={newName} placeholder="напр. Бойко Борисов, Европейска комисия, The Clashers" />
         </label>
 
         <label>
@@ -411,6 +460,15 @@
       </div>
 
       <div class="modal-body">
+        <label>
+          <span>{currentLang === 'bg' ? 'Тип на субекта' : 'Entity Type'}</span>
+          <select bind:value={editingPerson.entity_type}>
+            {#each ENTITY_TYPES.filter((e) => e.id !== 'all') as e}
+              <option value={e.id}>{e.icon} {currentLang === 'bg' ? e.bg : e.en}</option>
+            {/each}
+          </select>
+        </label>
+
         <label>
           <span>{currentLang === 'bg' ? 'Име' : 'Name'}</span>
           <input type="text" bind:value={editingPerson.canonical_name} />
@@ -620,6 +678,54 @@
     font-size: 0.98rem;
     font-weight: 700;
     color: var(--text-heading);
+  }
+
+  .person-badges-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 2px;
+    flex-wrap: wrap;
+  }
+
+  .person-entity-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .person-entity-badge.type-person {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--primary-accent);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+  }
+
+  .person-entity-badge.type-institution {
+    background: rgba(147, 51, 234, 0.12);
+    color: #9333ea;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+  }
+
+  .person-entity-badge.type-channel {
+    background: rgba(234, 88, 12, 0.12);
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.3);
+  }
+
+  .person-entity-badge.type-country {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .person-entity-badge.type-group {
+    background: rgba(217, 119, 6, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.3);
   }
 
   .person-category-badge {

@@ -27,6 +27,153 @@ pub struct ResolvedPersonRecord {
     pub summary: Option<String>,
     pub mentions: i64,
     pub found_in: String,
+    pub entity_type: String,
+}
+
+pub fn detect_entity_type(name: &str, role_hint: Option<&str>) -> &'static str {
+    let lower = name.trim().to_lowercase();
+    let r_lower = role_hint.map(|r| r.trim().to_lowercase()).unwrap_or_default();
+
+    if lower.starts_with("република ")
+        || lower.starts_with("кралство ")
+        || lower.starts_with("държава")
+        || lower.starts_with("федерална република")
+        || lower.starts_with("съединени американски")
+        || lower == "българия"
+        || lower == "република българия"
+        || lower == "русия"
+        || lower == "руска федерация"
+        || lower == "сащ"
+        || lower == "украйна"
+        || lower == "германия"
+        || lower == "франция"
+        || lower == "великобритания"
+        || lower == "китай"
+        || lower == "турция"
+        || lower == "гърция"
+        || lower == "румъния"
+        || lower == "сърбия"
+        || lower == "северна македония"
+        || lower == "израел"
+        || lower == "палестина"
+        || lower == "иран"
+        || lower == "ирак"
+        || lower == "сирия"
+        || lower == "полша"
+        || lower == "италия"
+        || lower == "испания"
+        || r_lower.contains("държава")
+        || r_lower.contains("страна")
+    {
+        return "country";
+    }
+
+    if lower.contains("комисия")
+        || lower.contains("европейска комисия")
+        || lower.contains("министерство")
+        || lower.contains("съвет")
+        || lower.contains("агенция")
+        || lower.contains("парламент")
+        || lower.contains("събрание")
+        || lower.contains("народно събрание")
+        || lower.contains("съд")
+        || lower.contains("прокуратура")
+        || lower.contains("инспекторат")
+        || lower.contains("институт")
+        || lower.contains("комитет")
+        || lower.contains("фонд")
+        || lower.contains("бюро")
+        || lower.contains("дирекция")
+        || lower.contains("управление")
+        || lower.contains("европейски съюз")
+        || lower.contains("nato")
+        || lower.contains("нато")
+        || lower.contains("оон")
+        || lower.contains("юнеско")
+        || lower.contains("сзо")
+        || lower.contains("мвр")
+        || lower.contains("данс")
+        || lower.contains("гдбоп")
+        || lower.contains("нап")
+        || lower.contains("цик")
+        || lower.contains("бнб")
+        || lower.contains("кзк")
+        || lower.contains("крс")
+        || lower.contains("пентагон")
+        || lower.contains("кремъл")
+        || lower.contains("бял дом")
+        || r_lower.contains("институция")
+        || r_lower.contains("орган")
+        || r_lower.contains("комисия")
+        || r_lower.contains("министерство")
+    {
+        return "institution";
+    }
+
+    if lower.contains("the clashers")
+        || lower.contains("clashers")
+        || lower.contains("канал")
+        || lower.contains("телевизия")
+        || lower.contains("тв")
+        || lower.contains("tv")
+        || lower.contains("podcast")
+        || lower.contains("подкаст")
+        || lower.contains("шоу")
+        || lower.contains("медия")
+        || lower.contains("новини")
+        || lower.contains("news")
+        || lower.contains("студио")
+        || lower.contains("studio")
+        || lower.contains("youtube")
+        || lower.contains("тикток")
+        || lower.contains("tiktok")
+        || lower.contains("бтв")
+        || lower.contains("btv")
+        || lower.contains("нова тв")
+        || lower.contains("нова телевизия")
+        || lower.contains("бнт")
+        || lower.contains("bnt")
+        || lower.contains("евронюз")
+        || lower.contains("свободна европа")
+        || lower.contains("дойче веле")
+        || lower.contains("цанов")
+        || lower.contains("господари")
+        || r_lower.contains("канал")
+        || r_lower.contains("медия")
+        || r_lower.contains("предаване")
+        || r_lower.contains("creator")
+        || r_lower.contains("youtuber")
+    {
+        return "channel";
+    }
+
+    if lower.contains("партия")
+        || lower.contains("коалиция")
+        || lower.contains("движение")
+        || lower.contains("съюз")
+        || lower.contains("асоциация")
+        || lower.contains("синдикат")
+        || lower.contains("фондация")
+        || lower.contains("герб")
+        || lower.contains("възраждане")
+        || lower.contains("бсп")
+        || lower.contains("дпс")
+        || lower.contains("итн")
+        || lower.contains("пп-дб")
+        || lower.contains("демократична българия")
+        || lower.contains("продължаваме промяната")
+        || lower.contains("величие")
+        || lower.contains("мечове")
+        || lower.contains("църква")
+        || r_lower.contains("партия")
+        || r_lower.contains("движение")
+        || r_lower.contains("коалиция")
+        || r_lower.contains("общност")
+    {
+        return "group";
+    }
+
+    "person"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +331,7 @@ impl PeopleResolver {
             canonical_name: String,
             variants: Vec<String>,
             role: Option<String>,
+            entity_type: Option<String>,
         }
 
         let mut groups: HashMap<String, CandidateGroup> = HashMap::new();
@@ -202,12 +350,22 @@ impl PeopleResolver {
                 continue;
             }
 
+            let item_ent_type = item.entity_type.clone().or_else(|| {
+                let d = detect_entity_type(&canon, role.as_deref());
+                if d != "person" {
+                    Some(d.to_string())
+                } else {
+                    None
+                }
+            });
+
             let entry = groups.entry(key.clone()).or_insert_with(|| {
                 group_order.push(key.clone());
                 CandidateGroup {
                     canonical_name: canon.clone(),
                     variants: Vec::new(),
                     role: None,
+                    entity_type: item_ent_type.clone(),
                 }
             });
 
@@ -228,6 +386,9 @@ impl PeopleResolver {
             }
             if entry.role.is_none() && role.is_some() {
                 entry.role = role;
+            }
+            if entry.entity_type.is_none() && item_ent_type.is_some() {
+                entry.entity_type = item_ent_type;
             }
         }
 
@@ -256,6 +417,9 @@ impl PeopleResolver {
                         }
                         if target_grp.role.is_none() {
                             target_grp.role = single_grp.role;
+                        }
+                        if target_grp.entity_type.is_none() {
+                            target_grp.entity_type = single_grp.entity_type;
                         }
                     }
                     group_order.retain(|k| k != &skey);
@@ -312,6 +476,10 @@ impl PeopleResolver {
             let mut final_variants = grp.variants;
             push_unique_ci(&mut final_variants, &final_canon);
 
+            let ent_type = grp
+                .entity_type
+                .unwrap_or_else(|| detect_entity_type(&final_canon, final_role.as_deref()).to_string());
+
             results.push(ResolvedPersonRecord {
                 canonical_name: final_canon,
                 variants: final_variants,
@@ -321,6 +489,7 @@ impl PeopleResolver {
                 summary,
                 mentions,
                 found_in: found_in_list.join(","),
+                entity_type: ent_type,
             });
         }
 
@@ -357,10 +526,12 @@ impl PeopleResolver {
                     continue;
                 }
                 let full = format!("{w1} {w2}");
+                let detected = detect_entity_type(&full, None);
                 out.push(PersonInput {
                     name: full.clone(),
                     variants: vec![full],
                     role_hint: None,
+                    entity_type: Some(detected.to_string()),
                 });
             }
         }

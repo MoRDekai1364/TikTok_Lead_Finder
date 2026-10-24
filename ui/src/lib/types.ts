@@ -81,6 +81,8 @@ export interface DetailedPersonProfile {
   psychographic_behavioral?: string;
 }
 
+export type EntityType = 'person' | 'institution' | 'channel' | 'country' | 'group';
+
 export interface Person {
   id: number;
   canonical_name: string;
@@ -99,6 +101,7 @@ export interface Person {
   category?: string | null;
   notes?: string | null;
   detailed_profile_json?: string | null;
+  entity_type?: EntityType | string;
 }
 
 export interface Creator {

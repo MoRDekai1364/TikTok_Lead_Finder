@@ -24,7 +24,18 @@ def get_user_default_browser_exe():
                             cmd, _ = winreg.QueryValueEx(cmd_key, "")
                             m = re.match(r'"([^"]+)"', cmd) or re.match(r'([^\s]+)', cmd)
                             if m and os.path.exists(m.group(1)):
-                                return m.group(1)
+                                path = m.group(1)
+                                if "brave" not in path.lower():
+                                    return path
+                                for alt in [
+                                    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                                    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                                ]:
+                                    if os.path.exists(alt):
+                                        return alt
+                                return None
                     except Exception:
                         pass
             except Exception:
@@ -94,6 +105,9 @@ def format_prompt(query, mode):
     return q
 
 async def fetch_ai_mode(query, mode, session_dir, headless, json_output, wait_seconds):
+    if session_dir == "data/google_session" and sys.platform == "win32":
+        appdata = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        session_dir = os.path.join(appdata, "LeadFinder", "google_session")
     os.makedirs(session_dir, exist_ok=True)
     prompt = format_prompt(query, mode)
     default_exe = get_user_default_browser_exe()
@@ -109,7 +123,10 @@ async def fetch_ai_mode(query, mode, session_dir, headless, json_output, wait_se
                     headless=headless,
                     args=[
                         "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox"
+                        "--no-sandbox",
+                        "--no-first-run",
+                        "--no-default-browser-check",
+                        "--disable-crash-reporter"
                     ],
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
                 )
@@ -122,7 +139,10 @@ async def fetch_ai_mode(query, mode, session_dir, headless, json_output, wait_se
                 headless=headless,
                 args=[
                     "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox"
+                    "--no-sandbox",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-crash-reporter"
                 ],
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
             )

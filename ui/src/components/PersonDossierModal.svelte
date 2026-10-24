@@ -19,6 +19,21 @@
   let isResearching = $state(false);
   let toastMsg = $state<string | null>(null);
 
+  function getEntityTypeInfo(type?: string) {
+    switch (type) {
+      case 'institution':
+        return { label: currentLang === 'bg' ? 'Институция' : 'Institution', icon: '🏛️', cssClass: 'type-institution' };
+      case 'channel':
+        return { label: currentLang === 'bg' ? 'Канал / Медия' : 'Channel / Media', icon: '📺', cssClass: 'type-channel' };
+      case 'country':
+        return { label: currentLang === 'bg' ? 'Държава' : 'Country', icon: '🌍', cssClass: 'type-country' };
+      case 'group':
+        return { label: currentLang === 'bg' ? 'Група / Партия' : 'Group / Party', icon: '👥', cssClass: 'type-group' };
+      default:
+        return { label: currentLang === 'bg' ? 'Личност' : 'Person', icon: '👤', cssClass: 'type-person' };
+    }
+  }
+
   function showToast(msg: string) {
     toastMsg = msg;
     setTimeout(() => {
@@ -202,6 +217,9 @@
         <div class="modal-title-col">
           <div class="title-row">
             <h3>📖 {currentLang === 'bg' ? 'OSINT Разузнавателно Досие:' : 'OSINT Dossier:'} {person.canonical_name}</h3>
+            <span class="person-entity-badge {getEntityTypeInfo(person.entity_type).cssClass}">
+              {getEntityTypeInfo(person.entity_type).icon} {getEntityTypeInfo(person.entity_type).label}
+            </span>
             {#if wordCount > 0}
               <span class="dossier-word-badge">
                 📄 {wordCount.toLocaleString()} {currentLang === 'bg' ? 'думи' : 'words'}
@@ -470,6 +488,46 @@
     background: rgba(37, 99, 235, 0.15);
     color: var(--primary-accent);
     border: 1px solid rgba(37, 99, 235, 0.3);
+  }
+
+  .person-entity-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .person-entity-badge.type-person {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--primary-accent);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+  }
+
+  .person-entity-badge.type-institution {
+    background: rgba(147, 51, 234, 0.12);
+    color: #9333ea;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+  }
+
+  .person-entity-badge.type-channel {
+    background: rgba(234, 88, 12, 0.12);
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.3);
+  }
+
+  .person-entity-badge.type-country {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .person-entity-badge.type-group {
+    background: rgba(217, 119, 6, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.3);
   }
 
   .dossier-sub {

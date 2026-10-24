@@ -371,26 +371,31 @@ mod tests {
                 name: "премиерът Бойко Борисов".to_string(),
                 variants: vec!["Бойко Борисов".to_string()],
                 role_hint: None,
+                entity_type: None,
             },
             PersonInput {
                 name: "Boyko Borissov".to_string(),
                 variants: vec!["Borissov".to_string()],
                 role_hint: None,
+                entity_type: None,
             },
             PersonInput {
                 name: "г-н Борисов".to_string(),
                 variants: vec![],
                 role_hint: None,
+                entity_type: None,
             },
             PersonInput {
                 name: "Иван Петров".to_string(),
                 variants: vec![],
                 role_hint: None,
+                entity_type: None,
             },
             PersonInput {
                 name: "Несъществуващ Човек".to_string(),
                 variants: vec![],
                 role_hint: None,
+                entity_type: None,
             },
         ];
 

@@ -43,6 +43,7 @@ pub struct ListPeopleQuery {
     pub tag: Option<String>,
     pub category: Option<String>,
     pub sort_by: Option<String>,
+    pub entity_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,6 +55,7 @@ pub struct CreatePersonRequest {
     pub rating: Option<i64>,
     pub notes: Option<String>,
     pub public_figure: Option<bool>,
+    pub entity_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,6 +69,7 @@ pub struct UpdatePersonRequest {
     pub public_figure: Option<bool>,
     pub summary: Option<String>,
     pub detailed_profile_json: Option<String>,
+    pub entity_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +79,7 @@ pub struct ReassignVideoPersonRequest {
     pub role: Option<String>,
     pub category: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub entity_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -747,103 +751,20 @@ async fn handle_ai_check_transcript(
     .into_response()
 }
 
-fn resolve_default_browser_path() -> Option<String> {
+fn resolve_headless_scraping_browser() -> Option<String> {
     if cfg!(target_os = "windows") {
-        let subkeys = [
-            r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
-            r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+        let candidates = [
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
         ];
-        for sk in subkeys {
-            if let Ok(out) = std::process::Command::new("reg")
-                .args(["query", sk, "/v", "ProgId"])
-                .output()
-            {
-                if out.status.success() {
-                    let s = String::from_utf8_lossy(&out.stdout);
-                    for line in s.lines() {
-                        if line.contains("ProgId") {
-                            let prog_id = line.split_whitespace().last().unwrap_or("");
-                            if !prog_id.is_empty() {
-                                let subkey = format!(r"HKCR\{}\shell\open\command", prog_id);
-                                if let Ok(c_out) = std::process::Command::new("reg")
-                                    .args(["query", &subkey, "/ve"])
-                                    .output()
-                                {
-                                    if c_out.status.success() {
-                                        let cs = String::from_utf8_lossy(&c_out.stdout);
-                                        for cline in cs.lines() {
-                                            if cline.contains("REG_SZ") {
-                                                if let Some(cmd) = cline.split("REG_SZ").nth(1) {
-                                                    let trimmed = cmd.trim();
-                                                    let exe = if trimmed.starts_with('"') {
-                                                        trimmed.split('"').nth(1).unwrap_or("").to_string()
-                                                    } else {
-                                                        trimmed.split_whitespace().next().unwrap_or("").to_string()
-                                                    };
-                                                    if !exe.is_empty() && std::path::Path::new(&exe).exists() {
-                                                        return Some(exe);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let generic_keys = [
-            r"HKCR\https\shell\open\command",
-            r"HKCR\http\shell\open\command",
-        ];
-        for gk in generic_keys {
-            if let Ok(c_out) = std::process::Command::new("reg")
-                .args(["query", gk, "/ve"])
-                .output()
-            {
-                if c_out.status.success() {
-                    let cs = String::from_utf8_lossy(&c_out.stdout);
-                    for cline in cs.lines() {
-                        if cline.contains("REG_SZ") {
-                            if let Some(cmd) = cline.split("REG_SZ").nth(1) {
-                                let trimmed = cmd.trim();
-                                let exe = if trimmed.starts_with('"') {
-                                    trimmed.split('"').nth(1).unwrap_or("").to_string()
-                                } else {
-                                    trimmed.split_whitespace().next().unwrap_or("").to_string()
-                                };
-                                if !exe.is_empty() && std::path::Path::new(&exe).exists() {
-                                    return Some(exe);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    } else if cfg!(target_os = "linux") {
-        if let Ok(out) = std::process::Command::new("xdg-settings")
-            .args(["get", "default-web-browser"])
-            .output()
-        {
-            if out.status.success() {
-                let desktop = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                let bin_name = desktop.replace(".desktop", "");
-                if let Ok(w_out) = std::process::Command::new("which").arg(&bin_name).output() {
-                    if w_out.status.success() {
-                        let path = String::from_utf8_lossy(&w_out.stdout).trim().to_string();
-                        if !path.is_empty() && std::path::Path::new(&path).exists() {
-                            return Some(path);
-                        }
-                    }
-                }
+        for c in candidates {
+            if std::path::Path::new(c).exists() {
+                return Some(c.to_string());
             }
         }
     }
-
     None
 }
 
@@ -886,17 +807,21 @@ async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
     let encoded_query: String = url::form_urlencoded::byte_serialize(prompt.as_bytes()).collect();
     let url = format!("https://www.google.com/search?udm=50&q={}", encoded_query);
 
-    let Some(bin) = resolve_default_browser_path() else {
+    let Some(bin) = resolve_headless_scraping_browser() else {
         return None;
     };
 
-    let session_dir = std::path::PathBuf::from("data/google_session");
+    let app_data = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| "data".to_string());
+    let session_dir = std::path::PathBuf::from(app_data).join("LeadFinder").join("google_session");
     let _ = std::fs::create_dir_all(&session_dir);
     let session_arg = format!("--user-data-dir={}", session_dir.display());
 
     let output = tokio::process::Command::new(&bin)
         .arg("--headless=new")
         .arg("--disable-gpu")
+        .arg("--no-sandbox")
+        .arg("--no-first-run")
+        .arg("--no-default-browser-check")
         .arg("--disable-blink-features=AutomationControlled")
         .arg(&session_arg)
         .arg("--virtual-time-budget=10000")
@@ -1209,14 +1134,14 @@ async fn handle_evidence_preview(
 async fn handle_open_browser(
     Json(body): Json<OpenBrowserRequest>,
 ) -> Response {
-    if let Some(exe) = resolve_default_browser_path() {
-        let _ = std::process::Command::new(exe).arg(&body.url).spawn();
-    } else {
-        #[cfg(windows)]
+    #[cfg(windows)]
+    {
         let _ = std::process::Command::new("rundll32")
             .args(["url.dll,FileProtocolHandler", &body.url])
             .spawn();
-        #[cfg(not(windows))]
+    }
+    #[cfg(not(windows))]
+    {
         let _ = std::process::Command::new("xdg-open").arg(&body.url).spawn();
     }
     Json(serde_json::json!({ "ok": true })).into_response()
@@ -1274,11 +1199,40 @@ async fn handle_research_person(
         }
     }
 
-    let queries = [
-        format!("{} биография произход образование кариера длъжност", name),
-        format!("{} фирми собственост имущество съдружници капитал", name),
-        format!("{} съд дела разследвания скандали проверка факти", name),
-    ];
+    let (existing_cat, existing_ent) = if let Ok(Some(p)) = ctx.db.get_person_by_id(id).await {
+        (p.category, Some(p.entity_type))
+    } else {
+        (None, None)
+    };
+    let entity_type = existing_ent.unwrap_or_else(|| leadfinder_providers::detect_entity_type(&name, None).to_string());
+
+    let queries = match entity_type.as_str() {
+        "institution" => [
+            format!("{} институция ръководство структура правомощия дейност", name),
+            format!("{} бюджет финансиране обществени поръчки одит проверки", name),
+            format!("{} решения съдебни дела скандали проверки критики", name),
+        ],
+        "country" => [
+            format!("{} държавно управление институции правителство структура", name),
+            format!("{} икономика геополитика международни договори санкции", name),
+            format!("{} кризи сигурност доклади права факти", name),
+        ],
+        "channel" => [
+            format!("{} автор водещ канал предаване аудитория последователи", name),
+            format!("{} медия продуцент собственост съдържание финансиране", name),
+            format!("{} дезинформация проверка на факти скандали критики", name),
+        ],
+        "group" => [
+            format!("{} партия коалиция движение ръководство лидери членове", name),
+            format!("{} финансиране дарения активи свързани лица фирми", name),
+            format!("{} платформа позиции избори скандали разследвания", name),
+        ],
+        _ => [
+            format!("{} биография произход образование кариера длъжност", name),
+            format!("{} фирми собственост имущество съдружници капитал", name),
+            format!("{} съд дела разследвания скандали проверка факти", name),
+        ],
+    };
 
     for q_str in queries {
         let sq = leadfinder_core::SearchQuery {
@@ -1310,6 +1264,10 @@ async fn handle_research_person(
             "summary": { "type": "string" },
             "public_figure": { "type": "boolean" },
             "category": { "type": "string" },
+            "entity_type": {
+                "type": "string",
+                "enum": ["person", "institution", "channel", "country", "group"]
+            },
             "tags": {
                 "type": "array",
                 "items": { "type": "string" }
@@ -1332,9 +1290,18 @@ async fn handle_research_person(
         },
         "required": ["role", "summary", "public_figure", "tags", "full_dossier_report_markdown"]
     });
+
+    let system_prompt_str = match entity_type.as_str() {
+        "institution" => "You are an expert institutional intelligence analyst and investigative journalist. Generate an exhaustive, deep OSINT due-diligence report on the named institution or government body in Bulgarian (~1,500 - 2,500 words). The 'full_dossier_report_markdown' must cover institutional mandate, governing leadership, budget, public contracts, audits, key decisions, regulatory actions, and controversies. Output strictly valid JSON in Bulgarian.",
+        "country" => "You are a senior geopolitical intelligence analyst. Generate an exhaustive OSINT country brief on the subject in Bulgarian (~1,500 - 2,500 words). Cover state structure, government institutions, geopolitical alignments, macroeconomic profile, international agreements, security, and verified key events. Output strictly valid JSON in Bulgarian.",
+        "channel" => "You are an OSINT media intelligence analyst. Generate an exhaustive due-diligence report on the media channel, show, or creator brand in Bulgarian (~1,500 - 2,500 words). Cover channel hosts/creators, corporate ownership, monetization, content focus, audience reach, disinformation factchecks, and controversies. Output strictly valid JSON in Bulgarian.",
+        "group" => "You are an expert political and group due-diligence investigator. Generate an exhaustive OSINT dossier on the political party, movement, or group in Bulgarian (~1,500 - 2,500 words). Cover leadership, organizational structure, donors, funding, assets, political alliances, policy platforms, and scandals. Output strictly valid JSON in Bulgarian.",
+        _ => "You are a master intelligence analyst and investigative journalist. Generate an exhaustive, deep, and complete due-diligence OSINT intelligence dossier on the subject in Bulgarian (target length: ~1,500 - 2,500 words). The field 'full_dossier_report_markdown' must be an extensive, highly detailed investigative dossier formatted with Markdown headers, full paragraphs, dates, institutions, verified facts, associates, companies, lawsuits, controversies, and narrative profiling covering all 9 OSINT categories:\n# ОСИНТ РАЗУЗНАВАТЕЛНО ДОСИЕ: {NAME}\n## 1. Идентичност и основни лични данни\n## 2. Локации, адреси и комуникационни канали\n## 3. Семейна среда, мрежа и ключови съдружници\n## 4. Образование и професионална хронология\n## 5. Финансов профил, фирми и имуществени интереси\n## 6. Правен, съдебен и регулаторен статус (PEP)\n## 7. Медийно присъствие, публикации и дигитален отпечатък\n## 8. Политически принадлежности, убеждения и лобистки връзки\n## 9. Психографски и поведенчески профил\n## 10. Оценка на риска и заключителни изводи\nDo not write a brief summary. Write extensive, multi-paragraph, professional analysis for every section. Output valid JSON in Bulgarian.",
+    };
+
     let llm_req = leadfinder_core::LlmJsonRequest {
-        system_prompt: "You are a master intelligence analyst and investigative journalist. Generate an exhaustive, deep, and complete due-diligence OSINT intelligence dossier on the subject in Bulgarian (target length: ~1,500 - 2,500 words). The field 'full_dossier_report_markdown' must be an extensive, highly detailed investigative dossier formatted with Markdown headers, full paragraphs, dates, institutions, verified facts, associates, companies, lawsuits, controversies, and narrative profiling covering all 9 OSINT categories:\n# ОСИНТ РАЗУЗНАВАТЕЛНО ДОСИЕ: {NAME}\n## 1. Идентичност и основни лични данни (Full names, aliases, vital statistics, birth date/place, citizenship)\n## 2. Локации, адреси и комуникационни канали (Historical and current locations, channels, domains)\n## 3. Семейна среда, мрежа и ключови съдружници (Immediate family, business associates, mentors, networks)\n## 4. Образование и професионална хронология (Universities, degrees, employment history, public offices)\n## 5. Финансов профил, фирми и имуществени интереси (Companies, directorships, assets, wealth, audits)\n## 6. Правен, съдебен и регулаторен статус (PEP) (Court cases, lawsuits, regulatory sanctions, investigations)\n## 7. Медийно присъствие, публикации и дигитален отпечатък (Media coverage, interviews, published work, leaks)\n## 8. Политически принадлежности, убеждения и лобистки връзки (Parties, campaigns, memberships, voting records)\n## 9. Психографски и поведенчески профил (Communication style, rhetorical traps, decision patterns)\n## 10. Оценка на риска и заключителни изводи (Final due-diligence verdict, reliability score, intelligence summary)\nDo not write a brief summary. Write extensive, multi-paragraph, professional analysis for every section. Output valid JSON in Bulgarian.".to_string(),
-        user_prompt: format!("Лице за пълно OSINT разследване: {}\n\nСъбрани разузнавателни данни и източници от мрежата:\n{}", name, summary_context),
+        system_prompt: system_prompt_str.to_string(),
+        user_prompt: format!("Субект за пълно OSINT разследване: {} (Тип: {})\n\nСъбрани разузнавателни данни и източници от мрежата:\n{}", name, entity_type, summary_context),
         json_schema: Some(schema_val),
         max_tokens: 4096,
         temperature: 0.1,
@@ -1345,14 +1312,20 @@ async fn handle_research_person(
     let mut res_pub = false;
     let mut res_tags: Vec<String> = Vec::new();
     let mut res_detailed_json: Option<String> = None;
-    let mut res_category: Option<String> = None;
+    let mut res_category: Option<String> = existing_cat;
+    let mut res_entity_type = entity_type;
     let mut report_md = String::new();
 
     if let Ok(val) = runner.complete_validated(&llm_req, &ctx.db).await {
         res_role = val.response.parsed_json.get("role").and_then(|v| v.as_str()).map(|s| s.to_string());
         res_summary = val.response.parsed_json.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
         res_pub = val.response.parsed_json.get("public_figure").and_then(|v| v.as_bool()).unwrap_or(false);
-        res_category = val.response.parsed_json.get("category").and_then(|v| v.as_str()).map(|s| s.to_string());
+        if let Some(cat) = val.response.parsed_json.get("category").and_then(|v| v.as_str()) {
+            res_category = Some(cat.to_string());
+        }
+        if let Some(ent) = val.response.parsed_json.get("entity_type").and_then(|v| v.as_str()) {
+            res_entity_type = ent.to_string();
+        }
         if let Some(arr) = val.response.parsed_json.get("tags").and_then(|v| v.as_array()) {
             for item in arr {
                 if let Some(t) = item.as_str() {
@@ -1401,6 +1374,8 @@ async fn handle_research_person(
         &res_tags,
         res_detailed_json.as_deref(),
         res_pub,
+        res_category.as_deref(),
+        Some(&res_entity_type),
     ).await;
     let (total_claims, contradicted, supported) = ctx.db.get_person_claims_stats(id).await.unwrap_or((0, 0, 0));
 
@@ -1411,6 +1386,7 @@ async fn handle_research_person(
         "summary": res_summary,
         "public_figure": res_pub,
         "category": res_category,
+        "entity_type": res_entity_type,
         "tags": res_tags,
         "detailed_profile_json": res_detailed_json,
         "dossier_report_markdown": report_md,
@@ -1455,6 +1431,7 @@ async fn handle_list_people(
         q.tag.as_deref(),
         q.category.as_deref(),
         q.sort_by.as_deref(),
+        q.entity_type.as_deref(),
     ).await {
         Ok(people) => Json(people).into_response(),
         Err(e) => (
@@ -1505,6 +1482,8 @@ async fn handle_create_person(
     let tags = body.tags.unwrap_or_default();
     let rating = body.rating.unwrap_or(50);
     let pub_fig = body.public_figure.unwrap_or(true);
+    let detected_type = leadfinder_providers::detect_entity_type(name, body.role.as_deref());
+    let ent_type = body.entity_type.as_deref().unwrap_or(detected_type);
     match ctx.db.create_person(
         name,
         body.role.as_deref(),
@@ -1513,6 +1492,7 @@ async fn handle_create_person(
         rating,
         body.notes.as_deref(),
         pub_fig,
+        Some(ent_type),
     ).await {
         Ok(id) => Json(serde_json::json!({ "ok": true, "id": id })).into_response(),
         Err(e) => (
@@ -1548,6 +1528,7 @@ async fn handle_update_person(
         pub_fig,
         body.summary.as_deref(),
         body.detailed_profile_json.as_deref(),
+        body.entity_type.as_deref(),
     ).await {
         Ok(()) => Json(serde_json::json!({ "ok": true, "id": id })).into_response(),
         Err(e) => (
@@ -1579,6 +1560,8 @@ async fn handle_reassign_video_person(
         new_id
     } else if let Some(name) = body.canonical_name.filter(|n| !n.trim().is_empty()) {
         let tags = body.tags.unwrap_or_default();
+        let detected = leadfinder_providers::detect_entity_type(&name, body.role.as_deref());
+        let ent = body.entity_type.as_deref().unwrap_or(detected);
         match ctx.db.create_person(
             &name,
             body.role.as_deref(),
@@ -1587,6 +1570,7 @@ async fn handle_reassign_video_person(
             75,
             None,
             true,
+            Some(ent),
         ).await {
             Ok(new_id) => new_id,
             Err(e) => return (

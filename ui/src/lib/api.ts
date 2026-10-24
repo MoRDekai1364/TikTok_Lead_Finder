@@ -248,12 +248,13 @@ export async function researchPerson(personId: number, name?: string): Promise<P
   });
 }
 
-export async function fetchPeople(params?: { query?: string; tag?: string; category?: string; sort_by?: string }): Promise<Person[]> {
+export async function fetchPeople(params?: { query?: string; tag?: string; category?: string; sort_by?: string; entity_type?: string }): Promise<Person[]> {
   const queryParts: string[] = [];
   if (params?.query) queryParts.push(`query=${encodeURIComponent(params.query)}`);
   if (params?.tag) queryParts.push(`tag=${encodeURIComponent(params.tag)}`);
   if (params?.category) queryParts.push(`category=${encodeURIComponent(params.category)}`);
   if (params?.sort_by) queryParts.push(`sort_by=${encodeURIComponent(params.sort_by)}`);
+  if (params?.entity_type) queryParts.push(`entity_type=${encodeURIComponent(params.entity_type)}`);
   const qs = queryParts.length ? `?${queryParts.join('&')}` : '';
   return fetchJson<Person[]>(`/api/people${qs}`);
 }
@@ -262,7 +263,7 @@ export async function fetchPersonDetail(id: number): Promise<{ person: Person; c
   return fetchJson<{ person: Person; claims_stats: { total: number; contradicted: number; supported: number } }>(`/api/people/${id}`);
 }
 
-export async function createPerson(person: { canonical_name: string; role?: string; category?: string; tags?: string[]; rating?: number; notes?: string; public_figure?: boolean }): Promise<{ ok: boolean; id: number }> {
+export async function createPerson(person: { canonical_name: string; role?: string; category?: string; tags?: string[]; rating?: number; notes?: string; public_figure?: boolean; entity_type?: string }): Promise<{ ok: boolean; id: number }> {
   return fetchJson<{ ok: boolean; id: number }>('/api/people', {
     method: 'POST',
     body: JSON.stringify(person),
@@ -282,7 +283,7 @@ export async function deletePerson(id: number): Promise<{ ok: boolean; deleted: 
   });
 }
 
-export async function reassignVideoPerson(videoId: string, personId: number, body: { new_person_id?: number; canonical_name?: string; role?: string; category?: string; tags?: string[] }): Promise<{ ok: boolean; video_id: string; old_person_id: number; new_person_id: number }> {
+export async function reassignVideoPerson(videoId: string, personId: number, body: { new_person_id?: number; canonical_name?: string; role?: string; category?: string; tags?: string[]; entity_type?: string }): Promise<{ ok: boolean; video_id: string; old_person_id: number; new_person_id: number }> {
   return fetchJson<{ ok: boolean; video_id: string; old_person_id: number; new_person_id: number }>(`/api/videos/${encodeURIComponent(videoId)}/people/${personId}/reassign`, {
     method: 'POST',
     body: JSON.stringify(body),

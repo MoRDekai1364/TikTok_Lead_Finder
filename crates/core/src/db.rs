@@ -60,6 +60,7 @@ impl Database {
             "ALTER TABLE people ADD COLUMN category TEXT",
             "ALTER TABLE people ADD COLUMN notes TEXT",
             "ALTER TABLE people ADD COLUMN detailed_profile_json TEXT",
+            "ALTER TABLE people ADD COLUMN entity_type TEXT DEFAULT 'person'",
         ];
         for mig in migrations {
             let _ = sqlx::raw_sql(mig).execute(&pool).await;
@@ -925,6 +926,7 @@ impl Database {
         summary: Option<&str>,
         mentions: i64,
         found_in: &str,
+        entity_type: Option<&str>,
     ) -> Result<i64> {
         let existing = sqlx::query("SELECT id, variants_json FROM people WHERE LOWER(canonical_name) = LOWER(?1) LIMIT 1")
             .bind(canonical_name)
@@ -954,7 +956,8 @@ impl Database {
                    public_figure = CASE WHEN ?4 = 1 THEN 1 ELSE public_figure END,
                    wikidata_id = COALESCE(?5, wikidata_id),
                    summary = COALESCE(?6, summary),
-                   researched_at = CASE WHEN ?6 IS NOT NULL THEN ?7 ELSE researched_at END
+                   researched_at = CASE WHEN ?6 IS NOT NULL THEN ?7 ELSE researched_at END,
+                   entity_type = COALESCE(?8, entity_type)
                  WHERE id = ?1",
             )
             .bind(pid)
@@ -964,15 +967,17 @@ impl Database {
             .bind(wikidata_id)
             .bind(summary)
             .bind(&now)
+            .bind(entity_type)
             .execute(&self.pool)
             .await?;
             pid
         } else {
             let vars_json = serde_json::to_string(variants)?;
             let researched = if summary.is_some() { Some(now) } else { None };
+            let ent = entity_type.unwrap_or("person");
             let res = sqlx::query(
-                "INSERT INTO people (canonical_name, variants_json, role, public_figure, wikidata_id, summary, researched_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO people (canonical_name, variants_json, role, public_figure, wikidata_id, summary, researched_at, entity_type)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             )
             .bind(canonical_name)
             .bind(&vars_json)
@@ -981,6 +986,7 @@ impl Database {
             .bind(wikidata_id)
             .bind(summary)
             .bind(researched)
+            .bind(ent)
             .execute(&self.pool)
             .await?;
             res.last_insert_rowid()
@@ -1054,6 +1060,7 @@ impl Database {
                     category: r.try_get("category").ok().flatten(),
                     notes: r.try_get("notes").ok().flatten(),
                     detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
+                    entity_type: r.try_get::<Option<String>, _>("entity_type").ok().flatten().unwrap_or_else(|| "person".to_string()),
                 }
             })
             .collect())
@@ -1191,6 +1198,7 @@ impl Database {
         tag: Option<&str>,
         category: Option<&str>,
         sort_by: Option<&str>,
+        entity_type: Option<&str>,
     ) -> Result<Vec<Person>> {
         let rows = sqlx::query(
             "SELECT p.*,
@@ -1204,6 +1212,7 @@ impl Database {
         let q_lower = query.map(|q| q.trim().to_lowercase()).filter(|q| !q.is_empty());
         let cat_lower = category.map(|c| c.trim().to_lowercase()).filter(|c| !c.is_empty() && c != "all");
         let tag_lower = tag.map(|t| t.trim().to_lowercase()).filter(|t| !t.is_empty());
+        let ent_lower = entity_type.map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty() && e != "all");
 
         let mut res = Vec::new();
         for r in rows {
@@ -1222,6 +1231,7 @@ impl Database {
             let canonical_name: String = r.get("canonical_name");
             let role: Option<String> = r.try_get("role").ok().flatten();
             let cat: Option<String> = r.try_get("category").ok().flatten();
+            let ent: String = r.try_get::<Option<String>, _>("entity_type").ok().flatten().unwrap_or_else(|| "person".to_string());
 
             if let Some(ref q) = q_lower {
                 let match_name = canonical_name.to_lowercase().contains(q);
@@ -1238,6 +1248,11 @@ impl Database {
             }
             if let Some(ref t) = tag_lower {
                 if !tags.iter().any(|item| item.to_lowercase().contains(t)) {
+                    continue;
+                }
+            }
+            if let Some(ref e) = ent_lower {
+                if !ent.eq_ignore_ascii_case(e) {
                     continue;
                 }
             }
@@ -1259,6 +1274,7 @@ impl Database {
                 category: cat,
                 notes: r.try_get("notes").ok().flatten(),
                 detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
+                entity_type: ent,
             });
         }
 
@@ -1310,6 +1326,7 @@ impl Database {
             category: r.try_get("category").ok().flatten(),
             notes: r.try_get("notes").ok().flatten(),
             detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
+            entity_type: r.try_get::<Option<String>, _>("entity_type").ok().flatten().unwrap_or_else(|| "person".to_string()),
         }))
     }
 
@@ -1322,12 +1339,14 @@ impl Database {
         rating: i64,
         notes: Option<&str>,
         public_figure: bool,
+        entity_type: Option<&str>,
     ) -> Result<i64> {
         let tags_json = serde_json::to_string(tags)?;
         let vars_json = serde_json::to_string(&[canonical_name])?;
+        let ent = entity_type.unwrap_or("person");
         let res = sqlx::query(
-            "INSERT INTO people (canonical_name, variants_json, role, category, tags_json, rating, notes, public_figure)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO people (canonical_name, variants_json, role, category, tags_json, rating, notes, public_figure, entity_type)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )
         .bind(canonical_name)
         .bind(&vars_json)
@@ -1337,6 +1356,7 @@ impl Database {
         .bind(rating)
         .bind(notes)
         .bind(if public_figure { 1i64 } else { 0i64 })
+        .bind(ent)
         .execute(&self.pool)
         .await?;
         Ok(res.last_insert_rowid())
@@ -1354,6 +1374,7 @@ impl Database {
         public_figure: bool,
         summary: Option<&str>,
         detailed_profile_json: Option<&str>,
+        entity_type: Option<&str>,
     ) -> Result<()> {
         let tags_json = serde_json::to_string(tags)?;
         sqlx::query(
@@ -1366,7 +1387,8 @@ impl Database {
                notes = ?7,
                public_figure = ?8,
                summary = COALESCE(?9, summary),
-               detailed_profile_json = COALESCE(?10, detailed_profile_json)
+               detailed_profile_json = COALESCE(?10, detailed_profile_json),
+               entity_type = COALESCE(?11, entity_type)
              WHERE id = ?1",
         )
         .bind(person_id)
@@ -1379,6 +1401,7 @@ impl Database {
         .bind(if public_figure { 1i64 } else { 0i64 })
         .bind(summary)
         .bind(detailed_profile_json)
+        .bind(entity_type)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -1392,6 +1415,8 @@ impl Database {
         tags: &[String],
         detailed_profile_json: Option<&str>,
         public_figure: bool,
+        category: Option<&str>,
+        entity_type: Option<&str>,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let tags_json = serde_json::to_string(tags)?;
@@ -1402,7 +1427,9 @@ impl Database {
                tags_json = CASE WHEN ?4 != '[]' THEN ?4 ELSE tags_json END,
                detailed_profile_json = COALESCE(?5, detailed_profile_json),
                public_figure = CASE WHEN ?6 = 1 THEN 1 ELSE public_figure END,
-               researched_at = ?7
+               researched_at = ?7,
+               category = COALESCE(?8, category),
+               entity_type = COALESCE(?9, entity_type)
              WHERE id = ?1",
         )
         .bind(person_id)
@@ -1412,6 +1439,8 @@ impl Database {
         .bind(detailed_profile_json)
         .bind(if public_figure { 1i64 } else { 0i64 })
         .bind(&now)
+        .bind(category)
+        .bind(entity_type)
         .execute(&self.pool)
         .await?;
         Ok(())

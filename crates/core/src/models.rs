@@ -353,6 +353,8 @@ pub struct PersonInput {
     #[serde(default)]
     pub variants: Vec<String>,
     pub role_hint: Option<String>,
+    #[serde(default)]
+    pub entity_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -415,6 +417,10 @@ fn default_person_rating() -> i64 {
     50
 }
 
+fn default_entity_type() -> String {
+    "person".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Person {
     pub id: i64,
@@ -434,6 +440,8 @@ pub struct Person {
     pub category: Option<String>,
     pub notes: Option<String>,
     pub detailed_profile_json: Option<String>,
+    #[serde(default = "default_entity_type")]
+    pub entity_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

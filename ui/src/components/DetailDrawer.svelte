@@ -9,6 +9,7 @@
     getCoreUrl,
     googleAiFixTranscript,
     logDecision,
+    openExternalUrl,
     queryGoogleAi,
     reassignVideoPerson,
     removePersonFromVideo,
@@ -20,7 +21,7 @@
   import type { GoogleAiQueryResult } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
-  import type { ClaimWithEvidence, LeadCard, Person, VideoDetail } from '../lib/types';
+  import type { ClaimWithEvidence, EntityType, LeadCard, Person, VideoDetail } from '../lib/types';
   import PersonDossierModal from './PersonDossierModal.svelte';
 
   let {
@@ -74,6 +75,22 @@
   let disambiguateRole = $state('');
   let disambiguateTags = $state('');
   let disambiguateTargetPersonId = $state<number | null>(null);
+  let disambiguateEntityType = $state<EntityType>('person');
+
+  function getEntityTypeInfo(type?: string) {
+    switch (type) {
+      case 'institution':
+        return { label: currentLang === 'bg' ? 'Институция' : 'Institution', icon: '🏛️', cssClass: 'type-institution' };
+      case 'channel':
+        return { label: currentLang === 'bg' ? 'Канал / Медия' : 'Channel / Media', icon: '📺', cssClass: 'type-channel' };
+      case 'country':
+        return { label: currentLang === 'bg' ? 'Държава' : 'Country', icon: '🌍', cssClass: 'type-country' };
+      case 'group':
+        return { label: currentLang === 'bg' ? 'Група / Партия' : 'Group / Party', icon: '👥', cssClass: 'type-group' };
+      default:
+        return { label: currentLang === 'bg' ? 'Личност' : 'Person', icon: '👤', cssClass: 'type-person' };
+    }
+  }
 
   const transcriptDisplaySegments = $derived.by(() => {
     if (!detail?.transcript) return [];
@@ -420,6 +437,7 @@
     disambiguateNewName = person.canonical_name;
     disambiguateRole = person.role || '';
     disambiguateTags = (person.tags || []).join(', ');
+    disambiguateEntityType = (person.entity_type as EntityType) || 'person';
     try {
       availablePeople = await fetchPeople();
     } catch {}
@@ -432,12 +450,17 @@
         await reassignVideoPerson(detail.video.id, disambiguatingPerson.id, {
           new_person_id: disambiguateTargetPersonId,
         });
-      } else if (disambiguateNewName.trim() && disambiguateNewName.trim() !== disambiguatingPerson.canonical_name) {
+      } else if (
+        (disambiguateNewName.trim() && disambiguateNewName.trim() !== disambiguatingPerson.canonical_name) ||
+        disambiguateEntityType !== (disambiguatingPerson.entity_type || 'person') ||
+        disambiguateRole.trim() !== (disambiguatingPerson.role || '')
+      ) {
         const tagsArr = disambiguateTags.split(',').map((t) => t.trim().replace(/^\[|\]$/g, '')).filter(Boolean);
         await reassignVideoPerson(detail.video.id, disambiguatingPerson.id, {
-          canonical_name: disambiguateNewName.trim(),
+          canonical_name: disambiguateNewName.trim() || disambiguatingPerson.canonical_name,
           role: disambiguateRole.trim() || undefined,
           tags: tagsArr,
+          entity_type: disambiguateEntityType,
         });
       }
       const fresh = await fetchVideoDetail(detail.video.id);
@@ -882,6 +905,10 @@
                     rel="noopener noreferrer"
                     class="factcheck-link-btn factcheck-bg"
                     title="Търсене в архивите на Factcheck.bg и БНР Проверено"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg ' + claim.text_bg)}`);
+                    }}
                   >
                     🇧🇬 Factcheck.bg / БНР ↗
                   </a>
@@ -891,6 +918,10 @@
                     rel="noopener noreferrer"
                     class="factcheck-link-btn factcheck-google"
                     title="Търсене в Google Fact Check Explorer"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://toolbox.google.com/factcheck/explorer/search/list:recent?query=${encodeURIComponent(claim.text_bg)}`);
+                    }}
                   >
                     🔎 Google Fact Check Tools ↗
                   </a>
@@ -900,6 +931,10 @@
                     rel="noopener noreferrer"
                     class="factcheck-link-btn factcheck-bta"
                     title="Търсене в архива на Българска телеграфна агенция (БТА)"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://www.google.com/search?q=${encodeURIComponent('site:bta.bg ' + claim.text_bg)}`);
+                    }}
                   >
                     📰 БТА Архив ↗
                   </a>
@@ -909,6 +944,10 @@
                     rel="noopener noreferrer"
                     class="factcheck-link-btn factcheck-web"
                     title="Общо търсене на твърдението в Google"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://www.google.com/search?q=${encodeURIComponent(claim.text_bg)}`);
+                    }}
                   >
                     🌐 Google Търсене ↗
                   </a>
@@ -963,6 +1002,13 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             class="evidence-link"
+                            onclick={(e) => {
+                              const u = ev.source_url || (ev as any).url;
+                              if (u) {
+                                e.preventDefault();
+                                openExternalUrl(u);
+                              }
+                            }}
                           >
                             {(ev as any).title || ev.source_url || (ev as any).url} ↗
                           </a>
@@ -1004,7 +1050,12 @@
               <div class="person-card">
                 <div class="person-card-header">
                   <div class="person-name-group">
-                    <span class="person-name">{person.canonical_name}</span>
+                    <div class="person-title-row">
+                      <span class="person-name">{person.canonical_name}</span>
+                      <span class="person-entity-badge {getEntityTypeInfo(person.entity_type).cssClass}">
+                        {getEntityTypeInfo(person.entity_type).icon} {getEntityTypeInfo(person.entity_type).label}
+                      </span>
+                    </div>
                     {#if person.role || (person as any).role_hint}
                       <span class="person-role">{person.role || (person as any).role_hint}</span>
                     {/if}
@@ -1078,6 +1129,10 @@
                     rel="noopener noreferrer"
                     class="person-link-btn"
                     title="Проверка на изказвания на това лице във Factcheck.bg / БНР"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg "' + person.canonical_name + '"')}`);
+                    }}
                   >
                     🇧🇬 Factcheck / БНР ↗
                   </a>
@@ -1087,6 +1142,10 @@
                     rel="noopener noreferrer"
                     class="person-link-btn"
                     title="Търсене в Уикипедия на български"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://bg.wikipedia.org/w/index.php?search=${encodeURIComponent(person.canonical_name)}`);
+                    }}
                   >
                     🌐 Уикипедия ↗
                   </a>
@@ -1096,6 +1155,10 @@
                     rel="noopener noreferrer"
                     class="person-link-btn"
                     title="Новини за личността в Google Новини"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://news.google.com/search?q=${encodeURIComponent(person.canonical_name)}`);
+                    }}
                   >
                     📰 Новини ↗
                   </a>
@@ -1106,6 +1169,10 @@
                       rel="noopener noreferrer"
                       class="person-link-btn wikidata-link"
                       title="Wikidata ID"
+                      onclick={(e) => {
+                        e.preventDefault();
+                        openExternalUrl(`https://www.wikidata.org/wiki/${person.wikidata_id}`);
+                      }}
                     >
                       Wikidata ({person.wikidata_id}) ↗
                     </a>
@@ -1142,6 +1209,10 @@
                   rel="noopener noreferrer"
                   class="creator-name-link"
                   title="Отвори профила в TikTok"
+                  onclick={(e) => {
+                    e.preventDefault();
+                    openExternalUrl(`https://www.tiktok.com/@${creator.handle}`);
+                  }}
                 >
                   @{creator.handle} ↗
                 </a>
@@ -1167,6 +1238,10 @@
                 rel="noopener noreferrer"
                 class="btn btn-outline btn-sm"
                 title="Търсене за този автор в Google"
+                onclick={(e) => {
+                  e.preventDefault();
+                  openExternalUrl(`https://www.google.com/search?q=${encodeURIComponent('site:tiktok.com/@' + creator.handle + ' OR "' + (creator.display_name || creator.handle) + '"')}`);
+                }}
               >
                 🔍 Търси в Google
               </a>
@@ -1232,6 +1307,10 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     class="btn btn-outline btn-sm"
+                    onclick={(e) => {
+                      e.preventDefault();
+                      openExternalUrl(`https://www.tiktok.com/@${creator.handle}`);
+                    }}
                   >
                     🎬 Отвори видеата на @{creator.handle} в TikTok ↗
                   </a>
@@ -1281,6 +1360,12 @@
             target="_blank"
             rel="noopener noreferrer"
             class="btn btn-primary btn-sm"
+            onclick={(e) => {
+              if (previewModalData?.url) {
+                e.preventDefault();
+                openExternalUrl(previewModalData.url);
+              }
+            }}
           >
             Отвори оригиналната страница ↗
           </a>
@@ -1319,7 +1404,18 @@
               <ul class="citations-list">
                 {#each googleAiModalData.citations as c}
                   <li class="citation-entry">
-                    <a href={c.url} target="_blank" rel="noopener noreferrer" class="citation-link">
+                    <a
+                      href={c.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="citation-link"
+                      onclick={(e) => {
+                        if (c.url) {
+                          e.preventDefault();
+                          openExternalUrl(c.url);
+                        }
+                      }}
+                    >
                       ↗ {c.title || c.url}
                     </a>
                   </li>
@@ -1397,6 +1493,16 @@
             </select>
           </label>
           <hr class="modal-divider" />
+          <label>
+            <span>{currentLang === 'bg' ? 'Тип субект:' : 'Entity Type:'}</span>
+            <select bind:value={disambiguateEntityType}>
+              <option value="person">👤 {currentLang === 'bg' ? 'Личност (човек)' : 'Person (individual)'}</option>
+              <option value="institution">🏛️ {currentLang === 'bg' ? 'Институция (орган, комисия, съд)' : 'Institution'}</option>
+              <option value="channel">📺 {currentLang === 'bg' ? 'Канал / Медия (предаване, YouTube, медия)' : 'Channel / Media'}</option>
+              <option value="country">🌍 {currentLang === 'bg' ? 'Държава (геополитически субект)' : 'Country'}</option>
+              <option value="group">👥 {currentLang === 'bg' ? 'Група / Партия (партия, коалиция, движение)' : 'Group / Party'}</option>
+            </select>
+          </label>
           <label>
             <span>{currentLang === 'bg' ? 'Или въведи ново правилно име:' : 'Or enter new name:'}</span>
             <input type="text" bind:value={disambiguateNewName} placeholder="напр. Костадин Костадинов (политик)" />
@@ -2146,14 +2252,61 @@
 
   .person-name-group {
     display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .person-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
   }
 
   .person-name {
     font-weight: 700;
     color: var(--text-heading);
     font-size: 0.88rem;
+  }
+
+  .person-entity-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .person-entity-badge.type-person {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--primary-accent);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+  }
+
+  .person-entity-badge.type-institution {
+    background: rgba(147, 51, 234, 0.12);
+    color: #9333ea;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+  }
+
+  .person-entity-badge.type-channel {
+    background: rgba(234, 88, 12, 0.12);
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.3);
+  }
+
+  .person-entity-badge.type-country {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .person-entity-badge.type-group {
+    background: rgba(217, 119, 6, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.3);
   }
 
   .person-role {

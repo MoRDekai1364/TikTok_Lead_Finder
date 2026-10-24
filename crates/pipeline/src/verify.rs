@@ -519,6 +519,7 @@ impl PipelineContext {
                             summary.as_deref(),
                             p.mentions.unwrap_or(1),
                             p.found_in.as_deref().unwrap_or("research_more"),
+                            Some(&p.entity_type),
                         )
                         .await;
                 }
