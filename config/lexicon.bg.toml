@@ -192,6 +192,178 @@ right = 'внимавай'
 wrong = 'сагласен'
 right = 'съгласен'
 
+[[asr_repairs]]
+wrong = 'алкогол'
+right = 'алкохол'
+
+[[asr_repairs]]
+wrong = 'полезай'
+right = 'полицаи'
+
+[[asr_repairs]]
+wrong = 'полицайте'
+right = 'полицаите'
+
+[[asr_repairs]]
+wrong = 'дои доха'
+right = 'дойдоха'
+
+[[asr_repairs]]
+wrong = 'бърза полнош'
+right = 'Бърза помощ'
+
+[[asr_repairs]]
+wrong = 'парното нещо'
+right = 'първото нещо'
+
+[[asr_repairs]]
+wrong = 'кота'
+right = 'колата'
+
+[[asr_repairs]]
+wrong = 'коаа'
+right = 'кола'
+
+[[asr_repairs]]
+wrong = 'е два'
+right = 'едвам'
+
+[[asr_repairs]]
+wrong = 'ито и 12'
+right = '112'
+
+[[asr_repairs]]
+wrong = 'и 12'
+right = '112'
+
+[[asr_repairs]]
+wrong = 'всичко е наряд'
+right = 'всичко е наред'
+
+[[asr_repairs]]
+wrong = 'нуа, нуа'
+right = '0.0'
+
+[[asr_repairs]]
+wrong = 'нуа нуа'
+right = '0.0'
+
+[[asr_repairs]]
+wrong = 'споливи тест'
+right = 'с полеви тест'
+
+[[asr_repairs]]
+wrong = 'наркотит'
+right = 'наркотици'
+
+[[asr_repairs]]
+wrong = 'наркотисти'
+right = 'наркотици'
+
+[[asr_repairs]]
+wrong = 'кълътка'
+right = 'кратка'
+
+[[asr_repairs]]
+wrong = 'натертена'
+right = 'натъртена'
+
+[[asr_repairs]]
+wrong = 'потордо'
+right = 'повторно'
+
+[[asr_repairs]]
+wrong = 'взриви овен'
+right = 'взриви, освен'
+
+[[asr_repairs]]
+wrong = 'душел'
+right = 'дошъл'
+
+[[asr_repairs]]
+wrong = 'разледането'
+right = 'разследването'
+
+[[asr_repairs]]
+wrong = 'безпрестрастно'
+right = 'безпристрастно'
+
+[[asr_repairs]]
+wrong = 'румен бъков'
+right = 'Румен Бахов'
+
+[[asr_repairs]]
+wrong = 'елисавета'
+right = 'Елизабет'
+
+[[asr_repairs]]
+wrong = 'кикам нас'
+right = 'към нас'
+
+[[asr_repairs]]
+wrong = 'следзаве'
+right = 'слезе'
+
+[[asr_repairs]]
+wrong = 'посмисляване'
+right = 'по смисъла'
+
+[[asr_repairs]]
+wrong = 'тож бе'
+right = 'всички да сме'
+
+[[asr_repairs]]
+wrong = 'свърчи'
+right = 'свърши'
+
+[[asr_repairs]]
+wrong = 'плътността на спорта на предшествия'
+right = 'пътнотранспортното произшествие'
+
+[[asr_repairs]]
+wrong = 'път на тъна спорта на правишествия'
+right = 'пътнотранспортното произшествие'
+
+[[asr_repairs]]
+wrong = 'озобахте се'
+right = 'озовахте се'
+
+[[asr_repairs]]
+wrong = 'биса 10 на минути'
+right = 'би след десетина минути'
+
+[[asr_repairs]]
+wrong = 'акър разбракате'
+right = 'как разбрахте'
+
+[[asr_repairs]]
+wrong = 'показвайте ми казаха'
+right = 'полицаите ми казаха'
+
+[[asr_repairs]]
+wrong = 'история тъм мери, ви ки'
+right = 'историята, Мира и Вики'
+
+[[asr_repairs]]
+wrong = 'бъщам ощещо'
+right = 'баща му също'
+
+[[asr_repairs]]
+wrong = 'каво че ухте'
+right = 'какво чухте'
+
+[[asr_repairs]]
+wrong = 'са гаснат'
+right = 'съгласни'
+
+[[asr_repairs]]
+wrong = 'се обера мое приятел'
+right = 'се обърна моят приятел'
+
+[[asr_repairs]]
+wrong = 'от гора на тротоара'
+right = 'отгоре на тротоара'
+
 [[orth_phonetic_clusters]]
 from = 'щн'
 to = 'SHN'

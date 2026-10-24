@@ -92,6 +92,64 @@
     }
   }
 
+  interface FormattedDialogueItem {
+    id: string;
+    timestampStr?: string;
+    start_ms: number;
+    speaker?: string;
+    text: string;
+  }
+
+  const formattedDialogue = $derived.by<FormattedDialogueItem[]>(() => {
+    const textToUse = detail?.transcript?.edited_text;
+    if (!textToUse || !textToUse.trim()) return [];
+
+    const lines = textToUse.split('\n');
+    const items: FormattedDialogueItem[] = [];
+    let currentMs = 0;
+    let currentTs = '00:00';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const tsMatch = line.match(/^(\*\*|\[)?(\d{1,2}:\d{2}(?::\d{2})?)(\*\*|\])?$/);
+      if (tsMatch) {
+        currentTs = tsMatch[2];
+        const parts = currentTs.split(':').map(Number);
+        if (parts.length === 2) {
+          currentMs = (parts[0] * 60 + parts[1]) * 1000;
+        } else if (parts.length === 3) {
+          currentMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+        }
+        continue;
+      }
+
+      const speakerMatch = line.match(/^(\*\*([^*]+)\*\*|([А-ЯA-Z][а-яa-zА-ЯA-Z\s]+):)\s*(.*)$/);
+      if (speakerMatch) {
+        const spk = (speakerMatch[2] || speakerMatch[3] || '').replace(':', '').trim();
+        const speech = speakerMatch[4] || '';
+        items.push({
+          id: `diag-${items.length}`,
+          timestampStr: currentTs,
+          start_ms: currentMs,
+          speaker: spk,
+          text: speech,
+        });
+        continue;
+      }
+
+      items.push({
+        id: `diag-${items.length}`,
+        timestampStr: currentTs,
+        start_ms: currentMs,
+        text: line,
+      });
+    }
+
+    return items;
+  });
+
   const transcriptDisplaySegments = $derived.by(() => {
     if (!detail?.transcript) return [];
     if (detail.transcript.segments && detail.transcript.segments.length > 0) {
@@ -394,7 +452,13 @@
   function handleDrawerScroll(e: Event) {
     const target = e.target as HTMLElement;
     if (!target) return;
-    isVideoOutOfView = target.scrollTop > 300;
+    if (videoContainerRef) {
+      const rect = videoContainerRef.getBoundingClientRect();
+      const parentRect = target.getBoundingClientRect();
+      isVideoOutOfView = rect.bottom < parentRect.top + 80;
+    } else {
+      isVideoOutOfView = target.scrollTop > 100;
+    }
   }
 
   function formatDuration(sec: number | null): string {
@@ -418,6 +482,19 @@
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
+  function handleDialogueEdit(item: FormattedDialogueItem, newText: string) {
+    item.text = newText;
+    editedText = formattedDialogue
+      .map((it) => {
+        let res = '';
+        if (it.timestampStr) res += `**${it.timestampStr}**\n`;
+        if (it.speaker) res += `**${it.speaker}:** `;
+        res += it.text;
+        return res;
+      })
+      .join('\n\n');
+  }
+
   function handleSegmentEdit(seg: any, newTxt: string) {
     seg.text = newTxt;
     editedText = transcriptDisplaySegments.map((s) => s.text).join(' ');
@@ -427,6 +504,9 @@
     if (isEditingTranscript) {
       await handleSaveTranscript();
     } else {
+      if (!editedText) {
+        editedText = detail?.transcript?.edited_text || detail?.transcript?.text || '';
+      }
       isEditingTranscript = true;
     }
   }
@@ -673,35 +753,6 @@
     </div>
   {:else if detail}
     <div class="drawer-body" onscroll={handleDrawerScroll}>
-      <div class="media-section feed-mode" bind:this={videoContainerRef}>
-        <div class="feed-top-meta">
-          <div class="feed-creator-badge">
-            <span class="creator-name">@{detail.video.creator_handle || 'tiktok_creator'}</span>
-            {#if detail.video.views}
-              <span class="creator-views">• {formatViews(detail.video.views)} гледания</span>
-            {/if}
-          </div>
-          {#if detail.video.duration_s}
-            <span class="feed-duration-pill">{formatDuration(detail.video.duration_s)}</span>
-          {/if}
-        </div>
-        <div class="feed-video-container">
-          <video
-            bind:this={videoElement}
-            src={videoSrc}
-            poster={detail.video.thumbnail_url || undefined}
-            controls
-            playsinline
-            ontimeupdate={handleTimeUpdate}
-            onplay={() => (isPlaying = true)}
-            onpause={() => (isPlaying = false)}
-            class="feed-vertical-player"
-          >
-            <track kind="captions" />
-          </video>
-        </div>
-      </div>
-
       <div class="section-card transcript-section">
         <div class="section-header">
           <div>
@@ -749,29 +800,113 @@
           </div>
         </div>
 
+        <div class="media-section feed-mode" bind:this={videoContainerRef}>
+          <div class="feed-top-meta">
+            <div class="feed-creator-badge">
+              <span class="creator-name">@{detail.video.creator_handle || 'tiktok_creator'}</span>
+              {#if detail.video.views}
+                <span class="creator-views">• {formatViews(detail.video.views)} гледания</span>
+              {/if}
+            </div>
+            {#if detail.video.duration_s}
+              <span class="feed-duration-pill">{formatDuration(detail.video.duration_s)}</span>
+            {/if}
+          </div>
+          <div class="feed-video-container">
+            <video
+              bind:this={videoElement}
+              src={videoSrc}
+              poster={detail.video.thumbnail_url || undefined}
+              controls
+              playsinline
+              ontimeupdate={handleTimeUpdate}
+              onplay={() => (isPlaying = true)}
+              onpause={() => (isPlaying = false)}
+              class="feed-vertical-player"
+            >
+              <track kind="captions" />
+            </video>
+          </div>
+        </div>
+
         {#if detail.transcript}
-          <div class="transcript-segments" class:editing-active={isEditingTranscript}>
-            {#if isEditingTranscript}
-              <div class="editing-banner">
-                💡 {currentLang === 'bg'
-                  ? 'Кликнете върху сегмент за прослушване, редактирайте текста на място в реално време.'
-                  : 'Click any segment to hear audio, edit the text in real time.'}
+          {#if isEditingTranscript}
+            {#if formattedDialogue.length > 0}
+              <div class="transcript-dialogue-flow editing-active">
+                <div class="editing-banner">
+                  💡 {currentLang === 'bg'
+                    ? 'Кликнете върху диалога за прослушване, редактирайте текста на място в реално време.'
+                    : 'Click any dialogue to hear audio, edit the text in real time.'}
+                </div>
+                {#each formattedDialogue as item}
+                  <div class="dialogue-card">
+                    <div class="dialogue-meta-row">
+                      {#if item.timestampStr}
+                        <button class="dialogue-time-badge" onclick={() => seekToMs(item.start_ms)} title="Пусни от тук">⏱️ {item.timestampStr}</button>
+                      {/if}
+                      {#if item.speaker}
+                        <span class="dialogue-speaker-badge">🗣️ {item.speaker}</span>
+                      {/if}
+                    </div>
+                    <div
+                      class="dialogue-speech-text-editable"
+                      contenteditable="true"
+                      onclick={() => seekToMs(item.start_ms)}
+                      onkeydown={(e) => e.key === 'Enter' && seekToMs(item.start_ms)}
+                      oninput={(e) => handleDialogueEdit(item, (e.target as HTMLElement).innerText)}
+                      role="textbox"
+                      tabindex="0"
+                    >{item.text}</div>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="transcript-segments editing-active">
+                <div class="editing-banner">
+                  💡 {currentLang === 'bg'
+                    ? 'Кликнете върху сегмент за прослушване, редактирайте текста на място в реално време.'
+                    : 'Click any segment to hear audio, edit the text in real time.'}
+                </div>
+                {#each transcriptDisplaySegments as seg}
+                  <span
+                    class="transcript-segment-editable"
+                    contenteditable="true"
+                    onclick={() => seekToMs(seg.start_ms)}
+                    onkeydown={(e) => e.key === 'Enter' && seekToMs(seg.start_ms)}
+                    oninput={(e) => handleSegmentEdit(seg, (e.target as HTMLElement).innerText)}
+                    role="textbox"
+                    tabindex="0"
+                    title="Кликни за прослушване, пиши за редакция"
+                  >{seg.text} </span>
+                {/each}
               </div>
             {/if}
-            {#each transcriptDisplaySegments as seg}
-              {@const cinfo = getSegmentClaimInfo(seg)}
-              {#if isEditingTranscript}
-                <span
-                  class="transcript-segment-editable"
-                  contenteditable="true"
-                  onclick={() => seekToMs(seg.start_ms)}
-                  onkeydown={(e) => e.key === 'Enter' && seekToMs(seg.start_ms)}
-                  oninput={(e) => handleSegmentEdit(seg, (e.target as HTMLElement).innerText)}
-                  role="textbox"
+          {:else if formattedDialogue.length > 0}
+            <div class="transcript-dialogue-flow">
+              {#each formattedDialogue as item}
+                <div
+                  class="dialogue-card"
+                  onclick={() => seekToMs(item.start_ms)}
+                  role="button"
                   tabindex="0"
-                  title="Кликни за прослушване, пиши за редакция"
-                >{seg.text} </span>
-              {:else}
+                  onkeydown={(e) => e.key === 'Enter' && seekToMs(item.start_ms)}
+                >
+                  <div class="dialogue-meta-row">
+                    {#if item.timestampStr}
+                      <span class="dialogue-time-badge">⏱️ {item.timestampStr}</span>
+                    {/if}
+                    {#if item.speaker}
+                      <span class="dialogue-speaker-badge">🗣️ {item.speaker}</span>
+                    {/if}
+                  </div>
+                  <div class="dialogue-speech-text">{item.text}</div>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div class="transcript-segments">
+              {#each transcriptDisplaySegments as seg}
+                {@const cinfo = getSegmentClaimInfo(seg)}
                 <span
                   id={`seg-${seg.start_ms}`}
                   class="transcript-segment"
@@ -813,9 +948,9 @@
                   {/if}
                   {seg.text}{' '}
                 </span>
-              {/if}
-            {/each}
-          </div>
+              {/each}
+            </div>
+          {/if}
         {:else}
           <p class="empty-hint">{currentLang === 'bg' ? 'Няма налична стенограма.' : 'No transcript available.'}</p>
         {/if}
@@ -1647,6 +1782,8 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border-color);
+    margin-top: 0.75rem;
+    margin-bottom: 0.85rem;
   }
 
   .feed-top-meta {
@@ -1871,6 +2008,88 @@
     color: var(--text-body);
     box-sizing: border-box;
     font-family: inherit;
+  }
+
+  .transcript-dialogue-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: var(--surface-bg);
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+  }
+
+  .dialogue-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--card-bg);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dialogue-card:hover {
+    background: var(--hover-bg);
+    border-color: var(--primary-accent);
+  }
+
+  .dialogue-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+  }
+
+  .dialogue-time-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    background: var(--primary-accent-alpha);
+    color: var(--primary-accent);
+    border-radius: 4px;
+    font-weight: 700;
+    font-family: monospace;
+    font-size: 0.75rem;
+    border: none;
+    cursor: pointer;
+  }
+
+  .dialogue-speaker-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    background: rgba(147, 51, 234, 0.12);
+    color: #9333ea;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+
+  .dialogue-speech-text {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-color);
+  }
+
+  .dialogue-speech-text-editable {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-color);
+    background: var(--surface-bg);
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px dashed var(--primary-accent);
+    outline: none;
+    cursor: text;
+  }
+
+  .dialogue-speech-text-editable:focus {
+    border-style: solid;
+    background: var(--card-bg);
   }
 
   .transcript-segments {

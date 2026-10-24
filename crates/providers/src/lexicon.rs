@@ -154,6 +154,7 @@ pub struct LexiconNormalizer {
     renarrated_aux_set: HashSet<String>,
     single_word_repairs: HashMap<String, String>,
     bigram_repairs: HashMap<(String, String), String>,
+    phrase_repairs: Vec<(String, String)>,
     hunspell_lemma_count: usize,
 }
 
@@ -185,6 +186,7 @@ impl LexiconNormalizer {
             renarrated_aux_set: HashSet::new(),
             single_word_repairs: HashMap::new(),
             bigram_repairs: HashMap::new(),
+            phrase_repairs: Vec::new(),
             hunspell_lemma_count: 0,
         }
     }
@@ -237,6 +239,9 @@ impl LexiconNormalizer {
             } else if parts.len() == 2 {
                 norm.bigram_repairs
                     .insert((parts[0].clone(), parts[1].clone()), rep.right.clone());
+            } else {
+                norm.phrase_repairs
+                    .push((rep.wrong.to_lowercase(), rep.right.clone()));
             }
         }
 
@@ -347,9 +352,22 @@ impl LexiconNormalizer {
             return input.to_string();
         }
 
-        let raw_tokens: Vec<&str> = input.split_whitespace().collect();
+        let mut preprocessed = input.to_string();
+        for (wrong, right) in &self.phrase_repairs {
+            let low = preprocessed.to_lowercase();
+            if low.contains(wrong) {
+                let re_str = format!(r"(?i)\b{}\b", regex::escape(wrong));
+                if let Ok(re) = regex::Regex::new(&re_str) {
+                    preprocessed = re.replace_all(&preprocessed, right.as_str()).to_string();
+                } else {
+                    preprocessed = preprocessed.replace(wrong, right);
+                }
+            }
+        }
+
+        let raw_tokens: Vec<&str> = preprocessed.split_whitespace().collect();
         if raw_tokens.is_empty() {
-            return input.to_string();
+            return preprocessed;
         }
 
         let mut stage1_tokens: Vec<String> = Vec::with_capacity(raw_tokens.len() + 4);

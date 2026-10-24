@@ -7,6 +7,11 @@ import sys
 import urllib.parse
 from playwright.async_api import async_playwright
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 def get_user_default_browser_exe():
     if sys.platform == "win32":
         import winreg

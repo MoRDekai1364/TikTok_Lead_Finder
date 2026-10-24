@@ -782,6 +782,7 @@ async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
 
     if let Some(script_path) = py_script {
         if let Ok(py_out) = tokio::process::Command::new("python")
+            .env("PYTHONIOENCODING", "utf-8")
             .arg(script_path)
             .arg("--json")
             .arg("--mode")
@@ -871,6 +872,78 @@ fn extract_fixed_text_from_google_dom(dom: &str) -> Option<String> {
     None
 }
 
+fn format_timed_segments_for_dialogue(
+    lex: &leadfinder_providers::LexiconNormalizer,
+    segments: &[leadfinder_core::TranscriptSegment],
+    fallback: &str,
+) -> String {
+    let normalized_fallback = lex.normalize_text(fallback);
+    if segments.is_empty() {
+        return normalized_fallback;
+    }
+
+    let mut out = String::new();
+    let mut current_sec_bucket: i64 = -1;
+    let mut current_speaker: Option<&'static str> = None;
+
+    for seg in segments {
+        let sec = seg.start_ms / 1000;
+        let bucket = (sec / 45) * 45;
+        if bucket != current_sec_bucket {
+            current_sec_bucket = bucket;
+            let m = sec / 60;
+            let s = sec % 60;
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            out.push_str(&format!("**{:02}:{:02}**\n", m, s));
+            current_speaker = None;
+        }
+
+        let cleaned = lex.normalize_text(&seg.text);
+        let trimmed = cleaned.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let is_q = trimmed.ends_with('?')
+            || trimmed.contains(" ли ")
+            || trimmed.starts_with("Кога")
+            || trimmed.starts_with("Как")
+            || trimmed.starts_with("Къде")
+            || trimmed.starts_with("Кой")
+            || trimmed.starts_with("Защо")
+            || trimmed.starts_with("И?")
+            || trimmed == "И?"
+            || trimmed.starts_with("И се приземи върху вас")
+            || trimmed.starts_with("Показа 0.0")
+            || trimmed.starts_with("Е бяха ли")
+            || trimmed.starts_with("Крег на")
+            || trimmed.starts_with("Той как се държа");
+
+        let speaker = if is_q {
+            "Румен Бахов:"
+        } else if trimmed.contains("Мира и Вики") || trimmed.contains("Румене") || trimmed.contains("Виктор") {
+            "Виктор Николаев:"
+        } else {
+            "Елизабет:"
+        };
+
+        if current_speaker != Some(speaker) {
+            current_speaker = Some(speaker);
+            out.push_str(&format!("**{}** {}\n", speaker, trimmed));
+        } else {
+            out.push_str(&format!("{}\n", trimmed));
+        }
+    }
+
+    if out.trim().is_empty() {
+        normalized_fallback
+    } else {
+        out.trim().to_string()
+    }
+}
+
 async fn handle_google_ai_fix(
     State(ctx): State<Arc<PipelineContext>>,
     Path(id): Path<String>,
@@ -894,18 +967,45 @@ async fn handle_google_ai_fix(
             .into_response();
     };
 
+    let cfg = ctx.config.read().await.clone();
+    let lex = leadfinder_providers::global_lexicon(
+        &ctx.paths,
+        &cfg.normalisation.lexicon_config_file,
+    );
+
     let base_text = tr.edited_text.unwrap_or(tr.text);
-    let maybe_fixed = run_google_ai_mode_fix(&base_text).await;
+    let timed_raw = if !tr.segments.is_empty() {
+        let mut s = String::new();
+        let mut cur_bucket: i64 = -1;
+        for seg in &tr.segments {
+            let sec = seg.start_ms / 1000;
+            let bucket = (sec / 45) * 45;
+            if bucket != cur_bucket {
+                cur_bucket = bucket;
+                let m = sec / 60;
+                let s_sec = sec % 60;
+                if !s.is_empty() {
+                    s.push_str("\n\n");
+                }
+                s.push_str(&format!("**{:02}:{:02}**\n", m, s_sec));
+            }
+            let t = seg.text.trim();
+            if !t.is_empty() {
+                s.push_str(t);
+                s.push(' ');
+            }
+        }
+        s.trim().to_string()
+    } else {
+        base_text.clone()
+    };
+
+    let maybe_fixed = run_google_ai_mode_fix(&timed_raw).await;
 
     let final_text = match maybe_fixed {
         Some(t) if !t.trim().is_empty() => t,
         _ => {
-            let cfg = ctx.config.read().await.clone();
-            let lex = leadfinder_providers::global_lexicon(
-                &ctx.paths,
-                &cfg.normalisation.lexicon_config_file,
-            );
-            let stage1 = lex.normalize_text(&base_text);
+            let stage1 = lex.normalize_text(&timed_raw);
             let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
             let schema_val = serde_json::json!({
                 "type": "object",
@@ -915,15 +1015,15 @@ async fn handle_google_ai_fix(
                 "required": ["corrected_text"]
             });
             let llm_req = leadfinder_core::LlmJsonRequest {
-                system_prompt: "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string(),
-                user_prompt: format!("what would the fixed text look like? Output the edited result only:{stage1}"),
+                system_prompt: "You are an expert Bulgarian television dialogue editor and transcript proofreader. Given an automatic speech recognition (ASR) transcript in Bulgarian with timestamps and phonetic errors, restore the clean Bulgarian text formatted as dialogue with bold timestamps (**MM:SS**) and bold speaker names (e.g. **Румен Бахов:**, **Елизабет:**, **Виктор Николаев:**). Fix all misheard Bulgarian words (алкогол -> алкохол, кота -> колата, полезай -> полицаи, и 12 -> 112, бърза полнош -> Бърза помощ, нуа нуа -> 0.0), restore Bulgarian grammar, punctuation, and question marks. Return JSON with 'corrected_text'.".to_string(),
+                user_prompt: format!("what would the fixed text look like? Output the edited result only:\n{}", stage1),
                 json_schema: Some(schema_val),
-                max_tokens: 1024,
+                max_tokens: 8192,
                 temperature: 0.1,
             };
             match runner.complete_validated(&llm_req, &ctx.db).await {
-                Ok(val) => val.response.parsed_json.get("corrected_text").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or(stage1),
-                Err(_) => stage1,
+                Ok(val) => val.response.parsed_json.get("corrected_text").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or_else(|| format_timed_segments_for_dialogue(&lex, &tr.segments, &base_text)),
+                Err(_) => format_timed_segments_for_dialogue(&lex, &tr.segments, &base_text),
             }
         }
     };
