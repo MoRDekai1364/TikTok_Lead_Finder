@@ -207,6 +207,25 @@ export async function queryGoogleAi(
   });
 }
 
+export async function openExternalUrl(url: string): Promise<void> {
+  if (!url) return;
+  if ('__TAURI_INTERNALS__' in window) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('open_in_browser', { url });
+      return;
+    } catch {}
+  }
+  try {
+    await fetchJson('/api/open-browser', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+    return;
+  } catch {}
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export async function deleteVideo(id: string): Promise<{ ok: boolean }> {
   return fetchJson<{ ok: boolean }>(`/api/videos/${encodeURIComponent(id)}`, {
     method: 'DELETE',

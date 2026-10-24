@@ -8,6 +8,7 @@
     fetchScaleStatus,
     fetchVideos,
     logDecision,
+    openExternalUrl,
     pasteLinks,
     pullMore,
     subscribeSse,
@@ -39,9 +40,7 @@
     typeof localStorage !== 'undefined' ? localStorage.getItem('leadfinder_video_feed') !== 'false' : true
   );
 
-  const activeDrawerId = $derived(
-    drawerVideoId || (activeScreen === 'inbox' && isVideoFeedOpen ? (selectedId || cards[0]?.id || null) : null)
-  );
+  const activeDrawerId = $derived(drawerVideoId);
 
   let queueCounts = $state<QueueCounts>({ queued: 0, running: 0, succeeded: 0, failed: 0 });
   let capacityPerDay = $state<number | null>(null);
@@ -75,11 +74,21 @@
       });
     });
 
+    const handleDocumentClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement)?.closest('a');
+      if (a && a.href && (a.target === '_blank' || a.href.startsWith('http'))) {
+        e.preventDefault();
+        openExternalUrl(a.href);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+
     window.addEventListener('keydown', handleGlobalKeydown);
 
     return () => {
       disposed = true;
       unsub();
+      document.removeEventListener('click', handleDocumentClick);
       window.removeEventListener('keydown', handleGlobalKeydown);
     };
   });
@@ -102,9 +111,6 @@
 
       if (cards.length > 0 && !selectedId) {
         selectedId = cards[0].id;
-      }
-      if (isVideoFeedOpen && !drawerVideoId && cards.length > 0) {
-        drawerVideoId = cards[0].id;
       }
     } catch {}
   }
@@ -233,16 +239,9 @@
   function toggleVideoFeed() {
     isVideoFeedOpen = !isVideoFeedOpen;
     localStorage.setItem('leadfinder_video_feed', String(isVideoFeedOpen));
-    if (isVideoFeedOpen) {
-      drawerVideoId = selectedId || cards[0]?.id || null;
-    } else {
-      drawerVideoId = null;
-    }
   }
 
   function handleCloseDrawer() {
-    isVideoFeedOpen = false;
-    localStorage.setItem('leadfinder_video_feed', 'false');
     drawerVideoId = null;
   }
 
@@ -250,7 +249,7 @@
     if (cards.length > 0) {
       const nextIdx = Math.max(0, Math.min(prevIdx, cards.length - 1));
       selectedId = cards[nextIdx].id;
-      if (drawerVideoId || isVideoFeedOpen) {
+      if (drawerVideoId) {
         drawerVideoId = cards[nextIdx].id;
       }
     } else {
@@ -301,17 +300,15 @@
     if (nextIdx < 0) nextIdx = 0;
     if (nextIdx >= cards.length) nextIdx = cards.length - 1;
     selectedId = cards[nextIdx].id;
-    if (isVideoFeedOpen) {
+    if (drawerVideoId) {
       drawerVideoId = cards[nextIdx].id;
     }
   }
 
   function handleSelectCard(id: string) {
     selectedId = id;
-    drawerVideoId = id;
-    if (!isVideoFeedOpen) {
-      isVideoFeedOpen = true;
-      localStorage.setItem('leadfinder_video_feed', 'true');
+    if (drawerVideoId) {
+      drawerVideoId = id;
     }
   }
 
@@ -329,7 +326,7 @@
     checkedIds = new Set();
     cards = await fetchVideos(lane);
     selectedId = cards[0]?.id || null;
-    if (isVideoFeedOpen) {
+    if (drawerVideoId) {
       drawerVideoId = cards[0]?.id || null;
     }
   }
@@ -361,6 +358,8 @@
           {checkedIds}
           {currentLang}
           {isVideoFeedOpen}
+          isDrawerOpen={Boolean(drawerVideoId)}
+          onOpenDetail={(id) => (drawerVideoId = id)}
           onToggleVideoFeed={toggleVideoFeed}
           laneCounts={queueCounts.lane_counts}
           onSelectCard={handleSelectCard}

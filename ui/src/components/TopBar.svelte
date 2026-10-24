@@ -54,7 +54,15 @@
 
   const t = $derived(translations[currentLang]);
 
-  const TERMINAL_STATES = ['VERIFIED', 'READY', 'KEPT', 'FAILED', 'SCREENED_OUT', 'DISCARDED'];
+  const TERMINAL_STATES = [
+    'VERIFIED',
+    'READY',
+    'KEPT',
+    'FAILED',
+    'SCREENED_OUT',
+    'DISCARDED',
+    'CLAIMS_DONE',
+  ];
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   onMount(() => () => stopPolling());
@@ -94,7 +102,12 @@
         const v = detail?.video;
         if (!v || v.id !== id || !lastPasted || lastPasted.id !== id) return;
         const state = String(v.state || '');
-        const finished = TERMINAL_STATES.includes(state);
+        const claimsDone = Boolean(
+          detail?.claims &&
+            detail.claims.length > 0 &&
+            detail.claims.every((c: any) => c.claim?.verdict)
+        );
+        const finished = TERMINAL_STATES.includes(state) || claimsDone;
         const info = describeState(state);
         lastPasted = {
           ...lastPasted,
@@ -106,7 +119,11 @@
           state,
           progress_pct: finished ? 100 : info.pct,
           etr_seconds: null,
-          stage_desc: info.desc,
+          stage_desc: finished
+            ? currentLang === 'bg'
+              ? 'Анализът е завършен'
+              : 'Analysis complete'
+            : info.desc,
           done: finished,
           failed: state === 'FAILED',
         };

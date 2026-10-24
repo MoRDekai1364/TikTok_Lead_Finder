@@ -33,6 +33,11 @@ pub struct PasteRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct OpenBrowserRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ImportRequest {
     pub content: String,
     #[serde(default = "default_import_label")]
@@ -155,6 +160,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id/google-ai-fix", post(handle_google_ai_fix))
         .route("/api/google-ai/query", post(handle_google_ai_query))
         .route("/api/evidence/preview", get(handle_evidence_preview))
+        .route("/api/open-browser", post(handle_open_browser))
         .route("/api/people/:id/research", post(handle_research_person))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
         .route("/api/seeds/:id", delete(handle_delete_seed))
@@ -1152,6 +1158,22 @@ async fn handle_evidence_preview(
         "text": text,
         "domain": domain
     })).into_response()
+}
+
+async fn handle_open_browser(
+    Json(body): Json<OpenBrowserRequest>,
+) -> Response {
+    if let Some(exe) = resolve_default_browser_path() {
+        let _ = std::process::Command::new(exe).arg(&body.url).spawn();
+    } else {
+        #[cfg(windows)]
+        let _ = std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &body.url])
+            .spawn();
+        #[cfg(not(windows))]
+        let _ = std::process::Command::new("xdg-open").arg(&body.url).spawn();
+    }
+    Json(serde_json::json!({ "ok": true })).into_response()
 }
 
 async fn handle_research_person(

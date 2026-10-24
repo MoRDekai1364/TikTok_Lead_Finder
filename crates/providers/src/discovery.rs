@@ -140,16 +140,37 @@ impl PasteLinkSource {
         Self::minimal_ref(resolved, discovered_via)
     }
 
+    pub async fn resolve_short_link_fast(&self, raw_url: &str) -> String {
+        if extract_video_id_from_url(raw_url).is_some() {
+            return raw_url.to_string();
+        }
+        match self.http.get(raw_url).timeout(Duration::from_millis(1500)).send().await {
+            Ok(resp) => resp.url().to_string(),
+            Err(_) => raw_url.to_string(),
+        }
+    }
+
+    async fn fetch_oembed_direct(&self, resolved_url: &str, discovered_via: &str) -> Option<VideoRef> {
+        let encoded = urlencoding::encode(resolved_url);
+        let oembed_url = format!("https://www.tiktok.com/oembed?url={encoded}");
+        if let Some(cached) = self.guard.get_cached(&oembed_url) {
+            if let Ok(val) = serde_json::from_str::<Value>(&cached.body) {
+                return Self::parse_oembed(&val, resolved_url, discovered_via);
+            }
+        }
+        let resp = self.http.get(&oembed_url).timeout(Duration::from_millis(1500)).send().await.ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let body = resp.text().await.ok()?;
+        self.guard.put_cached(&oembed_url, 200, body.clone(), Some("application/json".to_string()));
+        let val: Value = serde_json::from_str(&body).ok()?;
+        Self::parse_oembed(&val, resolved_url, discovered_via)
+    }
+
     pub async fn resolve_single_url_fast(&self, raw_url: &str, discovered_via: &str) -> VideoRef {
-        let resolved = tokio::time::timeout(Duration::from_secs(5), self.resolve_short_link(raw_url))
-            .await
-            .unwrap_or_else(|_| raw_url.to_string());
-        if let Ok(Some(oembed_ref)) = tokio::time::timeout(
-            Duration::from_secs(5),
-            self.fetch_oembed_fallback(&resolved, discovered_via),
-        )
-        .await
-        {
+        let resolved = self.resolve_short_link_fast(raw_url).await;
+        if let Some(oembed_ref) = self.fetch_oembed_direct(&resolved, discovered_via).await {
             return oembed_ref;
         }
         Self::minimal_ref(resolved, discovered_via)
