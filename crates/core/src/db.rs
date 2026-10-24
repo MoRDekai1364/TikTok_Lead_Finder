@@ -915,6 +915,14 @@ impl Database {
             .collect())
     }
 
+    pub async fn delete_evidence(&self, id: i64) -> Result<bool> {
+        let res = sqlx::query("DELETE FROM evidence WHERE id = ?1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
     pub async fn upsert_person_for_video(
         &self,
         video_id: &str,

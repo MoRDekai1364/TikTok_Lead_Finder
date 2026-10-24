@@ -247,6 +247,12 @@ export async function fetchEvidencePreview(url: string): Promise<{ url: string; 
   return fetchJson<{ url: string; title: string; text: string; domain: string }>(`/api/evidence/preview?url=${encodeURIComponent(url)}`);
 }
 
+export async function deleteEvidence(id: number): Promise<{ ok: boolean; deleted_id: number }> {
+  return fetchJson<{ ok: boolean; deleted_id: number }>(`/api/evidence/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function researchPerson(personId: number, name?: string): Promise<Person & { total_claims?: number; contradicted_count?: number; supported_count?: number }> {
   return fetchJson<Person & { total_claims?: number; contradicted_count?: number; supported_count?: number }>(`/api/people/${personId}/research`, {
     method: 'POST',

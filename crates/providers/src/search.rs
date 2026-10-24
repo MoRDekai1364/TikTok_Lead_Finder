@@ -200,7 +200,7 @@ impl Search for WebAndPrimarySearch {
         for rq in raw_queries.into_iter().take(4) {
             let found = self.execute_single_search(&rq).await;
             for (url, title, snippet, pub_date) in found {
-                if is_social_video_self_url(&url) {
+                if is_social_video_self_url(&url) || is_untrustworthy_or_junk_url(&url) {
                     continue;
                 }
                 if !query.restrict_domains.is_empty() {
@@ -258,6 +258,108 @@ pub fn is_social_video_self_url(url: &str) -> bool {
     };
     let h = u.host_str().unwrap_or("").to_lowercase();
     domain_matches(&h, "tiktok.com")
+}
+
+pub fn is_untrustworthy_or_junk_url(url: &str) -> bool {
+    let Ok(u) = reqwest::Url::parse(url) else {
+        return true;
+    };
+    let host = u.host_str().unwrap_or("").to_lowercase();
+    let path = u.path().to_lowercase();
+
+    if host.is_empty() {
+        return true;
+    }
+
+    if is_social_video_self_url(url) {
+        return true;
+    }
+
+    if host.ends_with(".google")
+        || host.contains("google.")
+        || host.ends_with("google.com")
+        || host.ends_with("google.bg")
+        || host.contains("familylink")
+        || host.contains("families.google")
+    {
+        return true;
+    }
+
+    if host.contains("bing.com")
+        || host.contains("duckduckgo.com")
+        || host.contains("yahoo.com")
+        || host.contains("yandex.")
+        || host.contains("mail.ru")
+        || host.contains("searx")
+        || host.contains("baidu.com")
+    {
+        return true;
+    }
+
+    if host.contains("abv.bg")
+        && (host.starts_with("passport.")
+            || host.starts_with("help.")
+            || host.starts_with("mail.")
+            || host.starts_with("home.")
+            || host.starts_with("trustsuite."))
+    {
+        return true;
+    }
+
+    if host.contains("play.google")
+        || host.contains("apps.apple.com")
+        || host.contains("microsoft.com")
+    {
+        return true;
+    }
+
+    if host.contains("casino")
+        || host.contains("betano")
+        || host.contains("palmsbet")
+        || host.contains("inbet")
+        || host.contains("efbet")
+        || host.contains("winbet")
+        || host.contains("sesame.bg")
+        || host.contains("alphawin")
+    {
+        return true;
+    }
+
+    if host.contains("porn")
+        || host.contains("xxx")
+        || host.contains("xhamster")
+        || host.contains("kompanionki")
+        || host.contains("badoo")
+        || host.contains("tinder")
+        || host.contains("eskort")
+        || host.contains("escort")
+        || host.contains("elmaz.com")
+        || host.contains("macki.info")
+        || host.contains("ometv")
+    {
+        return true;
+    }
+
+    if host.contains("alo.bg")
+        || host.contains("olx.bg")
+        || host.contains("bazar.bg")
+        || host.contains("ozone.bg")
+        || host.contains("playhop.com")
+    {
+        return true;
+    }
+
+    if host.contains("bolshoyvopros.ru")
+        || host.contains("otvet.mail.ru")
+        || path.contains("/login")
+        || path.contains("/signin")
+        || path.contains("/signup")
+        || path.contains("/auth")
+    {
+        return true;
+    }
+
+    false
 }
 
 fn parse_searxng_json(raw: &str) -> Vec<(String, String, String, Option<String>)> {
@@ -397,5 +499,17 @@ mod tests {
         let hits = parse_ddg_html(ddg);
         assert_eq!(hits[0].0, "https://c.example.bg/3");
         assert_eq!(hits[0].2, "Откъс");
+    }
+
+    #[test]
+    fn junk_and_untrustworthy_urls_are_rejected() {
+        assert!(is_untrustworthy_or_junk_url("https://familylink.google.com/"));
+        assert!(is_untrustworthy_or_junk_url("https://families.google.com/intl/bg/faq"));
+        assert!(is_untrustworthy_or_junk_url("https://www.bing.com/camera"));
+        assert!(is_untrustworthy_or_junk_url("https://rt.pornhub.com/"));
+        assert!(is_untrustworthy_or_junk_url("https://www.betano.bg/live"));
+        assert!(is_untrustworthy_or_junk_url("https://passport.abv.bg/app/login"));
+        assert!(!is_untrustworthy_or_junk_url("https://www.bta.bg/bg/news/123"));
+        assert!(!is_untrustworthy_or_junk_url("https://www.mvr.bg/press/news"));
     }
 }

@@ -91,7 +91,7 @@ def transcribe_with_gemini(wav_path, api_key):
         payload = {
             "contents": [{
                 "parts": [
-                    {"text": "Transcribe this Bulgarian television interview audio verbatim. Format the output strictly as timed dialogue with bold timestamps and bold speaker names:\n**MM:SS**\n**Speaker:** Speech\nReturn only the formatted Bulgarian dialogue."},
+                    {"text": "Transcribe this Bulgarian audio verbatim. Format the output in flowing paragraphs with bold timestamps:\n**MM:SS**\nReturn only the transcribed Bulgarian text."},
                     {
                         "inlineData": {
                             "mimeType": "audio/wav",
@@ -167,7 +167,6 @@ def transcribe_with_google_web(wav_path):
 def format_segments_to_dialogue(segments):
     lines = []
     cur_bucket = -1
-    cur_speaker = None
 
     for seg in segments:
         sec = seg['start_ms'] // 1000
@@ -177,41 +176,11 @@ def format_segments_to_dialogue(segments):
             m = sec // 60
             s = sec % 60
             lines.append(f'**{m:02d}:{s:02d}**')
-            cur_speaker = None
         
         t = seg.get('text', '').strip()
         if not t:
             continue
-        
-        is_q = (
-            t.endswith('?')
-            or ' ли ' in t
-            or t.startswith('Кога')
-            or t.startswith('Как')
-            or t.startswith('Къде')
-            or t.startswith('Кой')
-            or t.startswith('Защо')
-            or t.startswith('И?')
-            or t == 'И?'
-            or t.startswith('И се приземи върху вас')
-            or t.startswith('Показа 0.0')
-            or t.startswith('Е бяха ли')
-            or t.startswith('Крег на')
-            or t.startswith('Той как се държа')
-        )
-        
-        if is_q:
-            speaker = 'Румен Бахов:'
-        elif 'Мира и Вики' in t or 'Румене' in t or 'Виктор' in t:
-            speaker = 'Виктор Николаев:'
-        else:
-            speaker = 'Елизабет:'
-        
-        if cur_speaker != speaker:
-            cur_speaker = speaker
-            lines.append(f'**{speaker}** {t}')
-        else:
-            lines.append(t)
+        lines.append(t)
 
     return '\n'.join(lines)
 

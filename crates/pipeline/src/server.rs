@@ -206,6 +206,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/videos/:id/google-audio-transcribe", post(handle_google_audio_transcribe))
         .route("/api/google-ai/query", post(handle_google_ai_query))
         .route("/api/evidence/preview", get(handle_evidence_preview))
+        .route("/api/evidence/:id", delete(handle_delete_evidence))
         .route("/api/open-browser", post(handle_open_browser))
         .route("/api/people", get(handle_list_people).post(handle_create_person))
         .route("/api/people/auto-classify", post(handle_auto_classify_people))
@@ -885,7 +886,6 @@ fn format_timed_segments_for_dialogue(
 
     let mut out = String::new();
     let mut current_sec_bucket: i64 = -1;
-    let mut current_speaker: Option<&'static str> = None;
 
     for seg in segments {
         let sec = seg.start_ms / 1000;
@@ -898,7 +898,6 @@ fn format_timed_segments_for_dialogue(
                 out.push_str("\n\n");
             }
             out.push_str(&format!("**{:02}:{:02}**\n", m, s));
-            current_speaker = None;
         }
 
         let cleaned = lex.normalize_text(&seg.text);
@@ -907,35 +906,7 @@ fn format_timed_segments_for_dialogue(
             continue;
         }
 
-        let is_q = trimmed.ends_with('?')
-            || trimmed.contains(" ли ")
-            || trimmed.starts_with("Кога")
-            || trimmed.starts_with("Как")
-            || trimmed.starts_with("Къде")
-            || trimmed.starts_with("Кой")
-            || trimmed.starts_with("Защо")
-            || trimmed.starts_with("И?")
-            || trimmed == "И?"
-            || trimmed.starts_with("И се приземи върху вас")
-            || trimmed.starts_with("Показа 0.0")
-            || trimmed.starts_with("Е бяха ли")
-            || trimmed.starts_with("Крег на")
-            || trimmed.starts_with("Той как се държа");
-
-        let speaker = if is_q {
-            "Румен Бахов:"
-        } else if trimmed.contains("Мира и Вики") || trimmed.contains("Румене") || trimmed.contains("Виктор") {
-            "Виктор Николаев:"
-        } else {
-            "Елизабет:"
-        };
-
-        if current_speaker != Some(speaker) {
-            current_speaker = Some(speaker);
-            out.push_str(&format!("**{}** {}\n", speaker, trimmed));
-        } else {
-            out.push_str(&format!("{}\n", trimmed));
-        }
+        out.push_str(&format!("{}\n", trimmed));
     }
 
     if out.trim().is_empty() {
@@ -1016,7 +987,7 @@ async fn handle_google_ai_fix(
                 "required": ["corrected_text"]
             });
             let llm_req = leadfinder_core::LlmJsonRequest {
-                system_prompt: "You are an expert Bulgarian television dialogue editor and transcript proofreader. Given an automatic speech recognition (ASR) transcript in Bulgarian with timestamps and phonetic errors, restore the clean Bulgarian text formatted as dialogue with bold timestamps (**MM:SS**) and bold speaker names (e.g. **Румен Бахов:**, **Елизабет:**, **Виктор Николаев:**). Fix all misheard Bulgarian words (алкогол -> алкохол, кота -> колата, полезай -> полицаи, и 12 -> 112, бърза полнош -> Бърза помощ, нуа нуа -> 0.0), restore Bulgarian grammar, punctuation, and question marks. Return JSON with 'corrected_text'.".to_string(),
+                system_prompt: "You are an expert Bulgarian transcript editor and proofreader. Given an automatic speech recognition (ASR) transcript in Bulgarian with timestamps and phonetic errors, restore the clean Bulgarian text formatted in flowing paragraphs with bold timestamps (**MM:SS**). Fix all misheard Bulgarian words (e.g. алкогол -> алкохол, кота -> колата, полезай -> полицаи, и 12 -> 112, бърза полнош -> Бърза помощ, нуа нуа -> 0.0), restore Bulgarian grammar, punctuation, and question marks. Do not invent fake or arbitrary speaker names. Return JSON with 'corrected_text'.".to_string(),
                 user_prompt: format!("what would the fixed text look like? Output the edited result only:\n{}", stage1),
                 json_schema: Some(schema_val),
                 max_tokens: 8192,
@@ -1327,6 +1298,25 @@ async fn handle_evidence_preview(
         "text": text,
         "domain": domain
     })).into_response()
+}
+
+async fn handle_delete_evidence(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    match ctx.db.delete_evidence(id).await {
+        Ok(true) => Json(serde_json::json!({ "ok": true, "deleted_id": id })).into_response(),
+        Ok(false) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "evidence not found" })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
 }
 
 async fn handle_open_browser(

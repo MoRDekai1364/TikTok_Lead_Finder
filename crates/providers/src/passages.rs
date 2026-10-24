@@ -192,6 +192,9 @@ impl PassageExtractorAndRanker {
                 }
                 let pass_lemmas = extract_lemmas(&self.lexicon, &chunk);
                 let score = compute_bm25_score(&query_lemmas, &pass_lemmas);
+                if score < 0.25 {
+                    continue;
+                }
                 let kind_bonus = match hit.source_kind.as_str() {
                     "factcheck" => 1.35,
                     "primary" => 1.25,
@@ -251,6 +254,18 @@ fn clean_extracted_text(raw: &str) -> String {
             || low.contains("all rights reserved")
             || low.contains("политика за бисквитки")
             || low.contains("абонирайте се")
+            || low.contains("var ")
+            || low.contains("function(")
+            || low.contains("function ")
+            || low.contains("window[")
+            || low.contains("document.")
+            || low.contains("urlsearchparams")
+            || low.contains("addeventlistener")
+            || low.contains("{var ")
+            || low.contains("bind(")
+            || low.starts_with("-- function")
+            || low.starts_with("!function")
+            || low.contains("display:none")
         {
             continue;
         }
@@ -308,11 +323,13 @@ mod tests {
 
     #[test]
     fn boilerplate_lines_are_removed_from_extracted_text() {
-        let raw = "Основен текст на статията.\nCookie политика\nВсички права запазени\nОще текст.";
+        let raw = "Основен текст на статията.\nCookie политика\nВсички права запазени\nvar queryParams = new URLSearchParams(window.search);\n-- function oamSetHiddenInput(formname, name, value) {\nОще текст.";
         let clean = clean_extracted_text(raw);
         assert!(clean.contains("Основен текст"));
         assert!(clean.contains("Още текст"));
         assert!(!clean.to_lowercase().contains("cookie"));
         assert!(!clean.contains("права запазени"));
+        assert!(!clean.contains("queryParams"));
+        assert!(!clean.contains("oamSetHiddenInput"));
     }
 }

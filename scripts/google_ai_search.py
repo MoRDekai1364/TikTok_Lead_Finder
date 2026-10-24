@@ -73,6 +73,18 @@ def get_user_default_browser_exe():
 
     return None
 
+def is_unwanted_citation_url(href):
+    h = href.lower()
+    if "google.com" in h or "google.bg" in h or "families.google" in h or "safety.google" in h:
+        return True
+    if "bing.com" in h or "duckduckgo.com" in h or "yahoo.com" in h or "mail.ru" in h:
+        return True
+    if "play.google" in h or "apple.com" in h or "facebook.com" in h or "tiktok.com" in h:
+        return True
+    if "pornhub" in h or "xxx" in h or "casino" in h or "betano" in h:
+        return True
+    return False
+
 def parse_citations(page_content, inner_text):
     citations = []
     seen = set()
@@ -80,7 +92,7 @@ def parse_citations(page_content, inner_text):
     for m in link_regex.finditer(page_content):
         href = m.group(1)
         name = m.group(2).strip()
-        if "google.com" in href or href in seen or not name:
+        if is_unwanted_citation_url(href) or href in seen or not name:
             continue
         seen.add(href)
         citations.append({"title": name, "url": href})

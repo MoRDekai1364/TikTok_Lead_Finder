@@ -12,6 +12,7 @@
     researchPerson,
     autoClassifyPeople,
   } from '../lib/api';
+  import { isJobActive, startAiJob, finishAiJob } from '../lib/aiTasks.svelte';
 
   let { currentLang }: { currentLang: Language } = $props();
   const t = $derived(translations[currentLang]);
@@ -123,17 +124,17 @@
   }
 
   async function handleTriggerResearch(p: Person) {
-    if (researchingId) return;
-    researchingId = p.id;
+    if (isJobActive('person-research', p.id)) return;
+    startAiJob('person-research', p.id, p.canonical_name);
     showToast(currentLang === 'bg' ? `⚡ Стартирано OSINT проучване за ${p.canonical_name}...` : `⚡ Researching ${p.canonical_name}...`);
     try {
       const updated = await researchPerson(p.id, p.canonical_name);
       people = people.map((item) => (item.id === p.id ? { ...item, ...updated } : item));
+      finishAiJob('person-research', p.id, currentLang === 'bg' ? `✓ Досието на ${p.canonical_name} е обновено!` : `✓ Dossier updated!`, true);
       showToast(currentLang === 'bg' ? `✓ Досието на ${p.canonical_name} е обновено!` : `✓ Dossier updated!`);
     } catch {
+      finishAiJob('person-research', p.id, currentLang === 'bg' ? 'Грешка при AI проучването' : 'Research error', false);
       showToast(currentLang === 'bg' ? 'Грешка при AI проучването' : 'Research error');
-    } finally {
-      researchingId = null;
     }
   }
 
@@ -371,10 +372,10 @@
               <button
                 class="btn btn-primary btn-sm"
                 onclick={() => handleTriggerResearch(person)}
-                disabled={researchingId === person.id}
+                disabled={isJobActive('person-research', person.id)}
                 title="Стартирай автоматично 9-степенно OSINT проучване с AI"
               >
-                {researchingId === person.id ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи лицето' : 'OSINT Research')}
+                {isJobActive('person-research', person.id) ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи лицето' : 'OSINT Research')}
               </button>
 
               <button
