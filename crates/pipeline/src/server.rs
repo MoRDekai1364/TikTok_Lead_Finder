@@ -204,6 +204,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/open-browser", post(handle_open_browser))
         .route("/api/people", get(handle_list_people).post(handle_create_person))
         .route("/api/people/:id", get(handle_get_person).put(handle_update_person).delete(handle_delete_person))
+        .route("/api/people/:id/dossier", get(handle_get_person_dossier))
         .route("/api/people/:id/research", post(handle_research_person))
         .route("/api/videos/:video_id/people/:person_id/reassign", post(handle_reassign_video_person))
         .route("/api/videos/:video_id/people/:person_id", delete(handle_remove_video_person))
@@ -1229,14 +1230,7 @@ async fn handle_research_person(
     let name = body.name.unwrap_or_default();
     let cfg = ctx.config.read().await.clone();
     let lex = leadfinder_providers::global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
-    let query_str = format!("{} новини биография длъжност фактчекинг", name);
-    let search_q = leadfinder_core::SearchQuery {
-        query: query_str,
-        restrict_domains: Vec::new(),
-        date_from: None,
-        date_to: None,
-        max_results: 4,
-    };
+
     let archive_ep = cfg.factcheck_archives.clone();
     let primary_entries = leadfinder_core::load_primary_sources(&ctx.paths.config_dir).unwrap_or_default();
     let search_engine = leadfinder_providers::WebAndPrimarySearch::new(
@@ -1280,17 +1274,34 @@ async fn handle_research_person(
         }
     }
 
-    if let Ok(hits) = search_engine.search(&search_q).await {
-        for hit in hits.into_iter().take(3) {
-            let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
-            let txt = ranker.extract_main_text(&html);
-            if !txt.is_empty() {
-                hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(800).collect::<String>()));
+    let queries = [
+        format!("{} биография произход образование кариера длъжност", name),
+        format!("{} фирми собственост имущество съдружници капитал", name),
+        format!("{} съд дела разследвания скандали проверка факти", name),
+    ];
+
+    for q_str in queries {
+        let sq = leadfinder_core::SearchQuery {
+            query: q_str,
+            restrict_domains: Vec::new(),
+            date_from: None,
+            date_to: None,
+            max_results: 4,
+        };
+        if let Ok(hits) = search_engine.search(&sq).await {
+            for hit in hits.into_iter().take(3) {
+                if !hits_text.iter().any(|h| h.contains(&hit.url)) {
+                    let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+                    let txt = ranker.extract_main_text(&html);
+                    if !txt.is_empty() {
+                        hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(1500).collect::<String>()));
+                    }
+                }
             }
         }
     }
 
-    let summary_context = hits_text.join("\n\n");
+    let summary_context = hits_text.join("\n\n---\n\n");
     let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
     let schema_val = serde_json::json!({
         "type": "object",
@@ -1303,6 +1314,7 @@ async fn handle_research_person(
                 "type": "array",
                 "items": { "type": "string" }
             },
+            "full_dossier_report_markdown": { "type": "string" },
             "profile": {
                 "type": "object",
                 "properties": {
@@ -1318,13 +1330,13 @@ async fn handle_research_person(
                 }
             }
         },
-        "required": ["role", "summary", "public_figure", "tags"]
+        "required": ["role", "summary", "public_figure", "tags", "full_dossier_report_markdown"]
     });
     let llm_req = leadfinder_core::LlmJsonRequest {
-        system_prompt: "You are an expert OSINT intelligence analyst and Bulgarian investigative journalist. Synthesize an exhaustive background intelligence profile on the named person using the 9 OSINT categories: 1. Identity & Core Data, 2. Contact & Locational History, 3. Family & Network Associates, 4. Education & Career Timeline, 5. Financial Profile & Wealth/Business, 6. Legal/Criminal & Regulatory Status, 7. Digital & Media Footprint, 8. Affiliations & Beliefs, 9. Psychographic & Behavioral Profiling. Also generate a list of tags (e.g. ['politician', 'party X', 'lawyer', 'key figure', 'executive', etc.]) and a short category. Output valid JSON in Bulgarian.".to_string(),
-        user_prompt: format!("Лице: {}\nКонтекст от мрежата:\n{}", name, summary_context),
+        system_prompt: "You are a master intelligence analyst and investigative journalist. Generate an exhaustive, deep, and complete due-diligence OSINT intelligence dossier on the subject in Bulgarian (target length: ~1,500 - 2,500 words). The field 'full_dossier_report_markdown' must be an extensive, highly detailed investigative dossier formatted with Markdown headers, full paragraphs, dates, institutions, verified facts, associates, companies, lawsuits, controversies, and narrative profiling covering all 9 OSINT categories:\n# ОСИНТ РАЗУЗНАВАТЕЛНО ДОСИЕ: {NAME}\n## 1. Идентичност и основни лични данни (Full names, aliases, vital statistics, birth date/place, citizenship)\n## 2. Локации, адреси и комуникационни канали (Historical and current locations, channels, domains)\n## 3. Семейна среда, мрежа и ключови съдружници (Immediate family, business associates, mentors, networks)\n## 4. Образование и професионална хронология (Universities, degrees, employment history, public offices)\n## 5. Финансов профил, фирми и имуществени интереси (Companies, directorships, assets, wealth, audits)\n## 6. Правен, съдебен и регулаторен статус (PEP) (Court cases, lawsuits, regulatory sanctions, investigations)\n## 7. Медийно присъствие, публикации и дигитален отпечатък (Media coverage, interviews, published work, leaks)\n## 8. Политически принадлежности, убеждения и лобистки връзки (Parties, campaigns, memberships, voting records)\n## 9. Психографски и поведенчески профил (Communication style, rhetorical traps, decision patterns)\n## 10. Оценка на риска и заключителни изводи (Final due-diligence verdict, reliability score, intelligence summary)\nDo not write a brief summary. Write extensive, multi-paragraph, professional analysis for every section. Output valid JSON in Bulgarian.".to_string(),
+        user_prompt: format!("Лице за пълно OSINT разследване: {}\n\nСъбрани разузнавателни данни и източници от мрежата:\n{}", name, summary_context),
         json_schema: Some(schema_val),
-        max_tokens: 1500,
+        max_tokens: 4096,
         temperature: 0.1,
     };
 
@@ -1334,6 +1346,7 @@ async fn handle_research_person(
     let mut res_tags: Vec<String> = Vec::new();
     let mut res_detailed_json: Option<String> = None;
     let mut res_category: Option<String> = None;
+    let mut report_md = String::new();
 
     if let Ok(val) = runner.complete_validated(&llm_req, &ctx.db).await {
         res_role = val.response.parsed_json.get("role").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -1350,13 +1363,36 @@ async fn handle_research_person(
                 }
             }
         }
-        if let Some(prof) = val.response.parsed_json.get("profile") {
-            res_detailed_json = serde_json::to_string(prof).ok();
-        }
+        report_md = val.response.parsed_json.get("full_dossier_report_markdown")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let full_obj = serde_json::json!({
+            "report_markdown": report_md,
+            "profile": val.response.parsed_json.get("profile"),
+        });
+        res_detailed_json = Some(serde_json::to_string(&full_obj).unwrap_or_default());
     }
+
+    if report_md.is_empty() {
+        report_md = format!("# OSINT ДОСИЕ: {}\n\n## Обобщение\n{}\n\n## Контекст от източници\n{}", name, res_summary.as_deref().unwrap_or(""), summary_context);
+        let full_obj = serde_json::json!({
+            "report_markdown": report_md,
+            "profile": serde_json::Value::Null,
+        });
+        res_detailed_json = Some(serde_json::to_string(&full_obj).unwrap_or_default());
+    }
+
     if res_summary.is_none() && !summary_context.is_empty() {
         res_summary = Some(summary_context.chars().take(250).collect());
     }
+
+    let osint_dir = std::path::PathBuf::from("data/osint");
+    let _ = std::fs::create_dir_all(&osint_dir);
+    let safe_name: String = name.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+    let report_filename = format!("{}_{}_dossier.md", id, safe_name);
+    let report_path = osint_dir.join(&report_filename);
+    let _ = std::fs::write(&report_path, &report_md);
 
     let _ = ctx.db.update_person_research_data(
         id,
@@ -1377,10 +1413,37 @@ async fn handle_research_person(
         "category": res_category,
         "tags": res_tags,
         "detailed_profile_json": res_detailed_json,
+        "dossier_report_markdown": report_md,
+        "report_file_path": format!("data/osint/{}", report_filename),
         "total_claims": total_claims,
         "contradicted_count": contradicted,
         "supported_count": supported
     })).into_response()
+}
+
+async fn handle_get_person_dossier(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    if let Ok(Some(p)) = ctx.db.get_person_by_id(id).await {
+        if let Some(json_str) = p.detailed_profile_json {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                if let Some(md) = val.get("report_markdown").and_then(|v| v.as_str()) {
+                    return (
+                        [(axum::http::header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
+                        md.to_string(),
+                    ).into_response();
+                }
+            }
+        }
+        if let Some(sum) = p.summary {
+            return (
+                [(axum::http::header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
+                format!("# Досие: {}\n\n{}", p.canonical_name, sum),
+            ).into_response();
+        }
+    }
+    (StatusCode::NOT_FOUND, "Dossier not found").into_response()
 }
 
 async fn handle_list_people(

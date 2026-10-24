@@ -69,6 +69,7 @@ export interface Evidence {
 }
 
 export interface DetailedPersonProfile {
+  report_markdown?: string;
   identity?: string;
   contact_locations?: string;
   network_associates?: string;

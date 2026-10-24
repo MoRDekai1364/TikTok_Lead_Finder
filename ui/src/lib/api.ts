@@ -295,6 +295,13 @@ export async function removePersonFromVideo(videoId: string, personId: number): 
   });
 }
 
+export async function fetchPersonDossierMarkdown(personId: number): Promise<string> {
+  const base = getCoreUrl();
+  const res = await fetch(`${base}/api/people/${personId}/dossier`);
+  if (!res.ok) throw new Error('Failed to fetch dossier');
+  return res.text();
+}
+
 export async function fetchVideosByCreator(creatorId: string, limit: number = 10): Promise<LeadCard[]> {
   const res = await fetchJson<any>(`/api/videos?creator_id=${encodeURIComponent(creatorId)}&limit=${limit}`);
   const list = Array.isArray(res) ? res : Array.isArray(res?.cards) ? res.cards : [];

@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
-  import type { Person, DetailedPersonProfile } from '../lib/types';
+  import type { Person } from '../lib/types';
+  import PersonDossierModal from './PersonDossierModal.svelte';
   import {
     fetchPeople,
     createPerson,
@@ -172,15 +173,6 @@
       await loadData();
     } catch {
       showToast(currentLang === 'bg' ? 'Грешка при запазване' : 'Save error');
-    }
-  }
-
-  function parseProfile(p: Person): DetailedPersonProfile | null {
-    if (!p.detailed_profile_json) return null;
-    try {
-      return JSON.parse(p.detailed_profile_json);
-    } catch {
-      return null;
     }
   }
 </script>
@@ -467,114 +459,16 @@
 {/if}
 
 {#if viewingDossier}
-  {@const prof = parseProfile(viewingDossier)}
-  <div class="modal-backdrop" onclick={() => (viewingDossier = null)} role="presentation">
-    <div class="modal-dialog dossier-modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
-      <div class="modal-head">
-        <div>
-          <h3>📖 {currentLang === 'bg' ? 'OSINT Разузнавателно Досие:' : 'OSINT Dossier:'} {viewingDossier.canonical_name}</h3>
-          <span class="dossier-sub">{viewingDossier.role || viewingDossier.category || 'Публична личност'}</span>
-        </div>
-        <button class="close-btn" onclick={() => (viewingDossier = null)}>✕</button>
-      </div>
-
-      <div class="modal-body dossier-body">
-        {#if viewingDossier.summary}
-          <div class="dossier-section summary-box">
-            <h4>{currentLang === 'bg' ? 'Обобщение на личността' : 'Executive Summary'}</h4>
-            <p>{viewingDossier.summary}</p>
-          </div>
-        {/if}
-
-        {#if prof}
-          <div class="osint-categories-grid">
-            {#if prof.identity}
-              <div class="osint-card">
-                <h5>1. {currentLang === 'bg' ? 'Идентичност и лични данни' : 'Identity & Core Data'}</h5>
-                <p>{prof.identity}</p>
-              </div>
-            {/if}
-
-            {#if prof.contact_locations}
-              <div class="osint-card">
-                <h5>2. {currentLang === 'bg' ? 'Локации и дигитални адреси' : 'Locational History & Channels'}</h5>
-                <p>{prof.contact_locations}</p>
-              </div>
-            {/if}
-
-            {#if prof.network_associates}
-              <div class="osint-card">
-                <h5>3. {currentLang === 'bg' ? 'Мрежа от контакти и съдружници' : 'Network & Associates'}</h5>
-                <p>{prof.network_associates}</p>
-              </div>
-            {/if}
-
-            {#if prof.education_career}
-              <div class="osint-card">
-                <h5>4. {currentLang === 'bg' ? 'Образование и кариерно развитие' : 'Education & Career Timeline'}</h5>
-                <p>{prof.education_career}</p>
-              </div>
-            {/if}
-
-            {#if prof.financial_assets}
-              <div class="osint-card">
-                <h5>5. {currentLang === 'bg' ? 'Финансов профил и корпоративни интереси' : 'Financial & Wealth Profile'}</h5>
-                <p>{prof.financial_assets}</p>
-              </div>
-            {/if}
-
-            {#if prof.legal_regulatory}
-              <div class="osint-card">
-                <h5>6. {currentLang === 'bg' ? 'Правен и регулаторен статус (PEP)' : 'Legal, Criminal & PEP Status'}</h5>
-                <p>{prof.legal_regulatory}</p>
-              </div>
-            {/if}
-
-            {#if prof.digital_media_presence}
-              <div class="osint-card">
-                <h5>7. {currentLang === 'bg' ? 'Медийно присъствие и отзвук' : 'Digital & Media Footprint'}</h5>
-                <p>{prof.digital_media_presence}</p>
-              </div>
-            {/if}
-
-            {#if prof.affiliations_beliefs}
-              <div class="osint-card">
-                <h5>8. {currentLang === 'bg' ? 'Политически принадлежности и каузи' : 'Affiliations & Beliefs'}</h5>
-                <p>{prof.affiliations_beliefs}</p>
-              </div>
-            {/if}
-
-            {#if prof.psychographic_behavioral}
-              <div class="osint-card">
-                <h5>9. {currentLang === 'bg' ? 'Комуникационен стил и наративи' : 'Behavioral & Narrative Traits'}</h5>
-                <p>{prof.psychographic_behavioral}</p>
-              </div>
-            {/if}
-          </div>
-        {:else}
-          <div class="empty-dossier">
-            <p>{currentLang === 'bg' ? 'Все още няма генерирано разширено 9-степенно досие за това лице.' : 'No detailed OSINT dossier generated yet.'}</p>
-            <button
-              class="btn btn-primary btn-sm"
-              onclick={() => {
-                const target = viewingDossier!;
-                viewingDossier = null;
-                handleTriggerResearch(target);
-              }}
-            >
-              ⚡ {currentLang === 'bg' ? 'Генерирай 9-степенно OSINT проучване сега' : 'Generate Full OSINT Dossier Now'}
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      <div class="modal-foot">
-        <button class="btn btn-secondary btn-sm" onclick={() => (viewingDossier = null)}>
-          {currentLang === 'bg' ? 'Затвори' : 'Close'}
-        </button>
-      </div>
-    </div>
-  </div>
+  <PersonDossierModal
+    person={viewingDossier}
+    {currentLang}
+    onClose={() => (viewingDossier = null)}
+    onResearchTrigger={async (p) => {
+      await handleTriggerResearch(p);
+      const found = people.find((item) => item.id === p.id);
+      if (found) viewingDossier = found;
+    }}
+  />
 {/if}
 
 <style>
@@ -869,10 +763,6 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   }
 
-  .dossier-modal {
-    max-width: 860px;
-  }
-
   .modal-head {
     display: flex;
     align-items: center;
@@ -885,11 +775,6 @@
     margin: 0;
     font-size: 1rem;
     color: var(--text-heading);
-  }
-
-  .dossier-sub {
-    font-size: 0.78rem;
-    color: var(--primary-accent);
   }
 
   .modal-body {
@@ -935,58 +820,6 @@
     font-size: 1.1rem;
     color: var(--text-muted);
     cursor: pointer;
-  }
-
-  .osint-categories-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 0.85rem;
-  }
-
-  .osint-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.75rem;
-  }
-
-  .osint-card h5 {
-    margin: 0 0 0.35rem;
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--primary-accent);
-  }
-
-  .osint-card p {
-    margin: 0;
-    font-size: 0.8rem;
-    color: var(--text-body);
-    line-height: 1.4;
-  }
-
-  .summary-box {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.85rem;
-  }
-
-  .summary-box h4 {
-    margin: 0 0 0.4rem;
-    font-size: 0.85rem;
-    color: var(--text-heading);
-  }
-
-  .summary-box p {
-    margin: 0;
-    font-size: 0.85rem;
-    line-height: 1.45;
-  }
-
-  .empty-dossier {
-    text-align: center;
-    padding: 2rem;
-    color: var(--text-muted);
   }
 
   .loading-state,

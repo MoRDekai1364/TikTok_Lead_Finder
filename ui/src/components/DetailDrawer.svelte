@@ -21,6 +21,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { ClaimWithEvidence, LeadCard, Person, VideoDetail } from '../lib/types';
+  import PersonDossierModal from './PersonDossierModal.svelte';
 
   let {
     videoId,
@@ -67,6 +68,7 @@
   let videoContainerRef = $state<HTMLElement | null>(null);
   let isVideoOutOfView = $state(false);
   let disambiguatingPerson = $state<Person | null>(null);
+  let viewingPersonDossier = $state<Person | null>(null);
   let availablePeople = $state<Person[]>([]);
   let disambiguateNewName = $state('');
   let disambiguateRole = $state('');
@@ -1042,6 +1044,13 @@
 
                 <div class="person-actions-row">
                   <button
+                    class="btn btn-secondary btn-sm"
+                    onclick={() => (viewingPersonDossier = person)}
+                    title="Виж пълното 2000-думи разузнавателно OSINT досие"
+                  >
+                    📖 {currentLang === 'bg' ? 'Пълно досие' : 'Dossier'}
+                  </button>
+                  <button
                     class="btn btn-primary btn-sm person-verify-btn"
                     onclick={() => handleResearchPerson(person)}
                     disabled={isResearchingPersonId === person.id}
@@ -1411,6 +1420,19 @@
         </div>
       </div>
     </div>
+  {/if}
+
+  {#if viewingPersonDossier}
+    <PersonDossierModal
+      person={viewingPersonDossier}
+      {currentLang}
+      onClose={() => (viewingPersonDossier = null)}
+      onResearchTrigger={async (p) => {
+        await handleResearchPerson(p);
+        const updated = detail?.people?.find((item) => item.id === p.id);
+        if (updated) viewingPersonDossier = updated;
+      }}
+    />
   {/if}
 </aside>
 

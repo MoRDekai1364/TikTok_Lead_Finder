@@ -88,7 +88,7 @@ def format_prompt(query, mode):
             return q
         return f"what would the fixed text look like? Output the edited result only:{q}"
     elif mode == "research":
-        return f"Направи задълбочено проучване с факти, контекст и източници за следната тема или лице: {q}"
+        return f"Направи пълно, изключително подробно и изчерпателно OSINT разследване с хронология, биография, фирми, имоти, съдебни дела и свързани лица за: {q}"
     elif mode == "factcheck":
         return f"Провери истинността на следното твърдение, анализирай надеждни източници и изведи факти и заключение:\n{q}"
     return q
