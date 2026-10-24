@@ -165,6 +165,23 @@ fn open_in_browser(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn open_in_webview(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    if let Ok(parsed) = url.parse::<url::Url>() {
+        let label = format!("webview_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0));
+        let win = tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::External(parsed))
+            .title("LeadFinder - Преглед на източник")
+            .inner_size(1100.0, 750.0)
+            .resizable(true)
+            .build();
+        if let Err(e) = win {
+            return Err(e.to_string());
+        }
+        return Ok(());
+    }
+    Err("Invalid URL".to_string())
+}
+
 fn ensure_core_running() {
     use std::net::TcpStream;
     use std::time::Duration;
@@ -199,7 +216,7 @@ fn ensure_core_running() {
 fn main() {
     ensure_core_running();
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![core_connection, open_in_browser])
+        .invoke_handler(tauri::generate_handler![core_connection, open_in_browser, open_in_webview])
         .run(tauri::generate_context!())
         .expect("failed to run tauri desktop application");
 }

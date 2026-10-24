@@ -84,9 +84,9 @@ def extract_clean_text(inner_text):
 def format_prompt(query, mode):
     q = query.strip()
     if mode == "refine":
-        if "what would the fixed text look like?" in q:
+        if "what would the fixed text look like? Output the edited result only:" in q:
             return q
-        return f" what would the fixed text look like?\n{q}"
+        return f"what would the fixed text look like? Output the edited result only:{q}"
     elif mode == "research":
         return f"Направи задълбочено проучване с факти, контекст и източници за следната тема или лице: {q}"
     elif mode == "factcheck":

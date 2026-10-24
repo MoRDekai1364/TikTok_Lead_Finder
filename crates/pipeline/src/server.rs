@@ -38,6 +38,47 @@ pub struct OpenBrowserRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ListPeopleQuery {
+    pub query: Option<String>,
+    pub tag: Option<String>,
+    pub category: Option<String>,
+    pub sort_by: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreatePersonRequest {
+    pub canonical_name: String,
+    pub role: Option<String>,
+    pub category: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub rating: Option<i64>,
+    pub notes: Option<String>,
+    pub public_figure: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePersonRequest {
+    pub canonical_name: String,
+    pub role: Option<String>,
+    pub category: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub rating: Option<i64>,
+    pub notes: Option<String>,
+    pub public_figure: Option<bool>,
+    pub summary: Option<String>,
+    pub detailed_profile_json: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReassignVideoPersonRequest {
+    pub new_person_id: Option<i64>,
+    pub canonical_name: Option<String>,
+    pub role: Option<String>,
+    pub category: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ImportRequest {
     pub content: String,
     #[serde(default = "default_import_label")]
@@ -161,7 +202,11 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/google-ai/query", post(handle_google_ai_query))
         .route("/api/evidence/preview", get(handle_evidence_preview))
         .route("/api/open-browser", post(handle_open_browser))
+        .route("/api/people", get(handle_list_people).post(handle_create_person))
+        .route("/api/people/:id", get(handle_get_person).put(handle_update_person).delete(handle_delete_person))
         .route("/api/people/:id/research", post(handle_research_person))
+        .route("/api/videos/:video_id/people/:person_id/reassign", post(handle_reassign_video_person))
+        .route("/api/videos/:video_id/people/:person_id", delete(handle_remove_video_person))
         .route("/api/seeds", get(handle_list_seeds).post(handle_upsert_seed))
         .route("/api/seeds/:id", delete(handle_delete_seed))
         .route("/api/creators", get(handle_list_creators))
@@ -802,7 +847,7 @@ fn resolve_default_browser_path() -> Option<String> {
 }
 
 async fn run_google_ai_mode_fix(raw_text: &str) -> Option<String> {
-    let prompt = format!(" what would the fixed text look like?\n{}", raw_text.trim());
+    let prompt = format!("what would the fixed text look like? Output the edited result only:{}", raw_text.trim());
 
     let py_script = if std::path::Path::new("scripts/google_ai_search.py").exists() {
         Some("scripts/google_ai_search.py")
@@ -944,7 +989,7 @@ async fn handle_google_ai_fix(
             });
             let llm_req = leadfinder_core::LlmJsonRequest {
                 system_prompt: "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string(),
-                user_prompt: format!(" what would the fixed text look like?\n{stage1}"),
+                user_prompt: format!("what would the fixed text look like? Output the edited result only:{stage1}"),
                 json_schema: Some(schema_val),
                 max_tokens: 1024,
                 temperature: 0.1,
@@ -1036,7 +1081,7 @@ async fn handle_google_ai_query(
         });
         let llm_req = leadfinder_core::LlmJsonRequest {
             system_prompt: "You are a specialized Bulgarian language transcription editor and fact-checking proofreader. You are given an automatic speech recognition (ASR) transcript in Bulgarian with phonetic errors, misrecognized Bulgarian names, distorted courtroom/political terminology, or dropped sounds. Restore the correct Bulgarian text: fix misheard names (e.g. Милен Цветков, Кристиан Николов, Софийски градски съд, прокуратура, затворническа администрация), correct phonetic misspellings, restore proper Bulgarian grammar, punctuation, and capitalization, while keeping the original spoken speech flow intact. Return JSON with a single field 'corrected_text' containing the clean corrected Bulgarian text.".to_string(),
-            user_prompt: format!(" what would the fixed text look like?\n{stage1}"),
+            user_prompt: format!("what would the fixed text look like? Output the edited result only:{stage1}"),
             json_schema: Some(schema_val),
             max_tokens: 1024,
             temperature: 0.1,
@@ -1252,31 +1297,75 @@ async fn handle_research_person(
         "properties": {
             "role": { "type": "string" },
             "summary": { "type": "string" },
-            "public_figure": { "type": "boolean" }
+            "public_figure": { "type": "boolean" },
+            "category": { "type": "string" },
+            "tags": {
+                "type": "array",
+                "items": { "type": "string" }
+            },
+            "profile": {
+                "type": "object",
+                "properties": {
+                    "identity": { "type": "string" },
+                    "contact_locations": { "type": "string" },
+                    "network_associates": { "type": "string" },
+                    "education_career": { "type": "string" },
+                    "financial_assets": { "type": "string" },
+                    "legal_regulatory": { "type": "string" },
+                    "digital_media_presence": { "type": "string" },
+                    "affiliations_beliefs": { "type": "string" },
+                    "psychographic_behavioral": { "type": "string" }
+                }
+            }
         },
-        "required": ["role", "summary", "public_figure"]
+        "required": ["role", "summary", "public_figure", "tags"]
     });
     let llm_req = leadfinder_core::LlmJsonRequest {
-        system_prompt: "You are a Bulgarian investigative journalist. Given the scraped news data about the named person, summarize in Bulgarian in 2 concise sentences: their public position or profession, and any notable public actions or fact-checks. Output valid JSON.".to_string(),
+        system_prompt: "You are an expert OSINT intelligence analyst and Bulgarian investigative journalist. Synthesize an exhaustive background intelligence profile on the named person using the 9 OSINT categories: 1. Identity & Core Data, 2. Contact & Locational History, 3. Family & Network Associates, 4. Education & Career Timeline, 5. Financial Profile & Wealth/Business, 6. Legal/Criminal & Regulatory Status, 7. Digital & Media Footprint, 8. Affiliations & Beliefs, 9. Psychographic & Behavioral Profiling. Also generate a list of tags (e.g. ['politician', 'party X', 'lawyer', 'key figure', 'executive', etc.]) and a short category. Output valid JSON in Bulgarian.".to_string(),
         user_prompt: format!("Лице: {}\nКонтекст от мрежата:\n{}", name, summary_context),
         json_schema: Some(schema_val),
-        max_tokens: 512,
+        max_tokens: 1500,
         temperature: 0.1,
     };
 
     let mut res_role = None;
     let mut res_summary = None;
     let mut res_pub = false;
+    let mut res_tags: Vec<String> = Vec::new();
+    let mut res_detailed_json: Option<String> = None;
+    let mut res_category: Option<String> = None;
+
     if let Ok(val) = runner.complete_validated(&llm_req, &ctx.db).await {
         res_role = val.response.parsed_json.get("role").and_then(|v| v.as_str()).map(|s| s.to_string());
         res_summary = val.response.parsed_json.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
         res_pub = val.response.parsed_json.get("public_figure").and_then(|v| v.as_bool()).unwrap_or(false);
+        res_category = val.response.parsed_json.get("category").and_then(|v| v.as_str()).map(|s| s.to_string());
+        if let Some(arr) = val.response.parsed_json.get("tags").and_then(|v| v.as_array()) {
+            for item in arr {
+                if let Some(t) = item.as_str() {
+                    let clean = t.trim();
+                    if !clean.is_empty() && !res_tags.iter().any(|x| x.eq_ignore_ascii_case(clean)) {
+                        res_tags.push(clean.to_string());
+                    }
+                }
+            }
+        }
+        if let Some(prof) = val.response.parsed_json.get("profile") {
+            res_detailed_json = serde_json::to_string(prof).ok();
+        }
     }
     if res_summary.is_none() && !summary_context.is_empty() {
         res_summary = Some(summary_context.chars().take(250).collect());
     }
 
-    let _ = ctx.db.update_person_profile(id, res_role.as_deref(), res_summary.as_deref(), res_pub).await;
+    let _ = ctx.db.update_person_research_data(
+        id,
+        res_role.as_deref(),
+        res_summary.as_deref(),
+        &res_tags,
+        res_detailed_json.as_deref(),
+        res_pub,
+    ).await;
     let (total_claims, contradicted, supported) = ctx.db.get_person_claims_stats(id).await.unwrap_or((0, 0, 0));
 
     Json(serde_json::json!({
@@ -1285,10 +1374,190 @@ async fn handle_research_person(
         "role": res_role,
         "summary": res_summary,
         "public_figure": res_pub,
+        "category": res_category,
+        "tags": res_tags,
+        "detailed_profile_json": res_detailed_json,
         "total_claims": total_claims,
         "contradicted_count": contradicted,
         "supported_count": supported
     })).into_response()
+}
+
+async fn handle_list_people(
+    State(ctx): State<Arc<PipelineContext>>,
+    Query(q): Query<ListPeopleQuery>,
+) -> Response {
+    match ctx.db.list_all_people(
+        q.query.as_deref(),
+        q.tag.as_deref(),
+        q.category.as_deref(),
+        q.sort_by.as_deref(),
+    ).await {
+        Ok(people) => Json(people).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+async fn handle_get_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    match ctx.db.get_person_by_id(id).await {
+        Ok(Some(p)) => {
+            let (total, contradicted, supported) = ctx.db.get_person_claims_stats(id).await.unwrap_or((0, 0, 0));
+            Json(serde_json::json!({
+                "person": p,
+                "claims_stats": {
+                    "total": total,
+                    "contradicted": contradicted,
+                    "supported": supported,
+                }
+            })).into_response()
+        }
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Person not found" })),
+        ).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+async fn handle_create_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<CreatePersonRequest>,
+) -> Response {
+    let name = body.canonical_name.trim();
+    if name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "canonical_name is required" })),
+        ).into_response();
+    }
+    let tags = body.tags.unwrap_or_default();
+    let rating = body.rating.unwrap_or(50);
+    let pub_fig = body.public_figure.unwrap_or(true);
+    match ctx.db.create_person(
+        name,
+        body.role.as_deref(),
+        body.category.as_deref(),
+        &tags,
+        rating,
+        body.notes.as_deref(),
+        pub_fig,
+    ).await {
+        Ok(id) => Json(serde_json::json!({ "ok": true, "id": id })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+async fn handle_update_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+    Json(body): Json<UpdatePersonRequest>,
+) -> Response {
+    let name = body.canonical_name.trim();
+    if name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "canonical_name is required" })),
+        ).into_response();
+    }
+    let tags = body.tags.unwrap_or_default();
+    let rating = body.rating.unwrap_or(50);
+    let pub_fig = body.public_figure.unwrap_or(true);
+    match ctx.db.update_person_full(
+        id,
+        name,
+        body.role.as_deref(),
+        body.category.as_deref(),
+        &tags,
+        rating,
+        body.notes.as_deref(),
+        pub_fig,
+        body.summary.as_deref(),
+        body.detailed_profile_json.as_deref(),
+    ).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true, "id": id })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+async fn handle_delete_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    match ctx.db.delete_person(id).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true, "deleted": id })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+async fn handle_reassign_video_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path((video_id, person_id)): Path<(String, i64)>,
+    Json(body): Json<ReassignVideoPersonRequest>,
+) -> Response {
+    let target_person_id = if let Some(new_id) = body.new_person_id {
+        new_id
+    } else if let Some(name) = body.canonical_name.filter(|n| !n.trim().is_empty()) {
+        let tags = body.tags.unwrap_or_default();
+        match ctx.db.create_person(
+            &name,
+            body.role.as_deref(),
+            body.category.as_deref(),
+            &tags,
+            75,
+            None,
+            true,
+        ).await {
+            Ok(new_id) => new_id,
+            Err(e) => return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            ).into_response(),
+        }
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Either new_person_id or canonical_name must be provided" })),
+        ).into_response();
+    };
+
+    match ctx.db.reassign_video_person(&video_id, person_id, target_person_id).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true, "video_id": video_id, "old_person_id": person_id, "new_person_id": target_person_id })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+async fn handle_remove_video_person(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path((video_id, person_id)): Path<(String, i64)>,
+) -> Response {
+    match ctx.db.remove_person_from_video(&video_id, person_id).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true, "video_id": video_id, "removed_person_id": person_id })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
 }
 
 async fn handle_list_seeds(State(ctx): State<Arc<PipelineContext>>) -> Response {

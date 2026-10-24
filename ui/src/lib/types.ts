@@ -1,6 +1,6 @@
 export type Lane = 'leads' | 'already_checked' | 'low_quality' | 'failed' | 'screened_out' | 'pasted';
 
-export type Screen = 'inbox' | 'creators' | 'seeds' | 'calibration' | 'settings' | 'export' | 'help';
+export type Screen = 'inbox' | 'creators' | 'people' | 'seeds' | 'calibration' | 'settings' | 'export' | 'help';
 
 export interface LeadCard {
   id: string;
@@ -68,12 +68,36 @@ export interface Evidence {
   similarity: number | null;
 }
 
+export interface DetailedPersonProfile {
+  identity?: string;
+  contact_locations?: string;
+  network_associates?: string;
+  education_career?: string;
+  financial_assets?: string;
+  legal_regulatory?: string;
+  digital_media_presence?: string;
+  affiliations_beliefs?: string;
+  psychographic_behavioral?: string;
+}
+
 export interface Person {
   id: number;
   canonical_name: string;
-  role_hint: string | null;
-  wikidata_id: string | null;
-  is_public_figure: boolean;
+  variants?: string[];
+  role?: string | null;
+  role_hint?: string | null;
+  public_figure?: boolean;
+  is_public_figure?: boolean;
+  wikidata_id?: string | null;
+  summary?: string | null;
+  researched_at?: string | null;
+  mentions?: number | null;
+  found_in?: string | null;
+  tags?: string[];
+  rating?: number;
+  category?: string | null;
+  notes?: string | null;
+  detailed_profile_json?: string | null;
 }
 
 export interface Creator {

@@ -13,11 +13,13 @@
     onKeep,
     onDiscard,
     onResearchMore,
+    isCompact = false,
   }: {
     card: LeadCard;
     isSelected: boolean;
     isChecked: boolean;
     currentLang: Language;
+    isCompact?: boolean;
     onSelect: (id: string) => void;
     onToggleCheck: (id: string) => void;
     onKeep: (id: string) => void;
@@ -64,6 +66,7 @@
   class="lead-card"
   class:selected={isSelected}
   class:checked={isChecked}
+  class:compact={isCompact}
   onclick={() => onSelect(card.id)}
   role="option"
   tabindex="0"
@@ -226,6 +229,30 @@
     border-color: var(--primary-accent);
     box-shadow: 0 0 0 2px var(--primary-accent-alpha);
     background: var(--card-selected-bg);
+  }
+
+  .lead-card.compact {
+    padding: 0.35rem 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .lead-card.compact .thumb-col {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+  }
+
+  .lead-card.compact .creator-handle {
+    max-width: 120px;
+  }
+
+  .lead-card.compact .reason-flagged {
+    display: none;
+  }
+
+  .lead-card.compact .badge {
+    padding: 1px 3px;
+    font-size: 0.62rem;
   }
 
   .select-col {

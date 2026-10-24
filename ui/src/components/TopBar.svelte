@@ -389,6 +389,9 @@
     <button class="nav-tab" class:active={activeScreen === 'creators'} onclick={() => onNavigate('creators')}>
       {t.tabCreators}
     </button>
+    <button class="nav-tab" class:active={activeScreen === 'people'} onclick={() => onNavigate('people')}>
+      {t.tabPeople}
+    </button>
     <button class="nav-tab" class:active={activeScreen === 'seeds'} onclick={() => onNavigate('seeds')}>
       {t.tabSeeds}
     </button>

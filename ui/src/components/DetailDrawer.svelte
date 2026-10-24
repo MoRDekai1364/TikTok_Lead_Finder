@@ -3,12 +3,15 @@
     aiCheckTranscript,
     deleteVideo,
     fetchEvidencePreview,
+    fetchPeople,
     fetchVideoDetail,
     fetchVideosByCreator,
     getCoreUrl,
     googleAiFixTranscript,
     logDecision,
     queryGoogleAi,
+    reassignVideoPerson,
+    removePersonFromVideo,
     researchPerson,
     retranscribeVideo,
     setCreatorWatchlist,
@@ -60,6 +63,15 @@
   let isLoadingPreview = $state(false);
   let isResearchingPersonId = $state<number | null>(null);
   let expandedEvidenceId = $state<number | null>(null);
+  let isPlaying = $state(false);
+  let videoContainerRef = $state<HTMLElement | null>(null);
+  let isVideoOutOfView = $state(false);
+  let disambiguatingPerson = $state<Person | null>(null);
+  let availablePeople = $state<Person[]>([]);
+  let disambiguateNewName = $state('');
+  let disambiguateRole = $state('');
+  let disambiguateTags = $state('');
+  let disambiguateTargetPersonId = $state<number | null>(null);
 
   const transcriptDisplaySegments = $derived.by(() => {
     if (!detail?.transcript) return [];
@@ -315,8 +327,7 @@
       if (res && res.corrected_text) {
         detail.transcript.edited_text = res.corrected_text;
         editedText = res.corrected_text;
-        await navigator.clipboard.writeText(res.corrected_text);
-        copyToast = currentLang === 'bg' ? '✓ Коригирано с AI и копирано!' : '✓ AI corrected & copied!';
+        copyToast = currentLang === 'bg' ? '✓ Коригирано с AI!' : '✓ AI corrected!';
       }
     } catch {
       copyToast = currentLang === 'bg' ? 'Грешка при AI проверка' : 'AI check error';
@@ -329,21 +340,122 @@
   async function handleGoogleAiFix() {
     if (!detail?.transcript || isGoogleAiFixing) return;
     isGoogleAiFixing = true;
-    copyToast = currentLang === 'bg' ? '🌐 Google AI обработка...' : '🌐 Running Google AI fix...';
+    copyToast = currentLang === 'bg' ? '✨ AI поправка на готовия транскрипт...' : '✨ Refining transcript with AI...';
     try {
       const res = await googleAiFixTranscript(detail.video.id);
       if (res && res.corrected_text) {
         detail.transcript.edited_text = res.corrected_text;
         editedText = res.corrected_text;
-        await navigator.clipboard.writeText(res.corrected_text);
-        copyToast = currentLang === 'bg' ? '✓ Поправено с Google AI и запазено!' : '✓ Corrected with Google AI & saved!';
+        copyToast = currentLang === 'bg' ? '✓ Поправено с AI!' : '✓ Corrected with AI!';
       }
     } catch {
-      copyToast = currentLang === 'bg' ? 'Грешка при Google AI поправка' : 'Google AI fix error';
+      copyToast = currentLang === 'bg' ? 'Грешка при AI поправка' : 'AI fix error';
     } finally {
       isGoogleAiFixing = false;
       setTimeout(() => (copyToast = null), 3000);
     }
+  }
+
+  function togglePlayPause() {
+    if (!videoElement) return;
+    if (videoElement.paused) {
+      videoElement.play();
+      isPlaying = true;
+    } else {
+      videoElement.pause();
+      isPlaying = false;
+    }
+  }
+
+  function seekRelative(seconds: number) {
+    if (!videoElement) return;
+    videoElement.currentTime = Math.max(0, videoElement.currentTime + seconds);
+  }
+
+  function handleDrawerScroll(e: Event) {
+    const target = e.target as HTMLElement;
+    if (!target) return;
+    isVideoOutOfView = target.scrollTop > 300;
+  }
+
+  function formatDuration(sec: number | null): string {
+    if (!sec) return '00:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function formatViews(v: number | null): string {
+    if (!v) return '0';
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+    return v.toString();
+  }
+
+  function formatTime(ms: number): string {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = Math.floor(totalSec % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function handleSegmentEdit(seg: any, newTxt: string) {
+    seg.text = newTxt;
+    editedText = transcriptDisplaySegments.map((s) => s.text).join(' ');
+  }
+
+  async function toggleTranscriptEditing() {
+    if (isEditingTranscript) {
+      await handleSaveTranscript();
+    } else {
+      isEditingTranscript = true;
+    }
+  }
+
+  async function handleOpenDisambiguate(person: Person) {
+    disambiguatingPerson = person;
+    disambiguateTargetPersonId = person.id;
+    disambiguateNewName = person.canonical_name;
+    disambiguateRole = person.role || '';
+    disambiguateTags = (person.tags || []).join(', ');
+    try {
+      availablePeople = await fetchPeople();
+    } catch {}
+  }
+
+  async function handleConfirmDisambiguation() {
+    if (!detail || !disambiguatingPerson) return;
+    try {
+      if (disambiguateTargetPersonId && disambiguateTargetPersonId !== disambiguatingPerson.id) {
+        await reassignVideoPerson(detail.video.id, disambiguatingPerson.id, {
+          new_person_id: disambiguateTargetPersonId,
+        });
+      } else if (disambiguateNewName.trim() && disambiguateNewName.trim() !== disambiguatingPerson.canonical_name) {
+        const tagsArr = disambiguateTags.split(',').map((t) => t.trim().replace(/^\[|\]$/g, '')).filter(Boolean);
+        await reassignVideoPerson(detail.video.id, disambiguatingPerson.id, {
+          canonical_name: disambiguateNewName.trim(),
+          role: disambiguateRole.trim() || undefined,
+          tags: tagsArr,
+        });
+      }
+      const fresh = await fetchVideoDetail(detail.video.id);
+      detail.people = fresh.people;
+      disambiguatingPerson = null;
+      copyToast = currentLang === 'bg' ? '✓ Лицето е коригирано!' : '✓ Person updated!';
+      setTimeout(() => (copyToast = null), 2500);
+    } catch {
+      copyToast = currentLang === 'bg' ? 'Грешка при пренасочване' : 'Reassignment error';
+      setTimeout(() => (copyToast = null), 2500);
+    }
+  }
+
+  async function handleRemovePersonFromVideo(person: Person) {
+    if (!detail) return;
+    if (!confirm(currentLang === 'bg' ? `Премахване на ${person.canonical_name} от това видео?` : `Remove ${person.canonical_name}?`)) return;
+    try {
+      await removePersonFromVideo(detail.video.id, person.id);
+      detail.people = detail.people.filter((p) => p.id !== person.id);
+    } catch {}
   }
 
   async function handleOpenGoogleAiResearch(query: string, mode: 'research' | 'refine' | 'factcheck' = 'research') {
@@ -535,17 +647,32 @@
       <span>{currentLang === 'bg' ? 'Зареждане на детайлите...' : 'Loading video details...'}</span>
     </div>
   {:else if detail}
-    <div class="drawer-body">
-      <div class="media-section">
-        <video
-          bind:this={videoElement}
-          src={videoSrc}
-          controls
-          ontimeupdate={handleTimeUpdate}
-          class="video-player"
-        >
-          <track kind="captions" />
-        </video>
+    <div class="drawer-body" onscroll={handleDrawerScroll}>
+      <div class="media-section feed-mode" bind:this={videoContainerRef}>
+        <div class="feed-top-meta">
+          <div class="feed-creator-badge">
+            <span class="creator-name">@{detail.video.creator_handle || 'tiktok_creator'}</span>
+            {#if detail.video.views}
+              <span class="creator-views">• {formatViews(detail.video.views)} гледания</span>
+            {/if}
+          </div>
+          {#if detail.video.duration_s}
+            <span class="feed-duration-pill">{formatDuration(detail.video.duration_s)}</span>
+          {/if}
+        </div>
+        <div class="feed-video-container">
+          <video
+            bind:this={videoElement}
+            src={videoSrc}
+            controls
+            ontimeupdate={handleTimeUpdate}
+            onplay={() => (isPlaying = true)}
+            onpause={() => (isPlaying = false)}
+            class="feed-vertical-player"
+          >
+            <track kind="captions" />
+          </video>
+        </div>
       </div>
 
       <div class="section-card transcript-section">
@@ -564,110 +691,102 @@
             {/if}
             <button
               class="btn btn-secondary btn-sm"
+              onclick={handleFullRetranscribe}
+              disabled={isRetranscribing}
+              title="Повторно гласово разпознаване от нулата с Whisper"
+            >
+              {isRetranscribing ? '...' : '🔄 Whisper'}
+            </button>
+            <button
+              class="btn btn-primary btn-sm btn-ai-fix"
+              onclick={handleGoogleAiFix}
+              disabled={isGoogleAiFixing}
+              title="Поправя фонетични грешки и имена в готовия транскрипт (без презаписване на клипборда)"
+            >
+              {isGoogleAiFixing ? '...' : '✨ AI Поправка'}
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              onclick={toggleTranscriptEditing}
+              title="Ръчна редакция на текста на място с прослушване"
+            >
+              {isEditingTranscript ? (currentLang === 'bg' ? '✓ Запази' : '✓ Save') : '✏️ ' + (currentLang === 'bg' ? 'Редактирай' : 'Edit')}
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
               onclick={handleCopyTranscript}
-              title={currentLang === 'bg' ? 'Копирай текста в клипборда' : 'Copy transcript to clipboard'}
+              title="Копирай транскрипта в клипборда"
             >
               📋 {currentLang === 'bg' ? 'Копирай' : 'Copy'}
             </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={handleWarmStartRedact}
-              disabled={isRetranscribing}
-              title={currentLang === 'bg' ? 'Преработка с българския речник и AI без изтриване' : 'Fast lexicon & AI warm-start redaction'}
-            >
-              {isRetranscribing ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Бърза преработка' : 'Warm-start')}
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={handleFullRetranscribe}
-              disabled={isRetranscribing}
-              title={currentLang === 'bg' ? 'Пълно повторно разпознаване с Whisper' : 'Full Whisper re-transcription'}
-            >
-              🔄 Whisper
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={handleAiCheckAndCopy}
-              disabled={isAiChecking}
-              title={currentLang === 'bg' ? 'AI проверка на думите и копиране' : 'AI spellcheck & copy'}
-            >
-              {isAiChecking ? '...' : '🤖 AI'}
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={handleGoogleAiFix}
-              disabled={isGoogleAiFixing}
-              title={currentLang === 'bg' ? 'Автоматична поправка чрез Google AI във фонов режим' : 'Automated fix via Google AI search in background'}
-            >
-              {isGoogleAiFixing ? '...' : '🌐 Google AI Fix'}
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick={() => handleOpenGoogleAiResearch(editedText || detail?.transcript?.text || '', 'refine')}
-              disabled={isGoogleAiQuerying}
-              title={currentLang === 'bg' ? 'Прецизиране и стилистично изчистване на текста с Google AI' : 'Refine text with Google AI Mode'}
-            >
-              {isGoogleAiQuerying ? '...' : '✨ ' + (currentLang === 'bg' ? 'Прецизирай' : 'Refine')}
-            </button>
-            {#if !isEditingTranscript}
-              <button class="btn btn-secondary btn-sm" onclick={() => (isEditingTranscript = true)}>
-                ✏️ {t.transcriptEditBtn}
-              </button>
-            {:else}
-              <button class="btn btn-primary btn-sm" onclick={handleSaveTranscript} disabled={isSavingTranscript}>
-                {isSavingTranscript ? '...' : t.transcriptSaveBtn}
-              </button>
-            {/if}
           </div>
         </div>
 
-        {#if isEditingTranscript}
-          <textarea class="transcript-editor" bind:value={editedText} rows="6"></textarea>
-        {:else if detail.transcript}
-          <div class="transcript-segments">
+        {#if detail.transcript}
+          <div class="transcript-segments" class:editing-active={isEditingTranscript}>
+            {#if isEditingTranscript}
+              <div class="editing-banner">
+                💡 {currentLang === 'bg'
+                  ? 'Кликнете върху сегмент за прослушване, редактирайте текста на място в реално време.'
+                  : 'Click any segment to hear audio, edit the text in real time.'}
+              </div>
+            {/if}
             {#each transcriptDisplaySegments as seg}
               {@const cinfo = getSegmentClaimInfo(seg)}
-              <span
-                id={`seg-${seg.start_ms}`}
-                class="transcript-segment"
-                class:active={currentTimeMs >= seg.start_ms && currentTimeMs <= seg.end_ms}
-                class:highlighted-pulse={highlightedSegmentMs === seg.start_ms}
-                class:claim-mark-contradicted={cinfo?.verdict === 'contradicted'}
-                class:claim-mark-supported={cinfo?.verdict === 'supported'}
-                class:claim-mark-unverifiable={cinfo?.verdict === 'unverifiable' || cinfo?.verdict === 'already_checked'}
-                onclick={() => {
-                  seekToMs(seg.start_ms);
-                  if (cinfo) {
-                    jumpToClaim(cinfo.claimId);
-                  }
-                }}
-                role="button"
-                tabindex="0"
-                onkeydown={(e) => {
-                  if (e.key === 'Enter') {
+              {#if isEditingTranscript}
+                <span
+                  class="transcript-segment-editable"
+                  contenteditable="true"
+                  onclick={() => seekToMs(seg.start_ms)}
+                  onkeydown={(e) => e.key === 'Enter' && seekToMs(seg.start_ms)}
+                  oninput={(e) => handleSegmentEdit(seg, (e.target as HTMLElement).innerText)}
+                  role="textbox"
+                  tabindex="0"
+                  title="Кликни за прослушване, пиши за редакция"
+                >{seg.text} </span>
+              {:else}
+                <span
+                  id={`seg-${seg.start_ms}`}
+                  class="transcript-segment"
+                  class:active={currentTimeMs >= seg.start_ms && currentTimeMs <= seg.end_ms}
+                  class:highlighted-pulse={highlightedSegmentMs === seg.start_ms}
+                  class:claim-mark-contradicted={cinfo?.verdict === 'contradicted'}
+                  class:claim-mark-supported={cinfo?.verdict === 'supported'}
+                  class:claim-mark-unverifiable={cinfo?.verdict === 'unverifiable' || cinfo?.verdict === 'already_checked'}
+                  onclick={() => {
                     seekToMs(seg.start_ms);
-                    if (cinfo) jumpToClaim(cinfo.claimId);
-                  }
-                }}
-                title={cinfo ? `Твърдение #${cinfo.index}: ${cinfo.verdict}` : `Сегмент: ${Math.round(seg.start_ms / 1000)}s`}
-              >
-                {#if cinfo}
-                  <span
-                    class="claim-badge-inline {cinfo.verdict}"
-                    onclick={(e) => {
-                      e.stopPropagation();
+                    if (cinfo) {
                       jumpToClaim(cinfo.claimId);
-                    }}
-                    role="button"
-                    tabindex="0"
-                    onkeydown={(e) => e.key === 'Enter' && jumpToClaim(cinfo.claimId)}
-                    title="Отиди на твърдение #{cinfo.index}"
-                  >
-                    [Т{cinfo.index}]
-                  </span>
-                {/if}
-                {seg.text}{' '}
-              </span>
+                    }
+                  }}
+                  role="button"
+                  tabindex="0"
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') {
+                      seekToMs(seg.start_ms);
+                      if (cinfo) jumpToClaim(cinfo.claimId);
+                    }
+                  }}
+                  title={cinfo ? `Твърдение #${cinfo.index}: ${cinfo.verdict}` : `Сегмент: ${Math.round(seg.start_ms / 1000)}s`}
+                >
+                  {#if cinfo}
+                    <span
+                      class="claim-badge-inline {cinfo.verdict}"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        jumpToClaim(cinfo.claimId);
+                      }}
+                      role="button"
+                      tabindex="0"
+                      onkeydown={(e) => e.key === 'Enter' && jumpToClaim(cinfo.claimId)}
+                      title="Отиди на твърдение #{cinfo.index}"
+                    >
+                      [Т{cinfo.index}]
+                    </span>
+                  {/if}
+                  {seg.text}{' '}
+                </span>
+              {/if}
             {/each}
           </div>
         {:else}
@@ -792,19 +911,11 @@
                     🌐 Google Търсене ↗
                   </a>
                   <button
-                    class="btn btn-secondary btn-sm factcheck-verify-btn"
+                    class="btn btn-primary btn-sm factcheck-verify-btn"
                     onclick={() => handleTriggerClaimVerify(claim.text_bg)}
-                    title="Стартирай автоматично проучване и извличане на доказателства с AI"
+                    title="Провери твърдението в българските медии и Factcheck.bg и извлечи цитати"
                   >
-                    ⚡ {currentLang === 'bg' ? 'Провери онлайн (AI & Web)' : 'Online Verify'}
-                  </button>
-                  <button
-                    class="btn btn-secondary btn-sm factcheck-verify-btn"
-                    onclick={() => handleOpenGoogleAiResearch(claim.text_bg, 'factcheck')}
-                    disabled={isGoogleAiQuerying}
-                    title="Задълбочено проучване на твърдението с Google AI Mode"
-                  >
-                    🌐 {currentLang === 'bg' ? 'Google AI Deep Research' : 'Google AI Deep Research'}
+                    ⚡ {currentLang === 'bg' ? 'Провери твърдението' : 'Verify Claim'}
                   </button>
                 </div>
               </div>
@@ -934,17 +1045,23 @@
                     class="btn btn-primary btn-sm person-verify-btn"
                     onclick={() => handleResearchPerson(person)}
                     disabled={isResearchingPersonId === person.id}
-                    title="Стартирай автоматично проучване, скрапване и профилиране на лицето с AI"
+                    title="Стартирай пълно 9-степенно OSINT разузнаване на лицето с AI"
                   >
-                    {isResearchingPersonId === person.id ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи в мрежата с AI' : 'AI Web Research')}
+                    {isResearchingPersonId === person.id ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи лицето' : 'OSINT Research')}
                   </button>
                   <button
                     class="btn btn-secondary btn-sm"
-                    onclick={() => handleOpenGoogleAiResearch(person.canonical_name, 'research')}
-                    disabled={isGoogleAiQuerying}
-                    title="Задълбочено проучване на лицето с Google AI Mode"
+                    onclick={() => handleOpenDisambiguate(person)}
+                    title="Смени или коригирай това лице (напр. политик вместо футболист)"
                   >
-                    🌐 Google AI
+                    ✏️ {currentLang === 'bg' ? 'Смени / Коригирай' : 'Disambiguate'}
+                  </button>
+                  <button
+                    class="btn btn-danger btn-sm"
+                    onclick={() => handleRemovePersonFromVideo(person)}
+                    title="Премахни от това видео"
+                  >
+                    ✕
                   </button>
                   <a
                     href={`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg "' + person.canonical_name + '"')}`}
@@ -1230,6 +1347,71 @@
       </div>
     </div>
   {/if}
+
+  {#if isVideoOutOfView && detail}
+    <div class="floating-audio-widget">
+      <button class="float-btn float-play" onclick={togglePlayPause} title={isPlaying ? 'Пауза' : 'Възпроизвеждане'}>
+        {isPlaying ? '⏸' : '▶'}
+      </button>
+      <div class="float-controls-group">
+        <button class="float-btn float-seek" onclick={() => seekRelative(-5)} title="Назад 5s">
+          ⏪
+        </button>
+        <button class="float-btn float-seek" onclick={() => seekRelative(5)} title="Напред 5s">
+          ⏩
+        </button>
+        <span class="float-time-text">{formatTime(currentTimeMs)}</span>
+      </div>
+    </div>
+  {/if}
+
+  {#if disambiguatingPerson}
+    <div class="modal-backdrop" onclick={() => (disambiguatingPerson = null)} role="presentation">
+      <div class="modal-dialog" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+        <div class="modal-head">
+          <h3>✏️ {currentLang === 'bg' ? 'Смяна на лице:' : 'Disambiguate:'} {disambiguatingPerson.canonical_name}</h3>
+          <button class="close-btn" onclick={() => (disambiguatingPerson = null)}>✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint">
+            {currentLang === 'bg'
+              ? 'Ако автоматичното разпознаване е асоциирало видеото с грешно лице (напр. футболист вместо политик), изберете правилното лице от базата или въведете ново.'
+              : 'Reassign this detection to another person in the database or specify a new profile.'}
+          </p>
+          <label>
+            <span>{currentLang === 'bg' ? 'Избери съществуваща личност от базата:' : 'Select existing person:'}</span>
+            <select bind:value={disambiguateTargetPersonId}>
+              <option value={null}>-- {currentLang === 'bg' ? 'Или въведи ново лице отдолу' : 'Or enter new details below'} --</option>
+              {#each availablePeople as p}
+                <option value={p.id}>{p.canonical_name} ({p.role || p.category || 'Личност'})</option>
+              {/each}
+            </select>
+          </label>
+          <hr class="modal-divider" />
+          <label>
+            <span>{currentLang === 'bg' ? 'Или въведи ново правилно име:' : 'Or enter new name:'}</span>
+            <input type="text" bind:value={disambiguateNewName} placeholder="напр. Костадин Костадинов (политик)" />
+          </label>
+          <label>
+            <span>{currentLang === 'bg' ? 'Длъжност / Категория:' : 'Role / Category:'}</span>
+            <input type="text" bind:value={disambiguateRole} placeholder="Политик, лидер на партия" />
+          </label>
+          <label>
+            <span>{currentLang === 'bg' ? 'Тагове:' : 'Tags:'}</span>
+            <input type="text" bind:value={disambiguateTags} placeholder="[политик], [партия X], [депутат]" />
+          </label>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-secondary btn-sm" onclick={() => (disambiguatingPerson = null)}>
+            {currentLang === 'bg' ? 'Отказ' : 'Cancel'}
+          </button>
+          <button class="btn btn-primary btn-sm" onclick={handleConfirmDisambiguation}>
+            {currentLang === 'bg' ? '✓ Потвърди корекцията' : '✓ Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </aside>
 
 <style>
@@ -1325,6 +1507,173 @@
     background: #000;
     border-radius: 8px;
     overflow: hidden;
+  }
+
+  .media-section.feed-mode {
+    width: 100%;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+  }
+
+  .feed-top-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.85rem;
+    background: rgba(18, 18, 24, 0.9);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .feed-creator-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .creator-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary-accent);
+  }
+
+  .creator-views {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .feed-duration-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .feed-video-container {
+    width: 100%;
+    max-height: 460px;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feed-vertical-player {
+    width: 100%;
+    max-height: 460px;
+    aspect-ratio: 9 / 16;
+    object-fit: contain;
+    display: block;
+  }
+
+  .btn-ai-fix {
+    background: var(--primary-accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .editing-banner {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-accent);
+    background: var(--primary-accent-alpha);
+    border: 1px dashed var(--primary-accent);
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    width: 100%;
+  }
+
+  .transcript-segment-editable {
+    display: inline;
+    padding: 1px 3px;
+    border-radius: 3px;
+    cursor: text;
+    background: rgba(59, 130, 246, 0.08);
+    border-bottom: 1px dashed #3b82f6;
+    outline: none;
+  }
+
+  .transcript-segment-editable:focus {
+    background: rgba(59, 130, 246, 0.2);
+    border-bottom: 1px solid #3b82f6;
+  }
+
+  .floating-audio-widget {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--surface-bg);
+    border: 1px solid var(--primary-accent);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    z-index: 60;
+  }
+
+  .float-btn {
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+
+  .float-btn:hover {
+    transform: scale(1.08);
+  }
+
+  .float-play {
+    width: 36px;
+    height: 36px;
+    background: var(--primary-accent);
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  .float-seek {
+    width: 28px;
+    height: 28px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-heading);
+    font-size: 0.75rem;
+  }
+
+  .float-controls-group {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .float-time-text {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin-left: 0.25rem;
+  }
+
+  .modal-hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .modal-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 0.4rem 0;
   }
 
   .video-player {

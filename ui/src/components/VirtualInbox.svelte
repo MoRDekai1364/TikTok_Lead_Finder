@@ -168,7 +168,7 @@
   });
 </script>
 
-<div class="inbox-container">
+<div class="inbox-container" class:has-right-column={Boolean((isVideoFeedOpen && !isDrawerOpen) || isDrawerOpen)}>
   <div class="inbox-subbar">
     <div class="lane-tabs" role="tablist">
       <button
@@ -324,6 +324,7 @@
                 isSelected={selectedId === item.id}
                 isChecked={checkedIds.has(item.id)}
                 {currentLang}
+                isCompact={Boolean((isVideoFeedOpen && !isDrawerOpen) || isDrawerOpen)}
                 onSelect={onSelectCard}
                 onToggleCheck={onToggleCheck}
                 onKeep={onKeep}
@@ -413,6 +414,24 @@
     display: flex;
     flex-direction: column;
     background: var(--bg-canvas);
+  }
+
+  .has-right-column .virtual-scroll-viewport {
+    padding: 0.5rem 0.65rem;
+  }
+
+  .has-right-column .inbox-subbar {
+    padding: 0.5rem 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .has-right-column .filter-controls {
+    flex-wrap: wrap;
+  }
+
+  .has-right-column .search-box input {
+    width: 140px;
   }
 
   .inbox-subbar {

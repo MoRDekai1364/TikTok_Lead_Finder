@@ -18,6 +18,7 @@
 
   import CalibrationScreen from './components/CalibrationScreen.svelte';
   import CreatorsScreen from './components/CreatorsScreen.svelte';
+  import PeopleScreen from './components/PeopleScreen.svelte';
   import DetailDrawer from './components/DetailDrawer.svelte';
   import ExportScreen from './components/ExportScreen.svelte';
   import HelpScreen from './components/HelpScreen.svelte';
@@ -374,6 +375,8 @@
         />
       {:else if activeScreen === 'creators'}
         <CreatorsScreen {currentLang} />
+      {:else if activeScreen === 'people'}
+        <PeopleScreen {currentLang} />
       {:else if activeScreen === 'seeds'}
         <SeedsScreen {currentLang} />
       {:else if activeScreen === 'calibration'}
