@@ -4,6 +4,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { BenchmarkProgress, PowerInfo, QueueCounts, ScaleStatus, Screen } from '../lib/types';
+  import { getCapacityTierInfo } from '../lib/types';
 
   let {
     activeScreen,
@@ -67,6 +68,15 @@
   } | null>(null);
 
   const t = $derived(translations[currentLang]);
+
+  const topTier = $derived(
+    capacityPerDay ? getCapacityTierInfo(capacityPerDay, currentLang) : null
+  );
+  const capacityTooltip = $derived(
+    topTier
+      ? `${t.capacityPerDay} ${capacityPerDay} (${topTier.tierName} • ${topTier.percentOfTarget}% ${currentLang === 'bg' ? 'от таргета' : 'of target'} • ~${topTier.secondsPerVideo}s/${currentLang === 'bg' ? 'видео' : 'vid'})`
+      : t.capacityPerDay
+  );
 
   const TERMINAL_STATES = [
     'VERIFIED',
@@ -325,10 +335,18 @@
       {/if}
 
       {#if capacityPerDay !== null}
-        <div class="indicator-pill capacity-pill" title={t.capacityPerDay}>
+        <button
+          type="button"
+          class="indicator-pill capacity-pill clickable"
+          title={capacityTooltip}
+          onclick={onOpenBenchmarkModal}
+        >
           <span class="dot green"></span>
+          {#if topTier}
+            <span class="topbar-tier-icon">{topTier.icon}</span>
+          {/if}
           <span>{capacityPerDay.toLocaleString()} / ден</span>
-        </div>
+        </button>
       {/if}
 
       <div class="indicator-pill queue-pill" title="Опашка на задачите">
@@ -684,6 +702,24 @@
   .power-pill:hover {
     filter: brightness(1.15);
     transform: translateY(-1px);
+  }
+
+  .capacity-pill.clickable {
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #34d399;
+  }
+
+  .capacity-pill.clickable:hover {
+    filter: brightness(1.2);
+    transform: translateY(-1px);
+  }
+
+  .topbar-tier-icon {
+    font-size: 0.85rem;
+    margin-right: 0.2rem;
   }
 
   .icon-btn {

@@ -394,3 +394,95 @@ export interface BenchmarkStatusResponse {
   battery_profile: HardwareProfile | null;
   active_profile: HardwareProfile | null;
 }
+
+export interface CapacityTierInfo {
+  tierName: string;
+  badgeClass: 'ultra' | 'high' | 'recommended' | 'moderate' | 'basic';
+  icon: string;
+  percentOfTarget: number;
+  explanation: string;
+  equivHoursPerDay: number;
+  equivChannels: number;
+  secondsPerVideo: number;
+}
+
+export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): CapacityTierInfo {
+  const roundCap = Math.max(0, Math.round(cap || 0));
+  const percentOfTarget = Math.round((roundCap / 300) * 100);
+  const equivHoursPerDay = Math.max(1, Math.round((roundCap * 45) / 3600));
+  const equivChannels = Math.max(1, Math.round(roundCap / 15));
+  const secondsPerVideo = roundCap > 0 ? Math.max(1, Math.round(43200 / roundCap)) : 0;
+
+  if (roundCap >= 1200) {
+    return {
+      tierName: lang === 'bg' ? 'Експертна AI работна станция (Ultra Tier)' : 'Pro AI Workstation (Ultra Tier)',
+      badgeClass: 'ultra',
+      icon: '🏆',
+      percentOfTarget,
+      explanation: lang === 'bg'
+        ? 'Изключителна производителност! Системата ви е на ниво професионална AI работна станция. Може да следи десетки TikTok канали едновременно без никакво забавяне.'
+        : 'Exceptional throughput! Pro workstation grade. Effortlessly monitors dozens of TikTok channels in real-time.',
+      equivHoursPerDay,
+      equivChannels,
+      secondsPerVideo,
+    };
+  }
+
+  if (roundCap >= 600) {
+    return {
+      tierName: lang === 'bg' ? 'Висока производителност (High Performance)' : 'High Performance Desktop',
+      badgeClass: 'high',
+      icon: '⚡',
+      percentOfTarget,
+      explanation: lang === 'bg'
+        ? `Много висока скорост! Надвишава препоръчителния минимум (300 видеа/ден) с ${percentOfTarget - 100}%. Спокойно сканира и проверява целия дневен TikTok нюзфийд.`
+        : `Very fast processing! Exceeds target baseline (300/day) by ${percentOfTarget - 100}%. Effortlessly screens the entire daily feed.`,
+      equivHoursPerDay,
+      equivChannels,
+      secondsPerVideo,
+    };
+  }
+
+  if (roundCap >= 300) {
+    return {
+      tierName: lang === 'bg' ? 'Препоръчително ниво (Recommended Tier)' : 'Recommended Baseline Tier',
+      badgeClass: 'recommended',
+      icon: '🚀',
+      percentOfTarget,
+      explanation: lang === 'bg'
+        ? 'Отлична скорост. Напълно покрива препоръчителния таргет на LeadFinder за постоянен автоматичен анализ на съдържание.'
+        : 'Optimal baseline speed. Fully satisfies the target quota for continuous automated screening.',
+      equivHoursPerDay,
+      equivChannels,
+      secondsPerVideo,
+    };
+  }
+
+  if (roundCap >= 150) {
+    return {
+      tierName: lang === 'bg' ? 'Стандартно / Мобилно ниво (Standard Tier)' : 'Standard / Mobile Tier',
+      badgeClass: 'moderate',
+      icon: '⚖️',
+      percentOfTarget,
+      explanation: lang === 'bg'
+        ? 'Добра скорост за лична употреба и по-малки списъци. При по-големи опашки се препоръчва работа на заден план.'
+        : 'Good for personal use and smaller watchlists. Background processing is recommended for larger batches.',
+      equivHoursPerDay,
+      equivChannels,
+      secondsPerVideo,
+    };
+  }
+
+  return {
+    tierName: lang === 'bg' ? 'Енергоспестяващ / Базов режим (Eco Tier)' : 'Power-Saver / Basic Tier',
+    badgeClass: 'basic',
+    icon: '🔋',
+    percentOfTarget,
+    explanation: lang === 'bg'
+      ? 'Икономичен режим за пестене на енергия. За максимална скорост включете зарядното или ползвайте безплатен Google AI ключ.'
+      : 'Power-saver mode. Connect to AC power or enable free Google AI cloud assist for maximum speed.',
+    equivHoursPerDay,
+    equivChannels,
+    secondsPerVideo,
+  };
+}

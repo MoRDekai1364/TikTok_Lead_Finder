@@ -8,6 +8,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { BenchmarkProgress, BenchmarkStatusResponse, HardwareProfile, PowerInfo } from '../lib/types';
+  import { getCapacityTierInfo } from '../lib/types';
 
   let {
     currentLang,
@@ -34,6 +35,24 @@
 
   const power = $derived<PowerInfo | null>(status?.power ?? null);
   const progress = $derived<BenchmarkProgress | null>(status?.progress ?? null);
+
+  const activeTier = $derived(
+    activeProfile?.capacity_per_day
+      ? getCapacityTierInfo(activeProfile.capacity_per_day, currentLang)
+      : null
+  );
+
+  const acTier = $derived(
+    status?.ac_profile?.capacity_per_day
+      ? getCapacityTierInfo(status.ac_profile.capacity_per_day, currentLang)
+      : null
+  );
+
+  const batteryTier = $derived(
+    status?.battery_profile?.capacity_per_day
+      ? getCapacityTierInfo(status.battery_profile.capacity_per_day, currentLang)
+      : null
+  );
 
   onMount(async () => {
     await loadStatus();
@@ -117,9 +136,16 @@
       </span>
     </div>
     {#if activeProfile}
-      <span class="capacity-pill">
-        {Math.round(activeProfile.capacity_per_day).toLocaleString()} {currentLang === 'bg' ? 'видеа / ден' : 'videos / day'}
-      </span>
+      <div class="header-cap-group">
+        {#if activeTier}
+          <span class="tier-pill tier-{activeTier.badgeClass}">
+            {activeTier.icon} {activeTier.tierName}
+          </span>
+        {/if}
+        <span class="capacity-pill">
+          {Math.round(activeProfile.capacity_per_day).toLocaleString()} {currentLang === 'bg' ? 'видеа / ден' : 'videos / day'}
+        </span>
+      </div>
     {/if}
   </div>
 
@@ -215,6 +241,20 @@
             <span class="m-val text-muted">{new Date(status.ac_profile.measured_at).toLocaleString()}</span>
           </div>
         </div>
+        {#if acTier}
+          <div class="tier-card-snippet tier-{acTier.badgeClass}">
+            <div class="tcs-top">
+              <span class="tcs-badge">{acTier.icon} {acTier.tierName}</span>
+              <span class="tcs-target">{acTier.percentOfTarget}% {currentLang === 'bg' ? 'от таргета' : 'of target'}</span>
+            </div>
+            <p class="tcs-desc">{acTier.explanation}</p>
+            <div class="tcs-stats">
+              <span>⏱️ ~{acTier.secondsPerVideo}s / {currentLang === 'bg' ? 'видео' : 'video'}</span>
+              <span>📺 ~{acTier.equivHoursPerDay}h {currentLang === 'bg' ? 'говор/24ч' : 'audio/24h'}</span>
+              <span>👥 ~{acTier.equivChannels} {currentLang === 'bg' ? 'канала' : 'creators'}</span>
+            </div>
+          </div>
+        {/if}
         <button
           class="btn btn-secondary mt-3"
           onclick={() => handleStartBenchmark('ac')}
@@ -277,6 +317,20 @@
             <span class="m-val text-muted">{new Date(status.battery_profile.measured_at).toLocaleString()}</span>
           </div>
         </div>
+        {#if batteryTier}
+          <div class="tier-card-snippet tier-{batteryTier.badgeClass}">
+            <div class="tcs-top">
+              <span class="tcs-badge">{batteryTier.icon} {batteryTier.tierName}</span>
+              <span class="tcs-target">{batteryTier.percentOfTarget}% {currentLang === 'bg' ? 'от таргета' : 'of target'}</span>
+            </div>
+            <p class="tcs-desc">{batteryTier.explanation}</p>
+            <div class="tcs-stats">
+              <span>⏱️ ~{batteryTier.secondsPerVideo}s / {currentLang === 'bg' ? 'видео' : 'video'}</span>
+              <span>📺 ~{batteryTier.equivHoursPerDay}h {currentLang === 'bg' ? 'говор/24ч' : 'audio/24h'}</span>
+              <span>👥 ~{batteryTier.equivChannels} {currentLang === 'bg' ? 'канала' : 'creators'}</span>
+            </div>
+          </div>
+        {/if}
         <button
           class="btn btn-secondary mt-3"
           onclick={() => handleStartBenchmark('battery')}
@@ -396,6 +450,53 @@
     color: var(--text-muted);
   }
 
+  .header-cap-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .tier-pill {
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .tier-pill.tier-ultra {
+    background: rgba(168, 85, 247, 0.18);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: #c084fc;
+  }
+
+  .tier-pill.tier-high {
+    background: rgba(59, 130, 246, 0.18);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+  }
+
+  .tier-pill.tier-recommended {
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+  }
+
+  .tier-pill.tier-moderate {
+    background: rgba(245, 158, 11, 0.18);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+  }
+
+  .tier-pill.tier-basic {
+    background: rgba(107, 114, 128, 0.18);
+    border: 1px solid rgba(107, 114, 128, 0.4);
+    color: #9ca3af;
+  }
+
   .capacity-pill {
     padding: 0.4rem 0.9rem;
     background: rgba(16, 185, 129, 0.15);
@@ -404,6 +505,79 @@
     font-size: 0.88rem;
     font-weight: 600;
     color: #34d399;
+  }
+
+  .tier-card-snippet {
+    margin-top: 0.75rem;
+    padding: 0.85rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .tier-card-snippet.tier-ultra {
+    background: rgba(168, 85, 247, 0.08);
+    border-color: rgba(168, 85, 247, 0.3);
+  }
+
+  .tier-card-snippet.tier-high {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .tier-card-snippet.tier-recommended {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .tier-card-snippet.tier-moderate {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+
+  .tier-card-snippet.tier-basic {
+    background: rgba(107, 114, 128, 0.08);
+    border-color: rgba(107, 114, 128, 0.3);
+  }
+
+  .tcs-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .tcs-badge {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-heading);
+  }
+
+  .tcs-target {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #34d399;
+  }
+
+  .tcs-desc {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: var(--text-muted);
+  }
+
+  .tcs-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-body);
+    font-weight: 500;
+    padding-top: 0.25rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
   }
 
   .power-status-banner {

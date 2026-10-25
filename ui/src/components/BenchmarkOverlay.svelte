@@ -3,6 +3,7 @@
   import { fetchCalibrationStatus, triggerBenchmark } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import type { BenchmarkProgress, PowerInfo } from '../lib/types';
+  import { getCapacityTierInfo } from '../lib/types';
 
   let {
     isOpen,
@@ -34,6 +35,12 @@
 
   const isBattery = $derived(
     effectiveProgress?.power_source === 'battery' || effectivePower?.power_source === 'battery'
+  );
+
+  const tierInfo = $derived(
+    effectiveProgress?.final_capacity
+      ? getCapacityTierInfo(effectiveProgress.final_capacity, currentLang)
+      : null
   );
 
   const stages = [
@@ -220,6 +227,78 @@
                 </p>
               </div>
             </div>
+
+            {#if tierInfo}
+              <div class="score-meaning-card tier-{tierInfo.badgeClass}">
+                <div class="smc-header">
+                  <div class="smc-badge">
+                    <span class="smc-icon">{tierInfo.icon}</span>
+                    <span class="smc-tier-name">{tierInfo.tierName}</span>
+                  </div>
+                  <div class="smc-target-tag" class:above={tierInfo.percentOfTarget >= 100}>
+                    {#if tierInfo.percentOfTarget >= 100}
+                      🎯 {tierInfo.percentOfTarget}% {currentLang === 'bg' ? 'от базовия таргет (300/ден)' : 'of baseline target (300/day)'}
+                    {:else}
+                      ⚠️ {tierInfo.percentOfTarget}% {currentLang === 'bg' ? 'от препоръчителния таргет' : 'of recommended target'}
+                    {/if}
+                  </div>
+                </div>
+
+                <p class="smc-explanation">
+                  {tierInfo.explanation}
+                </p>
+
+                <div class="smc-grid">
+                  <div class="smc-stat-box">
+                    <span class="smc-stat-label">
+                      {currentLang === 'bg' ? '⏱️ Обработка на 1 видео' : '⏱️ Per Video Speed'}
+                    </span>
+                    <strong class="smc-stat-val">
+                      ~{tierInfo.secondsPerVideo}s
+                    </strong>
+                    <span class="smc-stat-hint">
+                      {currentLang === 'bg' ? 'пълен ASR + LLM цикъл' : 'full pipeline cycle'}
+                    </span>
+                  </div>
+
+                  <div class="smc-stat-box">
+                    <span class="smc-stat-label">
+                      {currentLang === 'bg' ? '📺 Говор на денонощие' : '📺 Speech Audio / Day'}
+                    </span>
+                    <strong class="smc-stat-val">
+                      ~{tierInfo.equivHoursPerDay} {currentLang === 'bg' ? 'часа' : 'hours'}
+                    </strong>
+                    <span class="smc-stat-hint">
+                      {currentLang === 'bg' ? 'преслушано чист говор' : 'transcribed speech'}
+                    </span>
+                  </div>
+
+                  <div class="smc-stat-box">
+                    <span class="smc-stat-label">
+                      {currentLang === 'bg' ? '👥 Следени профили' : '👥 Monitored Creators'}
+                    </span>
+                    <strong class="smc-stat-val">
+                      ~{tierInfo.equivChannels} {currentLang === 'bg' ? 'канала' : 'creators'}
+                    </strong>
+                    <span class="smc-stat-hint">
+                      {currentLang === 'bg' ? 'при 15 видеа/ден' : 'at 15 vids/day each'}
+                    </span>
+                  </div>
+
+                  <div class="smc-stat-box">
+                    <span class="smc-stat-label">
+                      {currentLang === 'bg' ? '🎯 Индекс спрямо целта' : '🎯 Target Fulfillment'}
+                    </span>
+                    <strong class="smc-stat-val">
+                      {tierInfo.percentOfTarget}%
+                    </strong>
+                    <span class="smc-stat-hint">
+                      {currentLang === 'bg' ? 'базов минимум: 300' : 'baseline: 300/day'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            {/if}
 
             <div class="power-switch-notice">
               <span class="ps-icon">💡</span>
@@ -684,6 +763,117 @@
     color: #6ee7b7;
     font-size: 1.05rem;
     margin-left: 0.35rem;
+  }
+
+  .score-meaning-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color, #2b303c);
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .score-meaning-card.tier-ultra {
+    background: rgba(168, 85, 247, 0.08);
+    border-color: rgba(168, 85, 247, 0.35);
+  }
+
+  .score-meaning-card.tier-high {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.35);
+  }
+
+  .score-meaning-card.tier-recommended {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+
+  .score-meaning-card.tier-moderate {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.35);
+  }
+
+  .score-meaning-card.tier-basic {
+    background: rgba(107, 114, 128, 0.08);
+    border-color: rgba(107, 114, 128, 0.35);
+  }
+
+  .smc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .smc-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-heading, #f3f4f6);
+  }
+
+  .smc-icon {
+    font-size: 1.25rem;
+  }
+
+  .smc-target-tag {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .smc-target-tag.above {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .smc-explanation {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--text-body, #e5e7eb);
+  }
+
+  .smc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .smc-stat-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .smc-stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted, #9ca3af);
+  }
+
+  .smc-stat-val {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-heading, #f9fafb);
+  }
+
+  .smc-stat-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted, #6b7280);
   }
 
   .power-switch-notice {
