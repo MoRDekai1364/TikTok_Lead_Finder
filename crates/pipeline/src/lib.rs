@@ -32,7 +32,7 @@ pub fn crate_ready() -> &'static str {
 mod tests {
     use super::*;
     use axum::http::StatusCode;
-    use leadfinder_core::RuntimePaths;
+    use leadfinder_core::{RuntimePaths, Stage, VideoRef};
     use tokio::net::TcpListener;
 
     #[tokio::test]
@@ -265,5 +265,70 @@ mod tests {
         let scale_json: serde_json::Value = scale_resp.json().await.unwrap();
         assert!(scale_json.get("aimd").is_some());
         assert!(scale_json.get("rss_bytes").is_some());
+    }
+
+    #[tokio::test]
+    async fn worker_loop_claims_and_processes_jobs() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_dir = temp.path().join("config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let repo_cfg = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("config")
+            .join("default.toml");
+        std::fs::copy(&repo_cfg, config_dir.join("default.toml")).unwrap();
+
+        let paths = RuntimePaths {
+            static_root: temp.path().to_path_buf(),
+            mutable_root: temp.path().to_path_buf(),
+            config_dir,
+            data_dir: temp.path().join("data"),
+            db_path: temp.path().join("data").join("test.db"),
+            log_dir: temp.path().join("logs"),
+            cache_dir: temp.path().join("cache"),
+            prompts_dir: temp.path().join("prompts"),
+            assets_dir: temp.path().join("assets"),
+            tools_dir: temp.path().join("tools"),
+            bundled_tools_dir: temp.path().join("tools"),
+            models_dir: temp.path().join("models"),
+        };
+
+        let ctx = std::sync::Arc::new(PipelineContext::init_with_paths(paths).await.unwrap());
+        let (video, _) = ctx.db.upsert_video_discovered(&VideoRef {
+            id: "9999000011112222333".to_string(),
+            url: "https://www.tiktok.com/@test/video/9999000011112222333".to_string(),
+            caption: Some("Тестов клип за верификация".to_string()),
+            hashtags: vec!["тест".to_string()],
+            creator_handle: Some("test".to_string()),
+            creator_display_name: Some("Test".to_string()),
+            duration_s: Some(15.0),
+            views: Some(50000),
+            likes: Some(1000),
+            shares: Some(50),
+            comments: Some(20),
+            posted_at: None,
+            discovered_via: "paste".to_string(),
+            ..Default::default()
+        }, 0).await.unwrap();
+
+        let job = ctx.db.enqueue_job(Some(&video.id), Stage::ScreenCheap).await.unwrap();
+        assert_eq!(job.status, "queued");
+
+        let handle = ctx.clone().spawn_worker_loop();
+        let mut succeeded = false;
+        for _ in 0..20 {
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            if let Ok(counts) = ctx.db.queue_counts().await {
+                if counts.get("succeeded").and_then(|v| v.as_i64()).unwrap_or(0) >= 1 {
+                    succeeded = true;
+                    break;
+                }
+            }
+        }
+        handle.abort();
+        assert!(succeeded);
     }
 }

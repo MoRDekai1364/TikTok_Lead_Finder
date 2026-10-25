@@ -251,7 +251,14 @@ impl PipelineContext {
                 });
             }
             ScreenOutcome::Pass => {
-                let _ = self.db.enqueue_job(Some(&video.id), Stage::Acquire).await?;
+                if let Ok(next_job) = self.db.enqueue_job(Some(&video.id), Stage::Acquire).await {
+                    self.emit(CoreEvent::JobUpdated {
+                        job_id: next_job.id,
+                        video_id: Some(video.id.clone()),
+                        stage: next_job.stage,
+                        status: next_job.status,
+                    });
+                }
             }
         }
         Ok(())
@@ -377,7 +384,14 @@ impl PipelineContext {
             lane: video.lane.clone(),
         });
 
-        let _ = self.db.enqueue_job(Some(&video.id), Stage::Claims).await;
+        if let Ok(claims_job) = self.db.enqueue_job(Some(&video.id), Stage::Claims).await {
+            self.emit(CoreEvent::JobUpdated {
+                job_id: claims_job.id,
+                video_id: Some(video.id.clone()),
+                stage: claims_job.stage,
+                status: claims_job.status,
+            });
+        }
 
         self.db
             .get_video_detail(&video.id)
@@ -760,9 +774,10 @@ impl PipelineContext {
     pub fn spawn_worker_loop(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
         let maintenance_ctx = Arc::clone(&self);
         tokio::spawn(async move {
+            let _ = maintenance_ctx.db.recover_stalled_jobs(300).await;
             loop {
                 tokio::time::sleep(Duration::from_secs(60)).await;
-                let _ = maintenance_ctx.db.recover_stalled_jobs(900).await;
+                let _ = maintenance_ctx.db.recover_stalled_jobs(300).await;
                 let cfg = maintenance_ctx.config.read().await.clone();
                 let _ = run_media_retention_janitor(
                     &maintenance_ctx.db,
@@ -813,43 +828,53 @@ impl PipelineContext {
 
                         let permit = self.concurrency.acquire_permit(aimd_stage).await;
 
-                        let res = match st_opt {
-                            Some(Stage::ScreenCheap) => {
-                                if let Some(vid) = &job.video_id {
-                                    self.run_screen_cheap_job(vid).await
-                                } else {
-                                    Ok(())
+                        let job_ctx = Arc::clone(&self);
+                        let job_vid = job.video_id.clone();
+                        let job_st = st_opt;
+                        let job_task = tokio::spawn(async move {
+                            match job_st {
+                                Some(Stage::ScreenCheap) => {
+                                    if let Some(vid) = &job_vid {
+                                        job_ctx.run_screen_cheap_job(vid).await
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
-                            }
-                            Some(Stage::Acquire) | Some(Stage::Extract) => {
-                                if let Some(vid) = &job.video_id {
-                                    self.process_single_video(vid).await.map(|_| ())
-                                } else {
-                                    Ok(())
+                                Some(Stage::Acquire) | Some(Stage::Extract) => {
+                                    if let Some(vid) = &job_vid {
+                                        job_ctx.process_single_video(vid).await.map(|_| ())
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
-                            }
-                            Some(Stage::Claims) | Some(Stage::Checkworthy) => {
-                                if let Some(vid) = &job.video_id {
-                                    self.run_claims_job(vid).await
-                                } else {
-                                    Ok(())
+                                Some(Stage::Claims) | Some(Stage::Checkworthy) => {
+                                    if let Some(vid) = &job_vid {
+                                        job_ctx.run_claims_job(vid).await
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
-                            }
-                            Some(Stage::Verify) => {
-                                if let Some(vid) = &job.video_id {
-                                    self.run_verify_job(vid).await
-                                } else {
-                                    Ok(())
+                                Some(Stage::Verify) => {
+                                    if let Some(vid) = &job_vid {
+                                        job_ctx.run_verify_job(vid).await
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
-                            }
-                            Some(Stage::ResearchMore) => {
-                                if let Some(vid) = &job.video_id {
-                                    self.run_research_more_job(vid).await
-                                } else {
-                                    Ok(())
+                                Some(Stage::ResearchMore) => {
+                                    if let Some(vid) = &job_vid {
+                                        job_ctx.run_research_more_job(vid).await
+                                    } else {
+                                        Ok(())
+                                    }
                                 }
+                                _ => Ok(()),
                             }
-                            _ => Ok(()),
+                        });
+
+                        let res = match job_task.await {
+                            Ok(r) => r,
+                            Err(panic_err) => Err(anyhow::anyhow!("Worker panic: {panic_err}")),
                         };
 
                         match res {

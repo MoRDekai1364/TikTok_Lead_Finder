@@ -610,7 +610,14 @@ impl PipelineContext {
 
     pub async fn run_claims_job(&self, video_id: &str) -> Result<()> {
         self.extract_claims_for_video(video_id).await?;
-        self.db.enqueue_job(Some(video_id), Stage::Verify).await?;
+        if let Ok(verify_job) = self.db.enqueue_job(Some(video_id), Stage::Verify).await {
+            self.emit(CoreEvent::JobUpdated {
+                job_id: verify_job.id,
+                video_id: Some(video_id.to_string()),
+                stage: verify_job.stage,
+                status: verify_job.status,
+            });
+        }
         Ok(())
     }
 

@@ -95,7 +95,7 @@ impl PassageExtractorAndRanker {
 
     pub fn extract_main_text(&self, html: &str) -> String {
         static SCRIPT_STYLE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-            regex::Regex::new(r"(?is)<(script|style|iframe|noscript|svg)\b[^>]*>[\s\S]*?</\1>|<iframe\b[^>]*>").unwrap()
+            regex::Regex::new(r"(?is)<script\b[^>]*>[\s\S]*?</script>|<style\b[^>]*>[\s\S]*?</style>|<iframe\b[^>]*>[\s\S]*?</iframe>|<noscript\b[^>]*>[\s\S]*?</noscript>|<svg\b[^>]*>[\s\S]*?</svg>|<iframe\b[^>]*>").unwrap()
         });
         let sanitized = SCRIPT_STYLE_RE.replace_all(html, " ");
         let doc = Html::parse_document(&sanitized);
@@ -126,12 +126,12 @@ impl PassageExtractorAndRanker {
             }
         }
 
-        let body_sel = Selector::parse("body").unwrap();
-        if let Some(body) = doc.select(&body_sel).next() {
-            clean_extracted_text(&body.text().collect::<Vec<_>>().join(" "))
-        } else {
-            String::new()
+        if let Ok(body_sel) = Selector::parse("body") {
+            if let Some(body) = doc.select(&body_sel).next() {
+                return clean_extracted_text(&body.text().collect::<Vec<_>>().join(" "));
+            }
         }
+        String::new()
     }
 
     pub fn chunk_text(&self, text: &str) -> Vec<String> {
@@ -415,5 +415,22 @@ mod tests {
         let raw_cp1251: [u8; 12] = [0xc2, 0xe8, 0xea, 0xf2, 0xee, 0xf0, 0x20, 0xc9, 0xee, 0xf7, 0xe5, 0xe2];
         let decoded = decode_html_bytes(&raw_cp1251, Some("text/html; charset=windows-1251"));
         assert_eq!(decoded, "Виктор Йочев");
+    }
+
+    #[test]
+    fn extract_main_text_sanitizes_html_tags_without_panicking() {
+        let guard = PolitenessGuard::new(leadfinder_core::PolitenessPolicy {
+            requests_per_minute: 10,
+            breaker_failures: 5,
+            breaker_cooldown: std::time::Duration::from_secs(60),
+            cache_ttl: std::time::Duration::from_secs(60),
+        }, std::path::PathBuf::from("target/test_cache"));
+        let lex = Arc::new(LexiconNormalizer::empty());
+        let ranker = PassageExtractorAndRanker::new(guard, lex);
+        let sample = "<html><head><script>alert(1);</script><style>body { color: red; }</style></head><body><article><p>Български новинарски текст с над сто и двадесет символа за целите на валидацията и извличането на съдържание от уеб страници.</p></article></body></html>";
+        let extracted = ranker.extract_main_text(sample);
+        assert!(extracted.contains("Български новинарски текст"));
+        assert!(!extracted.contains("alert(1)"));
+        assert!(!extracted.contains("color: red"));
     }
 }

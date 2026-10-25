@@ -239,7 +239,7 @@ pub struct Creator {
     pub expansion_depth: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VideoRef {
     pub id: String,
     pub url: String,
