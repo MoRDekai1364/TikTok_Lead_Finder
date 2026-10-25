@@ -56,8 +56,17 @@
   let pullToast = $state<string | null>(null);
   let isPullingMore = $state(false);
 
+  const queuedBehindCap = $derived(laneCounts?.leads_queued ?? 0);
+
   async function handlePullMoreClick() {
     if (isPullingMore) return;
+    if (queuedBehindCap === 0) {
+      pullToast = currentLang === 'bg'
+        ? `Всички налични ${cards.length} лийда са заредени. Поставете нови TikTok връзки горе!`
+        : `All ${cards.length} leads are loaded. Paste new TikTok links above!`;
+      setTimeout(() => (pullToast = null), 4000);
+      return;
+    }
     isPullingMore = true;
     try {
       const res = await onPullMore();
@@ -65,7 +74,7 @@
         if (res.promoted > 0) {
           pullToast = currentLang === 'bg' ? `📥 +${res.promoted} нови лийда` : `📥 +${res.promoted} new leads`;
         } else {
-          pullToast = currentLang === 'bg' ? 'Няма чакащи лийдове' : 'No queued leads';
+          pullToast = currentLang === 'bg' ? 'Няма чакащи лийдове зад лимита' : 'No queued leads behind cap';
         }
       } else {
         pullToast = currentLang === 'bg' ? 'Готово' : 'Done';
@@ -77,7 +86,7 @@
     }
     setTimeout(() => {
       pullToast = null;
-    }, 3000);
+    }, 3500);
   }
 
   let searchQuery = $state('');
@@ -308,14 +317,26 @@
       </button>
 
       {#if activeLane === 'leads'}
-        <button
-          class="btn btn-secondary btn-sm"
-          onclick={handlePullMoreClick}
-          disabled={isPullingMore}
-          title={t.pullMoreTooltip}
-        >
-          📥 {t.pullMoreButton}
-        </button>
+        {#if queuedBehindCap > 0}
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick={handlePullMoreClick}
+            disabled={isPullingMore}
+            title={t.pullMoreTooltip}
+          >
+            📥 {t.pullMoreButton} ({queuedBehindCap})
+          </button>
+        {:else}
+          <button
+            class="btn btn-secondary btn-sm btn-cap-all"
+            onclick={handlePullMoreClick}
+            title={currentLang === 'bg'
+              ? 'Всички проверени лийдове са показани в списъка. За да добавите нови видеа, поставете връзка в полето горе.'
+              : 'All verified leads are already displayed. Paste new TikTok links in the input bar above.'}
+          >
+            ✓ {currentLang === 'bg' ? 'Всички лийдове са заредени' : 'All leads loaded'} ({cards.length})
+          </button>
+        {/if}
         {#if pullToast}
           <span class="pull-toast">{pullToast}</span>
         {/if}
@@ -385,7 +406,6 @@
                   src="{coreUrl}/api/media/{selectedCard.id}/video.mp4"
                   poster={selectedCard.thumbnail_url || undefined}
                   controls
-                  autoplay
                   class="feed-video-player"
                 >
                   <track kind="captions" />
@@ -628,6 +648,17 @@
     border: 1px solid rgba(37, 99, 235, 0.25);
     border-radius: 4px;
     font-weight: 500;
+  }
+
+  .btn-cap-all {
+    opacity: 0.85;
+    color: var(--text-muted);
+    border-style: dashed;
+  }
+
+  .btn-cap-all:hover {
+    opacity: 1;
+    color: var(--text-color);
   }
 
   .feed-sidebar {
