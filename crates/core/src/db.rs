@@ -2043,6 +2043,55 @@ impl Database {
         }))
     }
 
+    pub async fn save_profile_for_power(
+        &self,
+        profile: &HardwareProfile,
+        power_source: &str,
+    ) -> Result<()> {
+        let key = if power_source.eq_ignore_ascii_case("battery") {
+            "profile_battery"
+        } else {
+            "profile_ac"
+        };
+        self.set_setting(key, &serde_json::to_value(profile)?).await?;
+        self.save_profile(profile).await?;
+        Ok(())
+    }
+
+    pub async fn get_profile_for_power(
+        &self,
+        power_source: &str,
+    ) -> Result<Option<HardwareProfile>> {
+        let key = if power_source.eq_ignore_ascii_case("battery") {
+            "profile_battery"
+        } else {
+            "profile_ac"
+        };
+        if let Some(val) = self.get_setting(key).await? {
+            if let Ok(prof) = serde_json::from_value::<HardwareProfile>(val) {
+                return Ok(Some(prof));
+            }
+        }
+        self.get_profile().await
+    }
+
+    pub async fn get_power_profiles(
+        &self,
+    ) -> Result<(Option<HardwareProfile>, Option<HardwareProfile>)> {
+        let mut ac = self
+            .get_setting("profile_ac")
+            .await?
+            .and_then(|v| serde_json::from_value::<HardwareProfile>(v).ok());
+        let batt = self
+            .get_setting("profile_battery")
+            .await?
+            .and_then(|v| serde_json::from_value::<HardwareProfile>(v).ok());
+        if ac.is_none() {
+            ac = self.get_profile().await.ok().flatten();
+        }
+        Ok((ac, batt))
+    }
+
     pub async fn set_setting(&self, key: &str, value: &serde_json::Value) -> Result<()> {
         let raw = serde_json::to_string(value)?;
         sqlx::query(

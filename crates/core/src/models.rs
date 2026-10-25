@@ -541,4 +541,6 @@ pub enum CoreEvent {
     DiscoveryStatus { paused: bool, reason: Option<String>, active_breakers: Vec<String> },
     DecisionLogged { video_id: String, action: String },
     CalibrationUpdated { capacity_per_day: Option<f64> },
+    BenchmarkProgress { state: serde_json::Value },
+    PowerChanged { power: serde_json::Value },
 }

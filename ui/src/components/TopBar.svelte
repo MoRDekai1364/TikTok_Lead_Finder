@@ -3,7 +3,7 @@
   import { fetchGeminiStatus, fetchVideoDetail, getCoreUrl } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
-  import type { QueueCounts, ScaleStatus, Screen } from '../lib/types';
+  import type { BenchmarkProgress, PowerInfo, QueueCounts, ScaleStatus, Screen } from '../lib/types';
 
   let {
     activeScreen,
@@ -12,11 +12,14 @@
     queueCounts,
     capacityPerDay,
     scaleStatus,
+    powerInfo,
+    benchmarkProgress,
     onNavigate,
     onPasteUrls,
     onJumpToVideo,
     onOpenScanModal,
     onOpenGoogleAiWizard,
+    onOpenBenchmarkModal,
     onRequestExit,
     onToggleTheme,
     onToggleLang,
@@ -27,11 +30,14 @@
     queueCounts: QueueCounts;
     capacityPerDay: number | null;
     scaleStatus: ScaleStatus | null;
+    powerInfo?: PowerInfo | null;
+    benchmarkProgress?: BenchmarkProgress | null;
     onNavigate: (s: Screen) => void;
     onPasteUrls: (text: string) => Promise<any>;
     onJumpToVideo?: (id: string) => void;
     onOpenScanModal?: () => void;
     onOpenGoogleAiWizard?: () => void;
+    onOpenBenchmarkModal?: () => void;
     onRequestExit?: () => void;
     onToggleTheme: () => void;
     onToggleLang: () => void;
@@ -288,6 +294,36 @@
     </div>
 
     <div class="indicators">
+      {#if benchmarkProgress && benchmarkProgress.is_running}
+        <button
+          type="button"
+          class="indicator-pill benchmark-pulsing-pill"
+          onclick={onOpenBenchmarkModal}
+          title={currentLang === 'bg' ? 'Бенчмаркът се изпълнява - кликнете за преглед' : 'Benchmark running - click to view'}
+        >
+          <span class="pulsing-circle"></span>
+          <span>⚡ {benchmarkProgress.progress_pct}%</span>
+        </button>
+      {/if}
+
+      {#if powerInfo}
+        <button
+          type="button"
+          class="indicator-pill power-pill"
+          onclick={onOpenBenchmarkModal}
+          title={powerInfo.power_source === 'battery'
+            ? (currentLang === 'bg' ? 'Работа на батерия (енергоспестяващ профил)' : 'Battery Mode (power-saver profile)')
+            : (currentLang === 'bg' ? 'Мрежово захранване (максимален капацитет)' : 'AC Plugged In (high performance)')}
+        >
+          <span>{powerInfo.power_source === 'battery' ? '🔋' : '⚡'}</span>
+          <span>
+            {powerInfo.power_source === 'battery'
+              ? (powerInfo.battery_percent !== null ? `${powerInfo.battery_percent}%` : 'Batt')
+              : 'AC'}
+          </span>
+        </button>
+      {/if}
+
       {#if capacityPerDay !== null}
         <div class="indicator-pill capacity-pill" title={t.capacityPerDay}>
           <span class="dot green"></span>
@@ -611,6 +647,43 @@
     background-color: rgba(16, 185, 129, 0.15);
     border-color: rgba(16, 185, 129, 0.4);
     color: #34d399;
+  }
+
+  .benchmark-pulsing-pill {
+    cursor: pointer;
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.45);
+    color: #60a5fa;
+    transition: filter 0.15s, transform 0.1s;
+  }
+
+  .benchmark-pulsing-pill:hover {
+    filter: brightness(1.2);
+    transform: translateY(-1px);
+  }
+
+  .pulsing-circle {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #60a5fa;
+    box-shadow: 0 0 6px #60a5fa;
+    animation: topbarPulse 1.4s infinite;
+  }
+
+  @keyframes topbarPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.7); }
+  }
+
+  .power-pill {
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
+  }
+
+  .power-pill:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
   }
 
   .icon-btn {

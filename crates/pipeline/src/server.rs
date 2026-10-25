@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
 use tower_http::cors::CorsLayer;
 use leadfinder_core::{CoreEvent, Search, Stage, VideoFilter};
-use leadfinder_probe::{apply_calibration_overrides, run_calibration, CalibrationOverrides};
+use leadfinder_probe::{apply_calibration_overrides, CalibrationOverrides};
 use crate::engine::{CustomScanConfig, PipelineContext};
 
 #[derive(Debug, Deserialize)]
@@ -170,6 +170,31 @@ pub struct WatchlistRequest {
 pub struct CalibrateRequest {
     #[serde(default)]
     pub force_cpu: bool,
+    pub power_source: Option<String>,
+    #[serde(default)]
+    pub force_rerun: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CalibrateStatusResponse {
+    pub is_running: bool,
+    pub progress: leadfinder_probe::BenchmarkState,
+    pub power: leadfinder_probe::PowerInfo,
+    pub ac_profile: Option<leadfinder_core::HardwareProfile>,
+    pub battery_profile: Option<leadfinder_core::HardwareProfile>,
+    pub active_profile: Option<leadfinder_core::HardwareProfile>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SwitchPowerRequest {
+    pub power_source: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GeminiKeyInfo {
+    pub index: usize,
+    pub masked: String,
+    pub is_active: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -222,16 +247,49 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/creators/watchlist", post(handle_set_watchlist))
         .route("/api/profile", get(handle_get_profile))
         .route("/api/calibrate", post(handle_calibrate))
+        .route("/api/calibrate/status", get(handle_calibrate_status))
+        .route("/api/calibrate/switch-power", post(handle_calibrate_switch_power))
         .route("/api/calibrate/overrides", post(handle_calibrate_overrides))
         .route("/api/settings", get(handle_list_settings).post(handle_update_settings))
         .route("/api/settings/gemini-status", get(handle_gemini_status))
         .route("/api/settings/gemini-key", post(handle_set_gemini_key).delete(handle_delete_gemini_key))
+        .route("/api/settings/gemini-keys/rotate", post(handle_rotate_gemini_key))
         .route("/api/export", get(handle_export))
         .route("/api/scale/status", get(handle_scale_status))
         .route("/api/system/shutdown", post(handle_system_shutdown))
         .route("/api/system/shutdown-when-idle", post(handle_system_shutdown_when_idle))
         .route("/api/system/exit-status", get(handle_system_exit_status))
         .route_layer(middleware::from_fn_with_state(ctx.clone(), auth_middleware));
+
+    tokio::spawn({
+        let ctx = ctx.clone();
+        async move {
+            let mut last_source = leadfinder_probe::detect_power_info().power_source;
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                let current = leadfinder_probe::detect_power_info();
+                if current.power_source != last_source {
+                    let old = last_source.clone();
+                    last_source = current.power_source.clone();
+                    let prof = ctx.db.get_profile_for_power(&current.power_source).await.ok().flatten();
+                    let has_profile = prof.is_some();
+                    if let Some(ref p) = prof {
+                        let _ = ctx.db.save_profile(p).await;
+                    }
+                    let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::PowerChanged {
+                        power: serde_json::json!({
+                            "old_source": old,
+                            "new_source": current.power_source,
+                            "ac_online": current.ac_online,
+                            "battery_percent": current.battery_percent,
+                            "has_profile": has_profile,
+                            "capacity_per_day": prof.and_then(|p| p.capacity_per_day),
+                        }),
+                    });
+                }
+            }
+        }
+    });
 
     Router::new()
         .route("/metrics", get(handle_metrics))
@@ -2030,17 +2088,174 @@ async fn handle_get_profile(State(ctx): State<Arc<PipelineContext>>) -> Response
 
 async fn handle_calibrate(
     State(ctx): State<Arc<PipelineContext>>,
-    Json(body): Json<CalibrateRequest>,
+    body: Option<Json<CalibrateRequest>>,
 ) -> Response {
-    let cfg = ctx.config.read().await.clone();
-    match run_calibration(&ctx.paths, &cfg, &ctx.db, body.force_cpu).await {
-        Ok(prof) => Json(prof).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-            .into_response(),
+    let req = body.map(|Json(b)| b).unwrap_or_default();
+    let power_info = leadfinder_probe::detect_power_info();
+    let power_source = req
+        .power_source
+        .unwrap_or(power_info.power_source)
+        .to_lowercase();
+
+    {
+        let state = ctx.benchmark_state.read().await;
+        if state.is_running && !req.force_rerun {
+            return Json(serde_json::json!({
+                "already_running": true,
+                "progress": state.clone(),
+            }))
+            .into_response();
+        }
     }
+
+    {
+        let mut state = ctx.benchmark_state.write().await;
+        state.is_running = true;
+        state.power_source = power_source.clone();
+        state.current_stage = "detect_hw".to_string();
+        state.stage_index = 1;
+        state.total_stages = 4;
+        state.progress_pct = 5;
+        state.status_text = "Стартиране на калибриране...".to_string();
+        state.status_text_en = "Starting calibration...".to_string();
+        state.current_model = None;
+        state.asr_results.clear();
+        state.llm_results.clear();
+        state.final_capacity = None;
+        state.error = None;
+        state.started_at = Some(chrono::Utc::now().to_rfc3339());
+        state.completed_at = None;
+    }
+
+    let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress {
+        state: serde_json::to_value(&*ctx.benchmark_state.read().await).unwrap_or_default(),
+    });
+
+    let ctx_clone = ctx.clone();
+    let power_source_clone = power_source.clone();
+    tokio::spawn(async move {
+        let cfg = ctx_clone.config.read().await.clone();
+        let bstate = ctx_clone.benchmark_state.clone();
+        let ev_tx = ctx_clone.events_tx.clone();
+
+        let progress_cb: leadfinder_probe::BenchmarkProgressCallback = {
+            let bstate = bstate.clone();
+            let ev_tx = ev_tx.clone();
+            Arc::new(move |update: leadfinder_probe::BenchmarkProgressUpdate| {
+                let mut st = match bstate.try_write() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
+                st.current_stage = update.stage.clone();
+                st.stage_index = update.stage_index;
+                st.total_stages = update.total_stages;
+                st.progress_pct = update.percent;
+                st.status_text = update.message_bg.clone();
+                st.status_text_en = update.message_en.clone();
+                if let Some(ref m) = update.current_model {
+                    st.current_model = Some(m.clone());
+                }
+                if let Some(ref asr) = update.asr_benchmark {
+                    if !st.asr_results.iter().any(|b| b.model == asr.model) {
+                        st.asr_results.push(asr.clone());
+                    }
+                }
+                if let Some(ref llm) = update.llm_benchmark {
+                    if !st.llm_results.iter().any(|b| b.model == llm.model) {
+                        st.llm_results.push(llm.clone());
+                    }
+                }
+                let payload = serde_json::to_value(&*st).unwrap_or_default();
+                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress { state: payload });
+            })
+        };
+
+        match leadfinder_probe::run_calibration_for_power(
+            &ctx_clone.paths,
+            &cfg,
+            &ctx_clone.db,
+            req.force_cpu,
+            Some(&power_source_clone),
+            Some(progress_cb),
+        )
+        .await
+        {
+            Ok(profile) => {
+                let mut st = bstate.write().await;
+                st.is_running = false;
+                st.current_stage = "done".to_string();
+                st.progress_pct = 100;
+                st.final_capacity = profile.capacity_per_day;
+                st.completed_at = Some(chrono::Utc::now().to_rfc3339());
+                st.status_text = format!(
+                    "Готово! Измерен капацитет: {:.0} видеа/ден ({})",
+                    profile.capacity_per_day.unwrap_or(0.0),
+                    power_source_clone.to_uppercase()
+                );
+                st.status_text_en = format!(
+                    "Complete! Measured capacity: {:.0} videos/day ({})",
+                    profile.capacity_per_day.unwrap_or(0.0),
+                    power_source_clone.to_uppercase()
+                );
+                let payload = serde_json::to_value(&*st).unwrap_or_default();
+                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress { state: payload });
+                let _ = ev_tx.send(leadfinder_core::CoreEvent::CalibrationUpdated {
+                    capacity_per_day: profile.capacity_per_day,
+                });
+            }
+            Err(e) => {
+                let mut st = bstate.write().await;
+                st.is_running = false;
+                st.current_stage = "failed".to_string();
+                st.error = Some(e.to_string());
+                st.status_text = format!("Грешка при калибриране: {e}");
+                st.status_text_en = format!("Calibration failed: {e}");
+                let payload = serde_json::to_value(&*st).unwrap_or_default();
+                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress { state: payload });
+            }
+        }
+    });
+
+    let current = ctx.benchmark_state.read().await.clone();
+    Json(serde_json::json!({
+        "started": true,
+        "progress": current,
+    }))
+    .into_response()
+}
+
+async fn handle_calibrate_status(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let progress = ctx.benchmark_state.read().await.clone();
+    let power = leadfinder_probe::detect_power_info();
+    let (ac, batt) = ctx.db.get_power_profiles().await.unwrap_or((None, None));
+    let active = ctx.db.get_profile().await.ok().flatten();
+    Json(CalibrateStatusResponse {
+        is_running: progress.is_running,
+        progress,
+        power,
+        ac_profile: ac,
+        battery_profile: batt,
+        active_profile: active,
+    })
+    .into_response()
+}
+
+async fn handle_calibrate_switch_power(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<SwitchPowerRequest>,
+) -> Response {
+    let prof = ctx.db.get_profile_for_power(&body.power_source).await.ok().flatten();
+    if let Some(ref p) = prof {
+        let _ = ctx.db.save_profile(p).await;
+        let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::CalibrationUpdated {
+            capacity_per_day: p.capacity_per_day,
+        });
+    }
+    Json(serde_json::json!({
+        "power_source": body.power_source,
+        "profile": prof,
+    }))
+    .into_response()
 }
 
 async fn handle_calibrate_overrides(
@@ -2096,11 +2311,15 @@ pub struct GeminiStatusResponse {
     pub masked_key: Option<String>,
     pub cloud_enabled: bool,
     pub model: String,
+    pub total_keys: usize,
+    pub active_key_index: usize,
+    pub keys: Vec<GeminiKeyInfo>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SetGeminiKeyRequest {
-    pub key: String,
+    pub key: Option<String>,
+    pub keys: Option<Vec<String>>,
 }
 
 fn mask_api_key(key: &str) -> String {
@@ -2116,16 +2335,59 @@ async fn handle_gemini_status(
 ) -> Response {
     let cfg = ctx.config.read().await;
     let resolved_key = leadfinder_core::resolve_secret("GEMINI_API_KEY");
-    let configured = resolved_key.is_some();
-    let masked_key = resolved_key.as_deref().map(mask_api_key);
+    let pool_val = ctx.db.get_setting("gemini_keys_pool").await.ok().flatten();
+
+    let mut keys_list: Vec<String> = Vec::new();
+    let mut active_idx = 0usize;
+
+    if let Some(val) = pool_val {
+        if let Some(arr) = val.get("keys").and_then(|v| v.as_array()) {
+            for item in arr {
+                if let Some(s) = item.as_str() {
+                    let t = s.trim().to_string();
+                    if !t.is_empty() && !keys_list.contains(&t) {
+                        keys_list.push(t);
+                    }
+                }
+            }
+        }
+        active_idx = val.get("active_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+    }
+
+    if keys_list.is_empty() {
+        if let Some(ref k) = resolved_key {
+            keys_list.push(k.clone());
+        }
+    }
+
+    if active_idx >= keys_list.len() {
+        active_idx = 0;
+    }
+
+    let configured = !keys_list.is_empty();
+    let active_key = keys_list.get(active_idx).cloned().or(resolved_key);
+    let masked_key = active_key.as_deref().map(mask_api_key);
     let cloud_enabled = cfg.providers.cloud_enabled;
     let model = cfg.providers.gemini_model.clone();
+
+    let key_infos: Vec<GeminiKeyInfo> = keys_list
+        .iter()
+        .enumerate()
+        .map(|(i, k)| GeminiKeyInfo {
+            index: i,
+            masked: mask_api_key(k),
+            is_active: i == active_idx,
+        })
+        .collect();
 
     Json(GeminiStatusResponse {
         configured,
         masked_key,
         cloud_enabled,
         model,
+        total_keys: keys_list.len(),
+        active_key_index: active_idx,
+        keys: key_infos,
     })
     .into_response()
 }
@@ -2134,8 +2396,25 @@ async fn handle_set_gemini_key(
     State(ctx): State<Arc<PipelineContext>>,
     Json(body): Json<SetGeminiKeyRequest>,
 ) -> Response {
-    let key = body.key.trim().to_string();
-    if key.is_empty() {
+    let mut raw_keys = Vec::new();
+    if let Some(ref k) = body.key {
+        for part in k.split(|c| c == '\n' || c == ',' || c == ';' || c == '\r') {
+            let t = part.trim().to_string();
+            if !t.is_empty() && !raw_keys.contains(&t) {
+                raw_keys.push(t);
+            }
+        }
+    }
+    if let Some(ref list) = body.keys {
+        for k in list {
+            let t = k.trim().to_string();
+            if !t.is_empty() && !raw_keys.contains(&t) {
+                raw_keys.push(t);
+            }
+        }
+    }
+
+    if raw_keys.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({ "error": "API key cannot be empty" })),
@@ -2143,58 +2422,111 @@ async fn handle_set_gemini_key(
             .into_response();
     }
 
-    let test_url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key);
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
-        .build();
+        .build()
+        .unwrap_or_default();
 
-    let client = match client {
-        Ok(c) => c,
-        Err(e) => {
+    let mut valid_keys = Vec::new();
+    let mut errors = Vec::new();
+
+    for key in raw_keys {
+        let test_url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key);
+        match client.get(&test_url).send().await {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    valid_keys.push(key);
+                } else {
+                    let st = resp.status();
+                    let err = resp.text().await.unwrap_or_default();
+                    errors.push(format!("{}: HTTP {st} - {err}", mask_api_key(&key)));
+                }
+            }
+            Err(e) => {
+                errors.push(format!("{}: {e}", mask_api_key(&key)));
+            }
+        }
+    }
+
+    if valid_keys.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Validation failed for all keys: {}", errors.join("; "))
+            })),
+        )
+            .into_response();
+    }
+
+    let active_key = valid_keys[0].clone();
+    std::env::set_var("GEMINI_API_KEY", &active_key);
+    let _ = leadfinder_core::store_secret_in_os_credential_store("GEMINI_API_KEY", &active_key);
+
+    let pool = serde_json::json!({
+        "keys": valid_keys,
+        "active_index": 0,
+    });
+    let _ = ctx.db.set_setting("gemini_keys_pool", &pool).await;
+    let _ = ctx.db.set_setting("cloud_enabled", &serde_json::json!(true)).await;
+    let _ = ctx.db.set_setting("gemini_configured", &serde_json::json!(true)).await;
+    ctx.config.write().await.providers.cloud_enabled = true;
+
+    let key_infos: Vec<GeminiKeyInfo> = valid_keys
+        .iter()
+        .enumerate()
+        .map(|(i, k)| GeminiKeyInfo {
+            index: i,
+            masked: mask_api_key(k),
+            is_active: i == 0,
+        })
+        .collect();
+
+    Json(serde_json::json!({
+        "ok": true,
+        "total_keys": valid_keys.len(),
+        "masked_key": mask_api_key(&active_key),
+        "keys": key_infos,
+        "cloud_enabled": true,
+        "validation_warnings": if errors.is_empty() { None } else { Some(errors) }
+    }))
+    .into_response()
+}
+
+async fn handle_rotate_gemini_key(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let pool_val = ctx.db.get_setting("gemini_keys_pool").await.ok().flatten();
+    let Some(mut pool) = pool_val else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "No alternate keys available in pool" })),
+        )
+            .into_response();
+    };
+
+    let keys = match pool.get("keys").and_then(|v| v.as_array()) {
+        Some(k) if k.len() > 1 => k.clone(),
+        _ => {
             return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": format!("Failed to create HTTP client: {e}") })),
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Pool has only 1 key or empty" })),
             )
                 .into_response();
         }
     };
 
-    match client.get(&test_url).send().await {
-        Ok(resp) => {
-            if !resp.status().is_success() {
-                let status = resp.status();
-                let err_body = resp.text().await.unwrap_or_default();
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({
-                        "error": format!("Google AI validation failed (status {status}): {err_body}")
-                    })),
-                )
-                    .into_response();
-            }
-        }
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": format!("Connection to Google AI failed: {e}")
-                })),
-            )
-                .into_response();
-        }
-    }
+    let cur_idx = pool.get("active_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+    let next_idx = (cur_idx + 1) % keys.len();
+    let next_key = keys.get(next_idx).and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-    std::env::set_var("GEMINI_API_KEY", &key);
-    let _ = leadfinder_core::store_secret_in_os_credential_store("GEMINI_API_KEY", &key);
-
-    let _ = ctx.db.set_setting("cloud_enabled", &serde_json::json!(true)).await;
-    let _ = ctx.db.set_setting("gemini_configured", &serde_json::json!(true)).await;
-    ctx.config.write().await.providers.cloud_enabled = true;
+    pool["active_index"] = serde_json::json!(next_idx);
+    let _ = ctx.db.set_setting("gemini_keys_pool", &pool).await;
+    std::env::set_var("GEMINI_API_KEY", &next_key);
+    let _ = leadfinder_core::store_secret_in_os_credential_store("GEMINI_API_KEY", &next_key);
 
     Json(serde_json::json!({
         "ok": true,
-        "masked_key": mask_api_key(&key),
-        "cloud_enabled": true,
+        "rotated": true,
+        "active_index": next_idx,
+        "masked_key": mask_api_key(&next_key),
     }))
     .into_response()
 }
@@ -2204,6 +2536,7 @@ async fn handle_delete_gemini_key(
 ) -> Response {
     std::env::remove_var("GEMINI_API_KEY");
     let _ = leadfinder_core::store_secret_in_os_credential_store("GEMINI_API_KEY", "");
+    let _ = ctx.db.set_setting("gemini_keys_pool", &serde_json::json!({ "keys": [], "active_index": 0 })).await;
     let _ = ctx.db.set_setting("cloud_enabled", &serde_json::json!(false)).await;
     let _ = ctx.db.set_setting("gemini_configured", &serde_json::json!(false)).await;
     ctx.config.write().await.providers.cloud_enabled = false;

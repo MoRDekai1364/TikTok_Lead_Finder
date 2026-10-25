@@ -1,10 +1,13 @@
 import type {
+  BenchmarkProgress,
+  BenchmarkStatusResponse,
   Creator,
   CustomScanConfig,
   CustomScanResult,
   GeminiStatus,
   HardwareProfile,
   LeadCard,
+  PowerInfo,
   QueueCounts,
   ScaleStatus,
   Seed,
@@ -224,6 +227,25 @@ export async function queryGoogleAi(
   });
 }
 
+export async function openInBrowser(url: string): Promise<void> {
+  if (!url) return;
+  if ('__TAURI_INTERNALS__' in window) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('open_in_browser', { url });
+      return;
+    } catch {}
+  }
+  try {
+    await fetchJson('/api/open-browser', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+    return;
+  } catch {}
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   if (!url) return;
   if ('__TAURI_INTERNALS__' in window) {
@@ -267,16 +289,25 @@ export async function requestSystemShutdownWhenIdle(): Promise<{ ok: boolean }> 
 }
 
 export async function terminateApplication(): Promise<void> {
-  try {
-    await requestSystemShutdown();
-  } catch {}
   if ('__TAURI_INTERNALS__' in window) {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('terminate_desktop');
+      await invoke('terminate_application');
       return;
-    } catch {}
+    } catch {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('terminate_desktop');
+        return;
+      } catch {}
+    }
   }
+  try {
+    await requestSystemShutdown();
+  } catch {}
+  try {
+    window.close();
+  } catch {}
 }
 
 export async function exitAndRunBackground(): Promise<void> {
@@ -416,9 +447,42 @@ export async function setCreatorWatchlist(handle: string, watchlist: boolean): P
   });
 }
 
-export async function triggerCalibration(): Promise<HardwareProfile> {
-  const res = await fetchJson<any>('/api/calibrate', { method: 'POST' });
-  return normalizeProfile(res)!;
+export async function fetchCalibrationStatus(): Promise<BenchmarkStatusResponse> {
+  const res = await fetchJson<any>('/api/calibrate/status');
+  return {
+    ...res,
+    ac_profile: normalizeProfile(res.ac_profile),
+    battery_profile: normalizeProfile(res.battery_profile),
+    active_profile: normalizeProfile(res.active_profile),
+  };
+}
+
+export async function triggerBenchmark(opts?: {
+  power_source?: string;
+  force_cpu?: boolean;
+  force_rerun?: boolean;
+}): Promise<{ started?: boolean; already_running?: boolean; progress: BenchmarkProgress }> {
+  return fetchJson<{ started?: boolean; already_running?: boolean; progress: BenchmarkProgress }>('/api/calibrate', {
+    method: 'POST',
+    body: JSON.stringify(opts || {}),
+  });
+}
+
+export async function switchPowerProfile(power_source: string): Promise<{ power_source: string; profile: HardwareProfile | null }> {
+  const res = await fetchJson<any>('/api/calibrate/switch-power', {
+    method: 'POST',
+    body: JSON.stringify({ power_source }),
+  });
+  return {
+    power_source: res.power_source,
+    profile: normalizeProfile(res.profile),
+  };
+}
+
+export async function triggerCalibration(opts?: { power_source?: string; force_cpu?: boolean }): Promise<HardwareProfile> {
+  const runRes = await triggerBenchmark({ ...opts, force_rerun: true });
+  const statusRes = await fetchCalibrationStatus();
+  return (statusRes.active_profile || statusRes.ac_profile || statusRes.battery_profile)!;
 }
 
 export async function updateOverrides(overrides: Record<string, string>): Promise<HardwareProfile> {
@@ -444,10 +508,41 @@ export async function fetchGeminiStatus(): Promise<GeminiStatus> {
   return fetchJson<GeminiStatus>('/api/settings/gemini-status');
 }
 
-export async function saveGeminiKey(key: string): Promise<{ ok: boolean; masked_key?: string; error?: string }> {
-  return fetchJson<{ ok: boolean; masked_key?: string; error?: string }>('/api/settings/gemini-key', {
+export async function saveGeminiKey(keyOrKeys: string | string[]): Promise<{
+  ok: boolean;
+  masked_key?: string;
+  total_keys?: number;
+  validation_warnings?: string[];
+  error?: string;
+}> {
+  const body = Array.isArray(keyOrKeys) ? { keys: keyOrKeys } : { key: keyOrKeys };
+  return fetchJson<{
+    ok: boolean;
+    masked_key?: string;
+    total_keys?: number;
+    validation_warnings?: string[];
+    error?: string;
+  }>('/api/settings/gemini-key', {
     method: 'POST',
-    body: JSON.stringify({ key }),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function rotateGeminiKey(): Promise<{
+  ok: boolean;
+  rotated?: boolean;
+  active_index?: number;
+  masked_key?: string;
+  error?: string;
+}> {
+  return fetchJson<{
+    ok: boolean;
+    rotated?: boolean;
+    active_index?: number;
+    masked_key?: string;
+    error?: string;
+  }>('/api/settings/gemini-keys/rotate', {
+    method: 'POST',
   });
 }
 

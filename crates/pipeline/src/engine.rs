@@ -37,6 +37,7 @@ pub struct PipelineContext {
     pub concurrency: Arc<AimdConcurrencyManager>,
     pub quota_guard: Arc<ProviderQuotaGuard>,
     pub auto_terminate_when_idle: Arc<std::sync::atomic::AtomicBool>,
+    pub benchmark_state: Arc<tokio::sync::RwLock<leadfinder_probe::BenchmarkState>>,
 }
 
 impl PipelineContext {
@@ -74,6 +75,7 @@ impl PipelineContext {
 
         let concurrency = Arc::new(AimdConcurrencyManager::new());
         let quota_guard = Arc::new(ProviderQuotaGuard::new());
+        let benchmark_state = Arc::new(tokio::sync::RwLock::new(leadfinder_probe::BenchmarkState::default()));
 
         Ok(Self {
             paths,
@@ -88,6 +90,7 @@ impl PipelineContext {
             concurrency,
             quota_guard,
             auto_terminate_when_idle: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            benchmark_state,
         })
     }
 

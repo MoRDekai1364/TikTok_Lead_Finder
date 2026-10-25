@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { deleteGeminiKey, fetchGeminiStatus, openExternalUrl, saveGeminiKey } from '../lib/api';
+  import { deleteGeminiKey, fetchGeminiStatus, openInBrowser, rotateGeminiKey, saveGeminiKey } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import type { GeminiStatus } from '../lib/types';
 
@@ -19,8 +19,8 @@
   let step = $state<1 | 2 | 3 | 4>(1);
   let status = $state<GeminiStatus | null>(null);
   let apiKeyInput = $state('');
-  let showKey = $state(false);
   let isValidating = $state(false);
+  let isRotating = $state(false);
   let errorMessage = $state<string | null>(null);
   let successNotice = $state<string | null>(null);
 
@@ -51,7 +51,7 @@
   }
 
   function handleOpenStudio() {
-    openExternalUrl('https://aistudio.google.com/app/apikey');
+    openInBrowser('https://aistudio.google.com/app/apikey');
   }
 
   async function handleValidateAndSave() {
@@ -70,17 +70,13 @@
     try {
       const res = await saveGeminiKey(trimmed);
       if (res.ok) {
-        status = {
-          configured: true,
-          masked_key: res.masked_key || 'AIzaSy...',
-          cloud_enabled: true,
-          model: 'gemini-2.5-flash',
-        };
         apiKeyInput = '';
+        await loadStatus();
         step = 4;
+        const total = res.total_keys || 1;
         successNotice = currentLang === 'bg'
-          ? 'Ключът беше потвърден успешно от Google AI!'
-          : 'API key successfully verified by Google AI!';
+          ? (total > 1 ? `Успешно запазени и проверени ${total} ключа в пула!` : 'Ключът беше потвърден успешно от Google AI!')
+          : (total > 1 ? `Successfully saved and verified ${total} keys in pool!` : 'API key successfully verified by Google AI!');
         if (onStatusChange && status) {
           onStatusChange(status);
         }
@@ -91,6 +87,26 @@
       errorMessage = e?.message || (currentLang === 'bg' ? 'Неуспешна връзка с Google AI' : 'Connection failed');
     } finally {
       isValidating = false;
+    }
+  }
+
+  async function handleRotateKey() {
+    isRotating = true;
+    errorMessage = null;
+    try {
+      const res = await rotateGeminiKey();
+      if (res.ok) {
+        await loadStatus();
+        successNotice = currentLang === 'bg'
+          ? `Успешна ротация: Активен ключ #${(res.active_index ?? 0) + 1} (${res.masked_key || ''})`
+          : `Rotated key: Active key #${(res.active_index ?? 0) + 1} (${res.masked_key || ''})`;
+      } else {
+        errorMessage = res.error || (currentLang === 'bg' ? 'Грешка при ротация на ключа' : 'Error rotating key');
+      }
+    } catch (e: any) {
+      errorMessage = e?.message || (currentLang === 'bg' ? 'Неуспешна ротация' : 'Rotation failed');
+    } finally {
+      isRotating = false;
     }
   }
 
@@ -129,8 +145,8 @@
             </h3>
             <p class="wizard-sub">
               {currentLang === 'bg'
-                ? 'Настройка за >95% точност на българска транскрипция и интелигентен анализ'
-                : 'Setup for >95% Bulgarian speech accuracy & smart fact extraction'}
+                ? 'Настройка за >95% точност на българска транскрипция и мулти-ключов пул'
+                : 'Setup for >95% Bulgarian speech accuracy & multi-key rotation pool'}
             </p>
           </div>
         </div>
@@ -193,12 +209,12 @@
               </div>
 
               <div class="feature-card">
-                <div class="f-icon">⚡</div>
-                <div class="f-title">{currentLang === 'bg' ? 'Светкавична скорост' : 'Lightning Fast'}</div>
+                <div class="f-icon">🔄</div>
+                <div class="f-title">{currentLang === 'bg' ? 'Автоматична ротация на ключове' : 'Automatic Key Pool Rotation'}</div>
                 <div class="f-desc">
                   {currentLang === 'bg'
-                    ? 'Транскрибира 1 минута аудио само за 1-2 секунди в облака.'
-                    : 'Transcribes 1 minute of video audio in just 1-2 seconds.'}
+                    ? 'Можете да въведете няколко безплатни ключа - системата се прехвърля автоматично при лимит (429).'
+                    : 'Add multiple free keys to auto-rotate seamlessly when a daily quota limit (429) is hit.'}
                 </div>
               </div>
 
@@ -207,7 +223,7 @@
                 <div class="f-title">{currentLang === 'bg' ? 'Сигурен офлайн резерв' : 'Local Fallback'}</div>
                 <div class="f-desc">
                   {currentLang === 'bg'
-                    ? 'Ако нямате интернет връзка, системата автоматично използва локалния модел Whisper.'
+                    ? 'Ако нямате интернет връзка, системата автоматично използва локалния модел Whisper large-v3-turbo.'
                     : 'If offline, LeadFinder seamlessly falls back to your local Whisper large-v3-turbo.'}
                 </div>
               </div>
@@ -229,11 +245,11 @@
                   </div>
                   <div class="guide-detail">
                     {currentLang === 'bg'
-                      ? 'Влезте с вашия личен Google (Gmail) профил. Не се изисква въвеждане на кредитна карта.'
-                      : 'Sign in with your Google / Gmail account. No credit card required.'}
+                      ? 'Влезте с вашия личен Google (Gmail) профил. Линкът се отваря в браузъра ви.'
+                      : 'Sign in with your Google / Gmail account in your default web browser.'}
                   </div>
                   <button class="btn btn-studio" onclick={handleOpenStudio}>
-                    🔗 {currentLang === 'bg' ? 'Отвори Google AI Studio в нов прозорец' : 'Open Google AI Studio in browser'}
+                    🔗 {currentLang === 'bg' ? 'Отвори Google AI Studio в браузъра' : 'Open Google AI Studio in browser'}
                   </button>
                 </div>
               </div>
@@ -260,8 +276,8 @@
                   </div>
                   <div class="guide-detail">
                     {currentLang === 'bg'
-                      ? 'Ключът представлява дълъг низ от букви и цифри, започващ с "AIzaSy...". Копирайте го и преминете към следващата стъпка.'
-                      : 'Your key is a string starting with "AIzaSy...". Copy it to clipboard and proceed.'}
+                      ? 'Ключът започва с "AIzaSy...". Можете да създадете и втори ключ от друг акаунт за резерв!'
+                      : 'Your key starts with "AIzaSy...". You can also create keys in other accounts for rotation backup!'}
                   </div>
                 </div>
               </div>
@@ -271,47 +287,29 @@
         {:else if step === 3}
           <div class="slide-content">
             <h4 class="slide-title">
-              {currentLang === 'bg' ? 'Въведете вашия Google AI ключ' : 'Enter your Google AI key'}
+              {currentLang === 'bg' ? 'Въведете вашия Google AI ключ (или списък от ключове)' : 'Enter your Google AI key(s)'}
             </h4>
             <p class="slide-desc">
               {currentLang === 'bg'
-                ? 'Ключът ще бъде проверен веднага директно със сървърите на Google и запазен безопасно в Windows Credential Store.'
-                : 'Your key will be verified against Google AI servers and stored securely in Windows Credential Store.'}
+                ? 'Ключовете ще бъдат проверени веднага със сървърите на Google и запазени в Windows Credential Store.'
+                : 'Keys will be verified directly against Google AI servers and stored in Windows Credential Store.'}
             </p>
 
             <div class="input-card">
               <label for="gemini-key-input" class="input-title">
-                {currentLang === 'bg' ? 'Вашият API ключ (започва с AIza...):' : 'Your API Key (starts with AIza...):'}
+                {currentLang === 'bg' ? 'API ключове (по един на ред или запетая):' : 'API Key(s) (one per line or comma-separated):'}
               </label>
-              <div class="key-field-row">
-                {#if showKey}
-                  <input
-                    id="gemini-key-input"
-                    type="text"
-                    class="key-text-input"
-                    bind:value={apiKeyInput}
-                    placeholder="AIzaSy..."
-                    disabled={isValidating}
-                  />
-                {:else}
-                  <input
-                    id="gemini-key-input"
-                    type="password"
-                    class="key-text-input"
-                    bind:value={apiKeyInput}
-                    placeholder="AIzaSy..."
-                    disabled={isValidating}
-                  />
-                {/if}
-                <button
-                  type="button"
-                  class="toggle-visibility-btn"
-                  onclick={() => (showKey = !showKey)}
-                  title={showKey ? 'Скрий' : 'Покажи'}
-                >
-                  {showKey ? '🙈' : '👁️'}
-                </button>
-              </div>
+
+              <textarea
+                id="gemini-key-input"
+                class="key-textarea-input"
+                bind:value={apiKeyInput}
+                placeholder={currentLang === 'bg'
+                  ? "Въведете един или няколко ключа (по един на ред):\nAIzaSyA...\nAIzaSyB..."
+                  : "Enter one or multiple keys (one per line):\nAIzaSyA...\nAIzaSyB..."}
+                disabled={isValidating}
+                rows="4"
+              ></textarea>
 
               {#if errorMessage}
                 <div class="error-box">
@@ -321,8 +319,8 @@
 
               <div class="hint-text">
                 💡 {currentLang === 'bg'
-                  ? 'Ако все още нямате ключ, върнете се на Стъпка 2 за безплатно извличане.'
-                  : 'If you do not have a key yet, go back to Step 2 to generate one for free.'}
+                  ? 'Мулти-ключов пул: Ако добавите повече от 1 ключ, LeadFinder автоматично ще се прехвърли към следващия свободен ключ, ако дневната безплатна квота (1500 заявки) бъде достигната!'
+                  : 'Multi-key pool: Adding multiple keys allows LeadFinder to automatically switch to the next backup key when the 1,500 daily quota limit is reached!'}
               </div>
             </div>
           </div>
@@ -355,8 +353,12 @@
                 <span class="s-val badge-green">🟢 {currentLang === 'bg' ? 'Активен (Cloud Enabled)' : 'Active (Cloud Enabled)'}</span>
               </div>
               <div class="summary-row">
-                <span class="s-label">{currentLang === 'bg' ? 'Запазен ключ:' : 'Saved Key:'}</span>
+                <span class="s-label">{currentLang === 'bg' ? 'Активен ключ:' : 'Active Key:'}</span>
                 <span class="s-val mono">{status?.masked_key || 'AIzaSy...****'}</span>
+              </div>
+              <div class="summary-row">
+                <span class="s-label">{currentLang === 'bg' ? 'Общо ключове в пула:' : 'Keys in Pool:'}</span>
+                <span class="s-val bold">{status?.total_keys || 1}</span>
               </div>
               <div class="summary-row">
                 <span class="s-label">{currentLang === 'bg' ? 'Облачен модел:' : 'Cloud Model:'}</span>
@@ -372,14 +374,48 @@
               </div>
             </div>
 
-            <div class="danger-zone">
-              <span class="danger-title">{currentLang === 'bg' ? 'Управление на ключа:' : 'Key Management:'}</span>
-              <div class="danger-actions">
+            {#if status?.keys && status.keys.length > 0}
+              <div class="keys-pool-card">
+                <div class="keys-pool-header">
+                  <span class="kph-title">
+                    {currentLang === 'bg' ? 'Пул от налични ключове:' : 'Key Pool Status:'}
+                  </span>
+                  <span class="kph-count">
+                    ({status.keys.length} {currentLang === 'bg' ? 'ключа' : 'keys'})
+                  </span>
+                </div>
+                <div class="keys-list">
+                  {#each status.keys as k}
+                    <div class="key-item-row" class:active-key={k.is_active}>
+                      <div class="key-item-left">
+                        <span class="key-dot" class:active={k.is_active}></span>
+                        <span class="key-idx">#{k.index + 1}</span>
+                        <span class="key-code mono">{k.masked}</span>
+                      </div>
+                      <span class="key-status-badge" class:badge-active={k.is_active}>
+                        {k.is_active
+                          ? (currentLang === 'bg' ? '🟢 Активен' : '🟢 Active')
+                          : (currentLang === 'bg' ? '⚪ Резервен' : '⚪ Standby')}
+                      </span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            <div class="management-zone">
+              <span class="mgmt-title">{currentLang === 'bg' ? 'Управление на пула:' : 'Pool Management:'}</span>
+              <div class="mgmt-actions">
+                {#if (status?.total_keys || 0) > 1}
+                  <button class="btn btn-secondary" onclick={handleRotateKey} disabled={isRotating}>
+                    {isRotating ? '⏳ ...' : (currentLang === 'bg' ? '🔄 Ротация на ключ' : '🔄 Rotate Key')}
+                  </button>
+                {/if}
                 <button class="btn btn-secondary" onclick={() => { step = 3; apiKeyInput = ''; }}>
-                  🔄 {currentLang === 'bg' ? 'Смени ключа' : 'Change Key'}
+                  ➕ {currentLang === 'bg' ? 'Добави / Промени' : 'Add / Edit Keys'}
                 </button>
                 <button class="btn btn-danger" onclick={handleDisconnect}>
-                  🗑️ {currentLang === 'bg' ? 'Премахни ключа' : 'Disconnect'}
+                  🗑️ {currentLang === 'bg' ? 'Премахни всички' : 'Disconnect All'}
                 </button>
               </div>
             </div>
@@ -427,7 +463,7 @@
               {#if isValidating}
                 <span class="spin">⏳</span> {currentLang === 'bg' ? 'Проверка с Google AI...' : 'Validating with Google...'}
               {:else}
-                ⚡ {currentLang === 'bg' ? 'Тествай и свържи' : 'Test & Save Key'}
+                ⚡ {currentLang === 'bg' ? 'Тествай и свържи' : 'Test & Save Key(s)'}
               {/if}
             </button>
           </div>
@@ -448,28 +484,31 @@
 <style>
   .wizard-backdrop {
     position: fixed;
-    inset: 0;
-    z-index: 1050;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(5px);
-    animation: fadeIn 0.15s ease-out;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease-out;
   }
 
   .wizard-dialog {
-    display: flex;
-    flex-direction: column;
-    width: 92%;
-    max-width: 680px;
-    max-height: 88vh;
+    width: 90%;
+    max-width: 660px;
+    max-height: 90vh;
     background-color: var(--bg-surface, #1e2024);
     border: 1px solid var(--border-color, #333842);
     border-radius: 12px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .wizard-header {
@@ -488,15 +527,7 @@
   }
 
   .header-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    height: 38px;
-    font-size: 20px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+    font-size: 1.6rem;
   }
 
   .wizard-title {
@@ -602,46 +633,42 @@
 
   .slide-desc {
     margin: 0 0 20px 0;
-    font-size: 0.85rem;
-    line-height: 1.45;
+    font-size: 0.86rem;
     color: var(--text-secondary, #9ca3af);
+    line-height: 1.45;
   }
 
   .feature-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
 
   .feature-card {
-    padding: 14px 16px;
+    padding: 14px;
     background-color: var(--bg-surface-elevated, #25282f);
     border: 1px solid var(--border-color, #333842);
     border-radius: 8px;
-    transition: transform 0.15s, border-color 0.15s;
-  }
-
-  .feature-card:hover {
-    transform: translateY(-2px);
-    border-color: #3b82f6;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .f-icon {
-    font-size: 1.4rem;
-    margin-bottom: 6px;
+    font-size: 1.3rem;
+    margin-bottom: 2px;
   }
 
   .f-title {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-weight: 600;
     color: var(--text-primary, #f3f4f6);
-    margin-bottom: 4px;
   }
 
   .f-desc {
     font-size: 0.78rem;
-    line-height: 1.4;
     color: var(--text-secondary, #9ca3af);
+    line-height: 1.35;
   }
 
   .steps-guide {
@@ -653,48 +680,48 @@
   .guide-item {
     display: flex;
     gap: 14px;
-    padding: 14px 16px;
+    padding: 14px;
     background-color: var(--bg-surface-elevated, #25282f);
     border: 1px solid var(--border-color, #333842);
     border-radius: 8px;
   }
 
   .guide-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: 28px;
     height: 28px;
-    flex-shrink: 0;
-    font-size: 0.9rem;
-    font-weight: 700;
     border-radius: 50%;
     background-color: #3b82f6;
     color: #ffffff;
+    font-size: 0.88rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
   }
 
   .guide-info {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
 
   .guide-heading {
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary, #f3f4f6);
   }
 
   .guide-detail {
-    font-size: 0.8rem;
-    line-height: 1.4;
+    font-size: 0.82rem;
     color: var(--text-secondary, #9ca3af);
+    line-height: 1.4;
   }
 
   .btn-studio {
-    margin-top: 8px;
     align-self: flex-start;
+    margin-top: 6px;
     padding: 7px 14px;
     font-size: 0.82rem;
     font-weight: 600;
@@ -728,36 +755,25 @@
     color: var(--text-primary, #f3f4f6);
   }
 
-  .key-field-row {
-    display: flex;
-    gap: 8px;
-  }
-
-  .key-text-input {
-    flex: 1;
+  .key-textarea-input {
+    width: 100%;
     padding: 10px 14px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-family: monospace;
     background-color: var(--bg-surface, #1e2024);
     border: 1px solid var(--border-color, #4b5563);
     border-radius: 6px;
     color: #ffffff;
     outline: none;
+    box-sizing: border-box;
+    resize: vertical;
+    line-height: 1.5;
     transition: border-color 0.15s;
   }
 
-  .key-text-input:focus {
+  .key-textarea-input:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-  }
-
-  .toggle-visibility-btn {
-    padding: 0 12px;
-    font-size: 1.1rem;
-    background-color: var(--bg-surface, #1e2024);
-    border: 1px solid var(--border-color, #4b5563);
-    border-radius: 6px;
-    cursor: pointer;
   }
 
   .error-box {
@@ -832,7 +848,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 
   .summary-row {
@@ -868,22 +884,114 @@
     font-weight: 600;
   }
 
-  .danger-zone {
+  .keys-pool-card {
+    background-color: var(--bg-surface-elevated, #25282f);
+    border: 1px solid var(--border-color, #333842);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .keys-pool-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 10px;
+  }
+
+  .kph-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  .kph-count {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #9ca3af);
+  }
+
+  .keys-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .key-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .key-item-row.active-key {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.25);
+  }
+
+  .key-item-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+  }
+
+  .key-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #6b7280;
+  }
+
+  .key-dot.active {
+    background: #10b981;
+    box-shadow: 0 0 6px #10b981;
+  }
+
+  .key-idx {
+    color: var(--text-secondary, #9ca3af);
+    font-weight: 600;
+  }
+
+  .key-code {
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  .key-status-badge {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text-secondary, #9ca3af);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .key-status-badge.badge-active {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.15);
+    font-weight: 600;
+  }
+
+  .management-zone {
     padding-top: 14px;
     border-top: 1px solid var(--border-color, #333842);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
-  .danger-title {
+  .mgmt-title {
     font-size: 0.82rem;
     color: var(--text-secondary, #9ca3af);
   }
 
-  .danger-actions {
+  .mgmt-actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .wizard-footer {

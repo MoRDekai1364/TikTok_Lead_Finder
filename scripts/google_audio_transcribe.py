@@ -81,45 +81,64 @@ def ensure_wav(input_path):
     except Exception:
         return input_path
 
-def transcribe_with_gemini(wav_path, api_key):
+def transcribe_with_gemini(wav_path, api_keys_input):
+    if not api_keys_input:
+        return None
+    keys = [k.strip() for k in str(api_keys_input).replace('\n', ',').replace(';', ',').split(',') if k.strip()]
+    if not keys:
+        return None
     try:
         import urllib.request
+        import urllib.error
         import base64
         with open(wav_path, 'rb') as f:
             audio_bytes = f.read()
         b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": "Transcribe this Bulgarian audio verbatim. Format the output in flowing paragraphs with bold timestamps:\n**MM:SS**\nReturn only the transcribed Bulgarian text."},
-                    {
-                        "inlineData": {
-                            "mimeType": "audio/wav",
-                            "data": b64_audio
-                        }
-                    }
-                ]
-            }],
-            "generationConfig": {
-                "temperature": 0.1,
-                "maxOutputTokens": 8192
-            }
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    return parts[0].get("text", "").strip()
     except Exception:
-        pass
+        return None
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": "Transcribe this Bulgarian audio verbatim. Format the output in flowing paragraphs with bold timestamps:\n**MM:SS**\nReturn only the transcribed Bulgarian text."},
+                {
+                    "inlineData": {
+                        "mimeType": "audio/wav",
+                        "data": b64_audio
+                    }
+                }
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 8192
+        }
+    }
+    body_data = json.dumps(payload).encode('utf-8')
+
+    for api_key in keys:
+        try:
+            import urllib.request
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            req = urllib.request.Request(
+                url,
+                data=body_data,
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        text = parts[0].get("text", "").strip()
+                        if text:
+                            return text
+        except urllib.error.HTTPError as he:
+            if he.code in (429, 403):
+                continue
+        except Exception:
+            pass
     return None
 
 def transcribe_chunk_task(wav_path, offset, dur):

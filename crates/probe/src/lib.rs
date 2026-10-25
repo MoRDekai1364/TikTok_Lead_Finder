@@ -19,6 +19,139 @@ pub fn crate_ready() -> &'static str {
     leadfinder_providers::crate_ready()
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SystemPowerStatus {
+    pub ac_line_status: u8,
+    pub battery_flag: u8,
+    pub battery_life_percent: u8,
+    pub system_status_flag: u8,
+    pub battery_life_time: u32,
+    pub battery_full_life_time: u32,
+}
+
+#[cfg(windows)]
+extern "system" {
+    fn GetSystemPowerStatus(lpSystemPowerStatus: *mut SystemPowerStatus) -> i32;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PowerInfo {
+    pub power_source: String,
+    pub ac_online: bool,
+    pub battery_percent: Option<u8>,
+    pub has_battery: bool,
+    pub battery_life_time_seconds: Option<u32>,
+}
+
+pub fn detect_power_info() -> PowerInfo {
+    #[cfg(windows)]
+    {
+        let mut status = SystemPowerStatus {
+            ac_line_status: 255,
+            battery_flag: 255,
+            battery_life_percent: 255,
+            system_status_flag: 0,
+            battery_life_time: 0,
+            battery_full_life_time: 0,
+        };
+        let ok = unsafe { GetSystemPowerStatus(&mut status) };
+        if ok != 0 {
+            let ac_online = status.ac_line_status != 0;
+            let has_battery = (status.battery_flag & 128) == 0 && status.battery_flag != 255;
+            let battery_percent = if status.battery_life_percent <= 100 {
+                Some(status.battery_life_percent)
+            } else {
+                None
+            };
+            let power_source = if !ac_online && has_battery {
+                "battery".to_string()
+            } else {
+                "ac".to_string()
+            };
+            let battery_life_time_seconds = if status.battery_life_time != u32::MAX {
+                Some(status.battery_life_time)
+            } else {
+                None
+            };
+            return PowerInfo {
+                power_source,
+                ac_online,
+                battery_percent,
+                has_battery,
+                battery_life_time_seconds,
+            };
+        }
+    }
+
+    PowerInfo {
+        power_source: "ac".to_string(),
+        ac_online: true,
+        battery_percent: None,
+        has_battery: false,
+        battery_life_time_seconds: None,
+    }
+}
+
+pub fn default_power_source() -> String {
+    "ac".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BenchmarkProgressUpdate {
+    pub stage: String,
+    pub stage_index: usize,
+    pub total_stages: usize,
+    pub percent: usize,
+    pub message_bg: String,
+    pub message_en: String,
+    pub current_model: Option<String>,
+    pub asr_benchmark: Option<AsrCandidateBenchmark>,
+    pub llm_benchmark: Option<LlmCandidateBenchmark>,
+    pub power_source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BenchmarkState {
+    pub is_running: bool,
+    pub power_source: String,
+    pub current_stage: String,
+    pub stage_index: usize,
+    pub total_stages: usize,
+    pub progress_pct: usize,
+    pub status_text: String,
+    pub status_text_en: String,
+    pub current_model: Option<String>,
+    pub asr_results: Vec<AsrCandidateBenchmark>,
+    pub llm_results: Vec<LlmCandidateBenchmark>,
+    pub final_capacity: Option<f64>,
+    pub error: Option<String>,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+impl Default for BenchmarkState {
+    fn default() -> Self {
+        Self {
+            is_running: false,
+            power_source: "ac".to_string(),
+            current_stage: "idle".to_string(),
+            stage_index: 0,
+            total_stages: 4,
+            progress_pct: 0,
+            status_text: "Готовност за хардуерно калибриране".to_string(),
+            status_text_en: "Ready for calibration".to_string(),
+            current_model: None,
+            asr_results: Vec::new(),
+            llm_results: Vec::new(),
+            final_capacity: None,
+            error: None,
+            started_at: None,
+            completed_at: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GpuSpec {
     pub vendor: String,
@@ -37,6 +170,8 @@ pub struct HardwareSpec {
     pub gpus: Vec<GpuSpec>,
     pub compute_backends: Vec<String>,
     pub force_cpu: bool,
+    #[serde(default = "default_power_source")]
+    pub power_source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +236,8 @@ pub struct ChosenProfilePayload {
     pub llm_benchmarks: Vec<LlmCandidateBenchmark>,
     pub effective_overhead_seconds: f64,
     pub estimated_seconds_per_video: f64,
+    #[serde(default = "default_power_source")]
+    pub power_source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +301,8 @@ pub async fn detect_hardware(paths: &RuntimePaths, force_cpu: bool) -> HardwareS
     }
     compute_backends.push("cpu".to_string());
 
+    let power = detect_power_info();
+
     HardwareSpec {
         cpu_model,
         physical_cores,
@@ -174,6 +313,7 @@ pub async fn detect_hardware(paths: &RuntimePaths, force_cpu: bool) -> HardwareS
         gpus,
         compute_backends,
         force_cpu,
+        power_source: power.power_source,
     }
 }
 
@@ -270,13 +410,47 @@ async fn probe_gpus() -> (Vec<GpuSpec>, bool) {
     (gpus, has_cuda)
 }
 
+pub type BenchmarkProgressCallback = std::sync::Arc<dyn Fn(BenchmarkProgressUpdate) + Send + Sync>;
+
 pub async fn run_calibration(
     paths: &RuntimePaths,
     cfg: &AppConfig,
     db: &Database,
     force_cpu: bool,
 ) -> Result<HardwareProfile> {
-    let hw = detect_hardware(paths, force_cpu).await;
+    run_calibration_for_power(paths, cfg, db, force_cpu, None, None).await
+}
+
+pub async fn run_calibration_for_power(
+    paths: &RuntimePaths,
+    cfg: &AppConfig,
+    db: &Database,
+    force_cpu: bool,
+    requested_power: Option<&str>,
+    progress_cb: Option<BenchmarkProgressCallback>,
+) -> Result<HardwareProfile> {
+    let power = detect_power_info();
+    let power_source = requested_power
+        .unwrap_or(&power.power_source)
+        .to_lowercase();
+
+    if let Some(ref cb) = progress_cb {
+        cb(BenchmarkProgressUpdate {
+            stage: "detect_hw".to_string(),
+            stage_index: 1,
+            total_stages: 4,
+            percent: 10,
+            message_bg: "Откриване на хардуерни спецификации, CPU, RAM и GPU...".to_string(),
+            message_en: "Detecting CPU, RAM, GPUs and compute backends...".to_string(),
+            current_model: None,
+            asr_benchmark: None,
+            llm_benchmark: None,
+            power_source: power_source.clone(),
+        });
+    }
+
+    let mut hw = detect_hardware(paths, force_cpu).await;
+    hw.power_source = power_source.clone();
 
     let sample_wav = paths.assets_dir.join("calibration").join("sample_bg_30s.wav");
     let sample_ref_path = paths.assets_dir.join("calibration").join("sample_bg_30s.txt");
@@ -288,8 +462,71 @@ pub async fn run_calibration(
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default();
 
-    let asr_benchmarks = benchmark_whisper_candidates(paths, cfg, &sample_wav, &reference_text, force_cpu).await;
-    let llm_benchmarks = benchmark_llm_candidates(paths, cfg, &hw, &cases).await;
+    if let Some(ref cb) = progress_cb {
+        cb(BenchmarkProgressUpdate {
+            stage: "whisper_bench".to_string(),
+            stage_index: 2,
+            total_stages: 4,
+            percent: 25,
+            message_bg: "Стартиране на бенчмарк за разпознаване на реч (Whisper ASR)...".to_string(),
+            message_en: "Starting Whisper ASR speech recognition benchmark...".to_string(),
+            current_model: None,
+            asr_benchmark: None,
+            llm_benchmark: None,
+            power_source: power_source.clone(),
+        });
+    }
+
+    let asr_benchmarks = benchmark_whisper_candidates(
+        paths,
+        cfg,
+        &sample_wav,
+        &reference_text,
+        force_cpu,
+        &power_source,
+        &progress_cb,
+    )
+    .await;
+
+    if let Some(ref cb) = progress_cb {
+        cb(BenchmarkProgressUpdate {
+            stage: "llm_bench".to_string(),
+            stage_index: 3,
+            total_stages: 4,
+            percent: 65,
+            message_bg: "Стартиране на бенчмарк за LLM анализ на твърдения...".to_string(),
+            message_en: "Starting LLM claim extraction benchmark...".to_string(),
+            current_model: None,
+            asr_benchmark: None,
+            llm_benchmark: None,
+            power_source: power_source.clone(),
+        });
+    }
+
+    let llm_benchmarks = benchmark_llm_candidates(
+        paths,
+        cfg,
+        &hw,
+        &cases,
+        &power_source,
+        &progress_cb,
+    )
+    .await;
+
+    if let Some(ref cb) = progress_cb {
+        cb(BenchmarkProgressUpdate {
+            stage: "capacity_calc".to_string(),
+            stage_index: 4,
+            total_stages: 4,
+            percent: 90,
+            message_bg: "Изчисляване на максимален дневен капацитет и паралелизъм...".to_string(),
+            message_en: "Calculating daily processing capacity and concurrency...".to_string(),
+            current_model: None,
+            asr_benchmark: None,
+            llm_benchmark: None,
+            power_source: power_source.clone(),
+        });
+    }
 
     let cloud_key_available = cfg.providers.cloud_enabled && resolve_secret("GEMINI_API_KEY").is_some();
 
@@ -342,6 +579,7 @@ pub async fn run_calibration(
         llm_benchmarks,
         effective_overhead_seconds: (eff_overhead * 100.0).round() / 100.0,
         estimated_seconds_per_video: (est_sec_per_vid * 100.0).round() / 100.0,
+        power_source: power_source.clone(),
     };
 
     let profile = HardwareProfile {
@@ -351,7 +589,23 @@ pub async fn run_calibration(
         measured_at: Utc::now().to_rfc3339(),
     };
 
-    db.save_profile(&profile).await?;
+    db.save_profile_for_power(&profile, &power_source).await?;
+
+    if let Some(ref cb) = progress_cb {
+        cb(BenchmarkProgressUpdate {
+            stage: "done".to_string(),
+            stage_index: 4,
+            total_stages: 4,
+            percent: 100,
+            message_bg: format!("Готово! Измерен капацитет: {:.0} видеа/ден ({})", final_capacity, power_source.to_uppercase()),
+            message_en: format!("Complete! Measured capacity: {:.0} videos/day ({})", final_capacity, power_source.to_uppercase()),
+            current_model: None,
+            asr_benchmark: None,
+            llm_benchmark: None,
+            power_source: power_source.clone(),
+        });
+    }
+
     Ok(profile)
 }
 
@@ -521,12 +775,13 @@ pub fn select_pipeline_configuration(
     let est_sec_per_vid = cfg.capacity.avg_video_seconds * chosen_rtf + effective_overhead;
     let final_cap = ((window_s / est_sec_per_vid.max(1.0)) * 10.0).round() / 10.0;
 
-    let asr_concurrency = if compute_backend != "cpu" {
-        2
+    let (asr_concurrency, ocr_concurrency) = if hw.power_source.eq_ignore_ascii_case("battery") {
+        (1, 1)
+    } else if compute_backend != "cpu" {
+        (2, (hw.physical_cores / 4).clamp(1, 4))
     } else {
-        (hw.physical_cores / 6).clamp(1, 2)
+        ((hw.physical_cores / 6).clamp(1, 2), (hw.physical_cores / 4).clamp(1, 4))
     };
-    let ocr_concurrency = (hw.physical_cores / 4).clamp(1, 4);
     let llm_concurrency = 1;
 
     let selection = StageSelection {
@@ -553,6 +808,8 @@ async fn benchmark_whisper_candidates(
     sample_wav: &Path,
     reference_text: &str,
     force_cpu: bool,
+    power_source: &str,
+    progress_cb: &Option<BenchmarkProgressCallback>,
 ) -> Vec<AsrCandidateBenchmark> {
     if !sample_wav.is_file() {
         return Vec::new();
@@ -560,12 +817,29 @@ async fn benchmark_whisper_candidates(
     let candidate_names = ["tiny", "base", "small-q5_1", "small", "medium", "large-v3"];
     let mut results = Vec::new();
     let window_s = cfg.capacity.processing_window_hours * 3600.0;
+    let total_candidates = candidate_names.len();
 
-    for name in candidate_names {
+    for (idx, name) in candidate_names.iter().enumerate() {
         let rel = format!("whisper/ggml-{name}.bin");
         if paths.resolve_model_path(&rel).is_none() {
             continue;
         }
+        let cur_pct = 25 + (idx * 35 / total_candidates);
+        if let Some(ref cb) = progress_cb {
+            cb(BenchmarkProgressUpdate {
+                stage: "whisper_bench".to_string(),
+                stage_index: 2,
+                total_stages: 4,
+                percent: cur_pct,
+                message_bg: format!("Тестване на Whisper ASR: {}...", name),
+                message_en: format!("Benchmarking Whisper ASR: {}...", name),
+                current_model: Some(name.to_string()),
+                asr_benchmark: None,
+                llm_benchmark: None,
+                power_source: power_source.to_string(),
+            });
+        }
+
         let whisper = WhisperCppTranscriber::new(
             paths,
             name.to_string(),
@@ -588,13 +862,28 @@ async fn benchmark_whisper_candidates(
             let rtf = (elapsed.as_secs_f64() / 30.0 * 1000.0).round() / 1000.0;
             let wer = (compute_wer(reference_text, &rec.text) * 1000.0).round() / 1000.0;
             let raw_cap = window_s / (cfg.capacity.avg_video_seconds * rtf + cfg.capacity.overhead_seconds);
-            results.push(AsrCandidateBenchmark {
+            let bench = AsrCandidateBenchmark {
                 model: name.to_string(),
                 elapsed_ms: elapsed.as_millis() as u64,
                 rtf,
                 wer,
                 raw_capacity_per_day: (raw_cap * 10.0).round() / 10.0,
-            });
+            };
+            if let Some(ref cb) = progress_cb {
+                cb(BenchmarkProgressUpdate {
+                    stage: "whisper_bench".to_string(),
+                    stage_index: 2,
+                    total_stages: 4,
+                    percent: cur_pct + (35 / total_candidates).max(1),
+                    message_bg: format!("Завършен Whisper {}: RTF {:.3}, WER {:.1}%", name, rtf, wer * 100.0),
+                    message_en: format!("Completed Whisper {}: RTF {:.3}, WER {:.1}%", name, rtf, wer * 100.0),
+                    current_model: Some(name.to_string()),
+                    asr_benchmark: Some(bench.clone()),
+                    llm_benchmark: None,
+                    power_source: power_source.to_string(),
+                });
+            }
+            results.push(bench);
         }
     }
     results
@@ -605,8 +894,24 @@ async fn benchmark_llm_candidates(
     _cfg: &AppConfig,
     hw: &HardwareSpec,
     cases: &[CalibrationCase],
+    power_source: &str,
+    progress_cb: &Option<BenchmarkProgressCallback>,
 ) -> Vec<LlmCandidateBenchmark> {
     let Some(llama_bin) = paths.resolve_binary("llama-server") else {
+        if let Some(ref cb) = progress_cb {
+            cb(BenchmarkProgressUpdate {
+                stage: "llm_bench".to_string(),
+                stage_index: 3,
+                total_stages: 4,
+                percent: 85,
+                message_bg: "Локален LLM сървър не е наличен; активни са евристики и облак".to_string(),
+                message_en: "Local LLM server not available; heuristics and cloud active".to_string(),
+                current_model: None,
+                asr_benchmark: None,
+                llm_benchmark: None,
+                power_source: power_source.to_string(),
+            });
+        }
         return Vec::new();
     };
     if cases.is_empty() {
@@ -630,6 +935,24 @@ async fn benchmark_llm_candidates(
         }
     }
 
+    if gguf_files.is_empty() {
+        if let Some(ref cb) = progress_cb {
+            cb(BenchmarkProgressUpdate {
+                stage: "llm_bench".to_string(),
+                stage_index: 3,
+                total_stages: 4,
+                percent: 85,
+                message_bg: "Няма намерени локални GGUF модели; активен е облачен/евристичен бекенд".to_string(),
+                message_en: "No local GGUF models found; cloud/heuristics backend active".to_string(),
+                current_model: None,
+                asr_benchmark: None,
+                llm_benchmark: None,
+                power_source: power_source.to_string(),
+            });
+        }
+        return Vec::new();
+    }
+
     gguf_files.sort_by(|a, b| {
         let pa = infer_param_billions(a);
         let pb = infer_param_billions(b);
@@ -638,9 +961,10 @@ async fn benchmark_llm_candidates(
 
     let max_vram_mb = hw.gpus.iter().map(|g| g.vram_mb).max().unwrap_or(0);
     let gpu_active = !hw.force_cpu && hw.compute_backends.iter().any(|b| b != "cpu");
+    let total_candidates = gguf_files.len();
 
     let mut results = Vec::new();
-    for gguf in gguf_files {
+    for (idx, gguf) in gguf_files.into_iter().enumerate() {
         let file_mb = std::fs::metadata(&gguf).map(|m| m.len() / (1024 * 1024)).unwrap_or(0);
         if file_mb == 0 {
             continue;
@@ -668,6 +992,22 @@ async fn benchmark_llm_candidates(
             "cpu".to_string()
         };
 
+        let cur_pct = 65 + (idx * 20 / total_candidates.max(1));
+        if let Some(ref cb) = progress_cb {
+            cb(BenchmarkProgressUpdate {
+                stage: "llm_bench".to_string(),
+                stage_index: 3,
+                total_stages: 4,
+                percent: cur_pct,
+                message_bg: format!("Тестване на LLM модел: {}...", model_name),
+                message_en: format!("Benchmarking LLM model: {}...", model_name),
+                current_model: Some(model_name.clone()),
+                asr_benchmark: None,
+                llm_benchmark: None,
+                power_source: power_source.to_string(),
+            });
+        }
+
         if let Some(bench) = run_single_llama_server_benchmark(
             &llama_bin,
             &gguf,
@@ -679,6 +1019,20 @@ async fn benchmark_llm_candidates(
         )
         .await
         {
+            if let Some(ref cb) = progress_cb {
+                cb(BenchmarkProgressUpdate {
+                    stage: "llm_bench".to_string(),
+                    stage_index: 3,
+                    total_stages: 4,
+                    percent: cur_pct + (20 / total_candidates.max(1)),
+                    message_bg: format!("Завършен LLM {}: {:.1} токена/сек", model_name, bench.tokens_per_second),
+                    message_en: format!("Completed LLM {}: {:.1} tokens/sec", model_name, bench.tokens_per_second),
+                    current_model: Some(model_name.clone()),
+                    asr_benchmark: None,
+                    llm_benchmark: Some(bench.clone()),
+                    power_source: power_source.to_string(),
+                });
+            }
             results.push(bench);
         }
     }
@@ -1029,6 +1383,7 @@ mod tests {
             }],
             compute_backends: vec!["vulkan".to_string(), "cuda".to_string(), "cpu".to_string()],
             force_cpu: false,
+            power_source: "ac".to_string(),
         };
 
         let asr = vec![
@@ -1100,6 +1455,7 @@ mod tests {
             gpus: Vec::new(),
             compute_backends: vec!["cpu".to_string()],
             force_cpu: true,
+            power_source: "ac".to_string(),
         };
 
         let asr = vec![AsrCandidateBenchmark {

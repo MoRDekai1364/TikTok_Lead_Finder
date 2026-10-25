@@ -96,6 +96,11 @@ fn terminate_application(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn terminate_desktop(app: tauri::AppHandle) {
+    terminate_application(app);
+}
+
+#[tauri::command]
 fn exit_and_run_background(app: tauri::AppHandle) {
     app.exit(0);
     std::process::exit(0);
@@ -140,12 +145,15 @@ fn main() {
             open_in_browser,
             open_in_webview,
             terminate_application,
+            terminate_desktop,
             exit_and_run_background
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.emit("request-exit-prompt", ());
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.emit("request-exit-prompt", ());
+                }
             }
         })
         .run(tauri::generate_context!())

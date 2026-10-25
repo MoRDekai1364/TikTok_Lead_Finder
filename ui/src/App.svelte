@@ -4,6 +4,7 @@
     initDesktopConnection,
     deleteVideo,
     exitAndRunBackground,
+    fetchCalibrationStatus,
     fetchProfile,
     fetchQueueStatus,
     fetchScaleStatus,
@@ -15,10 +16,12 @@
     pullMore,
     subscribeSse,
     terminateApplication,
+    triggerBenchmark,
   } from './lib/api';
   import type { Language } from './lib/i18n';
-  import type { Lane, LeadCard, QueueCounts, ScaleStatus, Screen } from './lib/types';
+  import type { BenchmarkProgress, Lane, LeadCard, PowerInfo, QueueCounts, ScaleStatus, Screen } from './lib/types';
 
+  import BenchmarkOverlay from './components/BenchmarkOverlay.svelte';
   import CalibrationScreen from './components/CalibrationScreen.svelte';
   import CreatorsScreen from './components/CreatorsScreen.svelte';
   import PeopleScreen from './components/PeopleScreen.svelte';
@@ -59,6 +62,10 @@
   let isScanModalOpen = $state(false);
   let isGoogleAiWizardOpen = $state(false);
   let isExitPromptOpen = $state(false);
+  let isBenchmarkModalOpen = $state(false);
+  let benchmarkProgress = $state<BenchmarkProgress | null>(null);
+  let powerInfo = $state<PowerInfo | null>(null);
+  let powerToast = $state<string | null>(null);
 
   onMount(() => {
     const savedTheme = localStorage.getItem('leadfinder_theme') as 'light' | 'dark' | null;
@@ -121,11 +128,12 @@
 
   async function loadInitialData() {
     try {
-      const [vids, qc, prof, sc] = await Promise.all([
+      const [vids, qc, prof, sc, calStatus] = await Promise.all([
         fetchVideos(activeLane),
         fetchQueueStatus(),
         fetchProfile(),
         fetchScaleStatus(),
+        fetchCalibrationStatus().catch(() => null),
       ]);
 
       cards = vids;
@@ -135,13 +143,56 @@
       }
       scaleStatus = sc;
 
+      if (calStatus) {
+        powerInfo = calStatus.power;
+        benchmarkProgress = calStatus.progress;
+        if (calStatus.active_profile?.capacity_per_day) {
+          capacityPerDay = Math.round(calStatus.active_profile.capacity_per_day);
+        }
+        if (!calStatus.active_profile && !calStatus.ac_profile && !calStatus.battery_profile && !calStatus.is_running) {
+          const alreadyPrompted = sessionStorage.getItem('leadfinder_initial_benchmark_prompted');
+          if (!alreadyPrompted) {
+            sessionStorage.setItem('leadfinder_initial_benchmark_prompted', 'true');
+            isBenchmarkModalOpen = true;
+            void triggerBenchmark({ power_source: calStatus.power?.power_source || 'ac' });
+          }
+        } else if (calStatus.is_running) {
+          const alreadySeen = sessionStorage.getItem('leadfinder_running_benchmark_seen');
+          if (!alreadySeen) {
+            sessionStorage.setItem('leadfinder_running_benchmark_seen', 'true');
+            isBenchmarkModalOpen = true;
+          }
+        }
+      }
+
       if (cards.length > 0 && !selectedId) {
         selectedId = cards[0].id;
       }
     } catch {}
   }
 
-  function handleLiveEvent(_ev: unknown) {
+  function handleLiveEvent(ev: any) {
+    if (ev?.event === 'benchmark_progress' && ev.data) {
+      benchmarkProgress = ev.data;
+      if (benchmarkProgress?.completed_at) {
+        void loadInitialData();
+      }
+      return;
+    }
+    if (ev?.event === 'power_changed' && ev.data) {
+      powerInfo = ev.data;
+      const isBatt = powerInfo?.power_source === 'battery';
+      powerToast = currentLang === 'bg'
+        ? (isBatt ? '🔋 Преминаване на батерия: Активиран енергоспестяващ профил.' : '⚡ Включено зарядно: Активиран пълноскоростен AC профил.')
+        : (isBatt ? '🔋 Battery power detected: Switched to power-saver profile.' : '⚡ AC power connected: Switched to high-throughput profile.');
+      setTimeout(() => { powerToast = null; }, 5000);
+      void loadInitialData();
+      return;
+    }
+    if (ev?.event === 'calibration_updated') {
+      void loadInitialData();
+      return;
+    }
     fetchVideos(activeLane).then((vids) => {
       cards = vids;
     });
@@ -371,11 +422,14 @@
     {queueCounts}
     {capacityPerDay}
     {scaleStatus}
+    {powerInfo}
+    {benchmarkProgress}
     onNavigate={(s: Screen) => (activeScreen = s)}
     onPasteUrls={handlePasteUrls}
     onJumpToVideo={handleJumpToVideo}
     onOpenScanModal={() => (isScanModalOpen = true)}
     onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)}
+    onOpenBenchmarkModal={() => (isBenchmarkModalOpen = true)}
     onRequestExit={() => (isExitPromptOpen = true)}
     onToggleTheme={toggleTheme}
     onToggleLang={toggleLang}
@@ -413,7 +467,10 @@
       {:else if activeScreen === 'seeds'}
         <SeedsScreen {currentLang} />
       {:else if activeScreen === 'calibration'}
-        <CalibrationScreen {currentLang} />
+        <CalibrationScreen
+          {currentLang}
+          onOpenBenchmarkModal={() => (isBenchmarkModalOpen = true)}
+        />
       {:else if activeScreen === 'settings'}
         <SettingsScreen {currentLang} onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)} />
       {:else if activeScreen === 'export'}
@@ -469,6 +526,26 @@
       {queueCounts}
       onClose={() => (isExitPromptOpen = false)}
     />
+
+    <BenchmarkOverlay
+      isOpen={isBenchmarkModalOpen}
+      {currentLang}
+      {powerInfo}
+      progress={benchmarkProgress}
+      onClose={() => (isBenchmarkModalOpen = false)}
+      onBenchmarkStarted={() => {
+        void loadInitialData();
+      }}
+    />
+
+    {#if powerToast}
+      <div class="power-toast-alert">
+        <span>{powerToast}</span>
+        <button class="toast-view-btn" onclick={() => (isBenchmarkModalOpen = true)}>
+          {currentLang === 'bg' ? 'Преглед' : 'View'}
+        </button>
+      </div>
+    {/if}
   </main>
 </div>
 
@@ -501,5 +578,44 @@
     flex-direction: column;
     overflow: hidden;
     position: relative;
+  }
+
+  .power-toast-alert {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    background: rgba(17, 24, 39, 0.95);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    padding: 10px 16px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: #f3f4f6;
+    animation: toastSlide 0.25s ease-out;
+  }
+
+  .toast-view-btn {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .toast-view-btn:hover {
+    background: rgba(59, 130, 246, 0.35);
+  }
+
+  @keyframes toastSlide {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
   }
 </style>

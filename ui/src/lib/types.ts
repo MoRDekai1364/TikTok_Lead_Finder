@@ -180,8 +180,10 @@ export interface HardwareProfile {
     ram_mb: number;
     gpus: { vendor: string; name: string; vram_mb: number }[];
     compute_backends: string[];
+    power_source?: string;
   };
   chosen: {
+    power_source?: string;
     effective: {
       asr_engine: string;
       asr_model: string;
@@ -325,9 +327,70 @@ export interface CustomScanResult {
   errors: string[];
 }
 
+export interface GeminiKeyInfo {
+  index: number;
+  masked: string;
+  is_active: boolean;
+}
+
 export interface GeminiStatus {
   configured: boolean;
   masked_key?: string | null;
   cloud_enabled: boolean;
   model: string;
+  total_keys?: number;
+  active_key_index?: number;
+  keys?: GeminiKeyInfo[];
+}
+
+export interface PowerInfo {
+  power_source: 'ac' | 'battery';
+  ac_online: boolean;
+  battery_percent: number | null;
+  has_battery: boolean;
+  battery_life_time_seconds?: number | null;
+}
+
+export interface AsrCandidateBenchmark {
+  model: string;
+  elapsed_ms: number;
+  rtf: number;
+  wer: number;
+  raw_capacity_per_day: number;
+}
+
+export interface LlmCandidateBenchmark {
+  model: string;
+  param_billions?: number;
+  backend: string;
+  tokens_per_second: number;
+  mean_call_seconds: number;
+  json_validity_rate?: number;
+}
+
+export interface BenchmarkProgress {
+  is_running: boolean;
+  power_source: 'ac' | 'battery';
+  current_stage: string;
+  stage_index: number;
+  total_stages: number;
+  progress_pct: number;
+  status_text: string;
+  status_text_en: string;
+  current_model: string | null;
+  asr_results: AsrCandidateBenchmark[];
+  llm_results: LlmCandidateBenchmark[];
+  final_capacity: number | null;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface BenchmarkStatusResponse {
+  is_running: boolean;
+  progress: BenchmarkProgress;
+  power: PowerInfo;
+  ac_profile: HardwareProfile | null;
+  battery_profile: HardwareProfile | null;
+  active_profile: HardwareProfile | null;
 }
