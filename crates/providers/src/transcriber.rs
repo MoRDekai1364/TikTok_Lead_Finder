@@ -66,6 +66,16 @@ impl Transcriber for CaptionFirstTranscriber {
 
         if let Some(ref wav_path) = input.audio_wav_path {
             if wav_path.is_file() {
+                let detected_lang = self.whisper.detect_language(wav_path).await;
+                let is_non_bg = detected_lang
+                    .as_deref()
+                    .map(|l| l != "bg")
+                    .unwrap_or(false);
+
+                if is_non_bg {
+                    return self.whisper.transcribe(input).await;
+                }
+
                 let py_script = [
                     PathBuf::from("scripts/google_audio_transcribe.py"),
                     PathBuf::from("tools/google_audio_transcribe.py"),
@@ -74,19 +84,34 @@ impl Transcriber for CaptionFirstTranscriber {
                 .find(|p| p.is_file());
 
                 if let Some(script) = py_script {
+                    let whisper_res = self.whisper.transcribe_with_json_file(input).await.ok();
+                    let (whisper_rec, whisper_json_path) = match whisper_res {
+                        Some((rec, path)) => (Some(rec), Some(path)),
+                        None => (None, None),
+                    };
+
                     let mut cmd = Command::new("python");
                     cmd.env("PYTHONIOENCODING", "utf-8");
                     if let Some(key) = leadfinder_core::resolve_secret("GEMINI_API_KEY") {
                         cmd.env("GEMINI_API_KEY", key);
                     }
                     cmd.arg(&script).arg("--audio").arg(wav_path);
+                    if let Some(ref jpath) = whisper_json_path {
+                        cmd.arg("--whisper-json").arg(jpath);
+                    }
                     cmd.stdout(Stdio::piped());
                     cmd.stderr(Stdio::piped());
                     #[cfg(windows)]
                     {
                         cmd.creation_flags(0x08000000);
                     }
-                    if let Ok(Ok(output)) = tokio::time::timeout(Duration::from_secs(45), cmd.output()).await {
+                    let py_output = tokio::time::timeout(Duration::from_secs(45), cmd.output()).await;
+
+                    if let Some(ref jpath) = whisper_json_path {
+                        let _ = std::fs::remove_file(jpath);
+                    }
+
+                    if let Ok(Ok(output)) = py_output {
                         if output.status.success() {
                             if let Ok(val) = serde_json::from_slice::<Value>(&output.stdout) {
                                 let corrected = val
@@ -126,6 +151,10 @@ impl Transcriber for CaptionFirstTranscriber {
                                 }
                             }
                         }
+                    }
+
+                    if let Some(w_rec) = whisper_rec {
+                        return Ok(w_rec);
                     }
                 }
             }
@@ -229,15 +258,65 @@ impl WhisperCppTranscriber {
     pub fn is_ready(&self) -> bool {
         self.binary_path.is_some() && self.resolve_model_file().is_some()
     }
-}
 
-#[async_trait]
-impl Transcriber for WhisperCppTranscriber {
-    fn name(&self) -> &str {
-        "whisper_cpp"
+    pub async fn detect_language(&self, audio_wav_path: &Path) -> Option<String> {
+        let bin = self.binary_path.as_deref()?;
+        let model_file = [
+            self.models_dir.join("ggml-tiny.bin"),
+            self.bundled_models_dir.join("ggml-tiny.bin"),
+            self.models_dir.join("ggml-base.bin"),
+            self.bundled_models_dir.join("ggml-base.bin"),
+        ]
+        .into_iter()
+        .find(|p| p.is_file())
+        .or_else(|| self.resolve_model_file())?;
+
+        let mut cmd = Command::new(bin);
+        cmd.args([
+            "-m",
+            &model_file.to_string_lossy(),
+            "-f",
+            &audio_wav_path.to_string_lossy(),
+            "-dl",
+        ]);
+        if self.force_cpu {
+            cmd.arg("-ng");
+        }
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+
+        #[cfg(windows)]
+        {
+            cmd.creation_flags(0x08000000);
+        }
+
+        let output = tokio::time::timeout(Duration::from_secs(8), cmd.output()).await.ok()?.ok()?;
+        let combined = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        for line in combined.lines() {
+            if let Some(pos) = line.find("auto-detected language:") {
+                let rest = &line[pos + "auto-detected language:".len()..];
+                if let Some(token) = rest.split_whitespace().next() {
+                    let clean = token.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase();
+                    if !clean.is_empty() {
+                        return Some(clean);
+                    }
+                }
+            }
+        }
+        None
     }
 
-    async fn transcribe(&self, input: &TranscribeInput) -> Result<TranscriptRecord, ProviderError> {
+    pub async fn transcribe_with_json_file(
+        &self,
+        input: &TranscribeInput,
+    ) -> Result<(TranscriptRecord, PathBuf), ProviderError> {
         let audio = input.audio_wav_path.as_deref().ok_or_else(|| {
             ProviderError::new(
                 ProviderErrorKind::InvalidOutput,
@@ -348,7 +427,6 @@ impl Transcriber for WhisperCppTranscriber {
                 false,
             )
         })?;
-        let _ = std::fs::remove_file(&out_json_path);
 
         let parsed: Value = serde_json::from_str(&raw_json).map_err(|e| {
             ProviderError::new(ProviderErrorKind::ParseError, "whisper_cpp", e.to_string(), false)
@@ -460,6 +538,19 @@ impl Transcriber for WhisperCppTranscriber {
         if let Some(ref lex) = self.lexicon {
             lex.normalize_transcript(&mut rec);
         }
+        Ok((rec, out_json_path))
+    }
+}
+
+#[async_trait]
+impl Transcriber for WhisperCppTranscriber {
+    fn name(&self) -> &str {
+        "whisper_cpp"
+    }
+
+    async fn transcribe(&self, input: &TranscribeInput) -> Result<TranscriptRecord, ProviderError> {
+        let (rec, json_path) = self.transcribe_with_json_file(input).await?;
+        let _ = std::fs::remove_file(&json_path);
         Ok(rec)
     }
 }
