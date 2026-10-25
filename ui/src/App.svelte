@@ -291,6 +291,10 @@
       return;
     }
 
+    if (activeScreen !== 'inbox') {
+      return;
+    }
+
     if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') {
       e.preventDefault();
       moveSelection(1);
@@ -488,11 +492,14 @@
   }
 
   .main-content-area {
-    flex: 1;
+    flex: 1 1 0;
     min-width: 0;
+    min-height: 0;
     height: 100%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
   }
 </style>

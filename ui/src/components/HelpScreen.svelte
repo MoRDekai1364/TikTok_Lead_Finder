@@ -4,9 +4,17 @@
   let { currentLang }: { currentLang: Language } = $props();
 
   let activeSection = $state<'signs' | 'actions' | 'lanes' | 'verdicts' | 'dictionary'>('signs');
+  let scrollContainer = $state<HTMLDivElement | null>(null);
+
+  function setSection(section: 'signs' | 'actions' | 'lanes' | 'verdicts' | 'dictionary') {
+    activeSection = section;
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }
 </script>
 
-<div class="help-scroll-wrapper">
+<div class="help-scroll-wrapper" bind:this={scrollContainer}>
   <div class="help-container">
   <header class="help-header">
     <div class="help-title-group">
@@ -22,35 +30,35 @@
       <button
         class="help-nav-btn"
         class:active={activeSection === 'signs'}
-        onclick={() => (activeSection = 'signs')}
+        onclick={() => setSection('signs')}
       >
         🔤 {currentLang === 'bg' ? 'Означения (Q, C, E, R)' : 'Signings (Q, C, E, R)'}
       </button>
       <button
         class="help-nav-btn"
         class:active={activeSection === 'actions'}
-        onclick={() => (activeSection = 'actions')}
+        onclick={() => setSection('actions')}
       >
         ⌨️ {currentLang === 'bg' ? 'Действия & Клавиши' : 'Actions & Keys'}
       </button>
       <button
         class="help-nav-btn"
         class:active={activeSection === 'lanes'}
-        onclick={() => (activeSection = 'lanes')}
+        onclick={() => setSection('lanes')}
       >
         📂 {currentLang === 'bg' ? 'Секции (Lanes)' : 'Lanes & Queues'}
       </button>
       <button
         class="help-nav-btn"
         class:active={activeSection === 'verdicts'}
-        onclick={() => (activeSection = 'verdicts')}
+        onclick={() => setSection('verdicts')}
       >
         ⚖️ {currentLang === 'bg' ? 'Присъди' : 'Verdicts'}
       </button>
       <button
         class="help-nav-btn"
         class:active={activeSection === 'dictionary'}
-        onclick={() => (activeSection = 'dictionary')}
+        onclick={() => setSection('dictionary')}
       >
         📖 {currentLang === 'bg' ? 'Речници & Жаргон' : 'Dictionary & Slang'}
       </button>
@@ -473,22 +481,49 @@ standard = "човек"</code></pre>
 
 <style>
   .help-scroll-wrapper {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 100%;
     width: 100%;
     height: 100%;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    overflow-x: hidden;
     background: var(--bg-canvas);
     box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    outline: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+  }
+
+  .help-scroll-wrapper::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .help-scroll-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .help-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+  }
+
+  .help-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
   }
 
   .help-container {
     max-width: 1040px;
+    width: 100%;
     margin: 0 auto;
-    padding: 1.5rem 1rem 3rem 1rem;
+    padding: 1.5rem 1rem 4rem 1rem;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
     box-sizing: border-box;
+    min-height: min-content;
   }
 
   .help-header {
