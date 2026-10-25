@@ -323,8 +323,9 @@ export function formatVerdictDisplay(verdict: string | null | undefined, label: 
 }
 
 export interface CustomScanConfig {
-  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags';
+  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags' | 'all' | 'no_keywords';
   targets?: string[];
+  allow_no_keywords?: boolean;
   max_per_target?: number;
   min_views?: number | null;
   min_likes?: number | null;

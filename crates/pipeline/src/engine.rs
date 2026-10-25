@@ -612,9 +612,9 @@ impl PipelineContext {
 
         let ytdlp_source = YtDlpDiscoverySource::new(self.ytdlp.clone());
         let mut target_handles: Vec<String> = Vec::new();
-        let is_keyword_mode = cfg.target_mode == "keywords" || cfg.target_mode == "hashtags";
+        let is_keyword_mode = (cfg.target_mode == "keywords" || cfg.target_mode == "hashtags") && !cfg.allow_no_keywords;
 
-        if cfg.target_mode == "watchlist" || is_keyword_mode {
+        if cfg.target_mode == "watchlist" || cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" || cfg.target_mode == "all" || cfg.target_mode == "no_keywords" {
             let creators = self.db.list_creators().await.unwrap_or_default();
             let mut wl: Vec<String> = creators
                 .into_iter()
@@ -645,13 +645,22 @@ impl PipelineContext {
             }
         }
 
+        if target_handles.is_empty() {
+            let creators = self.db.list_creators().await.unwrap_or_default();
+            target_handles = creators
+                .into_iter()
+                .map(|c| c.handle.trim().trim_start_matches('@').to_lowercase())
+                .filter(|h| !h.is_empty())
+                .collect();
+        }
+
         if let Some(max_t) = cfg.max_targets {
             if max_t > 0 && target_handles.len() > max_t {
                 target_handles.truncate(max_t);
             }
         }
 
-        let search_terms: Vec<String> = if is_keyword_mode {
+        let search_terms: Vec<String> = if is_keyword_mode && !cfg.allow_no_keywords {
             cfg.targets
                 .iter()
                 .flat_map(|t| t.split([',', ';', '\n', '\r', '\t']))
@@ -709,7 +718,7 @@ impl PipelineContext {
                     }
                 }
 
-                if !search_terms.is_empty() {
+                if !cfg.allow_no_keywords && !search_terms.is_empty() {
                     let caption_lower = vref.caption.as_deref().unwrap_or("").to_lowercase();
                     let matches_term = search_terms.iter().any(|term| {
                         caption_lower.contains(term)
@@ -1037,6 +1046,8 @@ pub struct CustomScanConfig {
     pub auto_process: bool,
     #[serde(default)]
     pub max_targets: Option<usize>,
+    #[serde(default)]
+    pub allow_no_keywords: bool,
 }
 
 fn default_target_mode() -> String {

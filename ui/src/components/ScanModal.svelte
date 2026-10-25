@@ -21,6 +21,7 @@
   let targetMode = $state<'watchlist' | 'creators' | 'keywords'>('watchlist');
   let customTargetsText = $state('');
   let keywordQuery = $state('');
+  let allowNoKeywords = $state(false);
   let maxPerTarget = $state(5);
   let minViewsChoice = $state(0);
   let minLikesChoice = $state(0);
@@ -60,6 +61,8 @@
   function applyPreset(name: string) {
     if (name === 'full') {
       targetMode = 'watchlist';
+      allowNoKeywords = true;
+      keywordQuery = '';
       maxPerTarget = 5;
       minViewsChoice = 0;
       recencyDays = 7;
@@ -67,13 +70,26 @@
       autoProcess = true;
     } else if (name === 'fast') {
       targetMode = 'watchlist';
+      allowNoKeywords = true;
+      keywordQuery = '';
       maxPerTarget = 3;
       minViewsChoice = 1000;
       recencyDays = 3;
       maxTargetsChoice = 5;
       autoProcess = true;
+    } else if (name === 'open') {
+      targetMode = 'watchlist';
+      allowNoKeywords = true;
+      keywordQuery = '';
+      maxPerTarget = 5;
+      minViewsChoice = 0;
+      recencyDays = 7;
+      maxTargetsChoice = 0;
+      autoProcess = true;
     } else if (name === 'viral') {
       targetMode = 'watchlist';
+      allowNoKeywords = true;
+      keywordQuery = '';
       maxPerTarget = 10;
       minViewsChoice = 10000;
       minLikesChoice = 200;
@@ -106,23 +122,23 @@
           return;
         }
       } else if (targetMode === 'keywords') {
-        targets = keywordQuery
-          .split(/[\n,;]+/)
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-        if (targets.length === 0) {
-          errorMessage = currentLang === 'bg'
-            ? 'Моля въведете ключова дума или хаштаг (напр. избори, #българия)'
-            : 'Please enter a keyword or hashtag (e.g. elections, #bulgaria)';
-          isScanning = false;
-          stopTimer();
-          return;
+        if (!allowNoKeywords && keywordQuery.trim().length > 0) {
+          targets = keywordQuery
+            .split(/[\n,;]+/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+        } else {
+          targets = [];
+          allowNoKeywords = true;
         }
       }
+
+      const effectiveAllowNoKeywords = allowNoKeywords || targets.length === 0;
 
       const config: CustomScanConfig = {
         target_mode: targetMode,
         targets,
+        allow_no_keywords: effectiveAllowNoKeywords,
         max_per_target: Number(maxPerTarget),
         min_views: minViewsChoice > 0 ? minViewsChoice : null,
         min_likes: minLikesChoice > 0 ? minLikesChoice : null,
@@ -195,6 +211,9 @@
           <button class="preset-btn" onclick={() => applyPreset('fast')}>
             ⚡ {currentLang === 'bg' ? 'Бърз тест (5 канала, 3 видеа)' : 'Quick Test (5 channels, 3 vids)'}
           </button>
+          <button class="preset-btn" onclick={() => applyPreset('open')}>
+            🌐 {currentLang === 'bg' ? 'Отворен скенер (без филтър)' : 'Open Scan (no filter)'}
+          </button>
           <button class="preset-btn" onclick={() => applyPreset('full')}>
             📺 {currentLang === 'bg' ? 'Пълен списък (всички 23 канала)' : 'Full Watchlist (all 23 channels)'}
           </button>
@@ -254,11 +273,11 @@
                   onchange={() => (targetMode = 'keywords')}
                 />
                 <div class="mode-info">
-                  <span class="mode-name">🔍 {currentLang === 'bg' ? 'Ключови думи & Теми' : 'Keywords & Topics'}</span>
+                  <span class="mode-name">🔍 {currentLang === 'bg' ? 'Ключови думи & Хаштагове' : 'Keywords & Hashtags'}</span>
                   <span class="mode-desc">
                     {currentLang === 'bg'
-                      ? 'Сканира профилите и филтрира видеата само по съвпадение на тема или хаштаг'
-                      : 'Scans creators and filters videos by keyword or hashtag match'}
+                      ? 'Търсене по избрани теми или сканиране без филтър за пълно покритие'
+                      : 'Scan by chosen topics or unconstrained without filters'}
                   </span>
                 </div>
               </label>
@@ -281,16 +300,30 @@
 
             {#if targetMode === 'keywords'}
               <div class="input-subgroup">
-                <label for="custom-keywords" class="field-label">
-                  {currentLang === 'bg' ? 'Ключови думи / хаштагове:' : 'Keywords / hashtags:'}
-                </label>
+                <div class="field-label-row">
+                  <label for="custom-keywords" class="field-label">
+                    {currentLang === 'bg' ? 'Ключови думи / хаштагове (по избор):' : 'Keywords / hashtags (optional):'}
+                  </label>
+                  <label class="toggle-pill-label">
+                    <input type="checkbox" bind:checked={allowNoKeywords} />
+                    <span>⚡ {currentLang === 'bg' ? 'Без филтър (всички видеа)' : 'No filter (all videos)'}</span>
+                  </label>
+                </div>
                 <input
                   id="custom-keywords"
                   type="text"
                   class="custom-input"
-                  placeholder="избори, парламент, правителство, #новини"
+                  placeholder={allowNoKeywords
+                    ? (currentLang === 'bg' ? 'Без филтър по хаштаг / дума (всички видеа ще бъдат сканирани)' : 'No hashtag / keyword filter (all videos will be scanned)')
+                    : (currentLang === 'bg' ? 'избори, парламент, правителство, #новини (или оставете празно)' : 'elections, parliament, #news (or leave blank)')}
+                  disabled={allowNoKeywords}
                   bind:value={keywordQuery}
                 />
+                <span class="field-hint">
+                  {allowNoKeywords || keywordQuery.trim().length === 0
+                    ? (currentLang === 'bg' ? '✓ Без филтър: скенерът ще обходи каналите без ограничение по хаштаг или ключова дума.' : '✓ No-filter mode: scanner will ingest videos without hashtag or keyword restrictions.')
+                    : (currentLang === 'bg' ? 'Филтриране по съвпадение в заглавието или хаштаговете.' : 'Filtering by match in caption or hashtags.')}
+                </span>
               </div>
             {/if}
           </div>
@@ -439,6 +472,33 @@
                   </div>
                 </div>
               {/if}
+
+              <div class="filter-box">
+                <span class="filter-label">🏷️ {currentLang === 'bg' ? 'Хаштаг / Дума филтър:' : 'Hashtag / Keyword filter:'}</span>
+                <div class="pill-group">
+                  <button
+                    type="button"
+                    class="pill-choice"
+                    class:active={allowNoKeywords || (targetMode === 'keywords' && keywordQuery.trim().length === 0) || targetMode !== 'keywords'}
+                    onclick={() => {
+                      allowNoKeywords = true;
+                    }}
+                  >
+                    🔓 {currentLang === 'bg' ? 'Без филтър' : 'No filter'}
+                  </button>
+                  <button
+                    type="button"
+                    class="pill-choice"
+                    class:active={!allowNoKeywords && targetMode === 'keywords' && keywordQuery.trim().length > 0}
+                    onclick={() => {
+                      targetMode = 'keywords';
+                      allowNoKeywords = false;
+                    }}
+                  >
+                    🎯 {currentLang === 'bg' ? 'С филтър' : 'With filter'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="auto-process-row">
@@ -765,10 +825,33 @@
     margin-top: 0.25rem;
   }
 
+  .field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
   .field-label {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-body);
+  }
+
+  .toggle-pill-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.76rem;
+    color: var(--primary-accent);
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .field-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.3;
   }
 
   .custom-textarea,
