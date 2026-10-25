@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     aiCheckTranscript,
+    assessCreatorRisk,
     deleteEvidence,
     deleteVideo,
     fetchEvidencePreview,
@@ -64,6 +65,7 @@
   let creatorVideos = $state<LeadCard[]>([]);
   let isLoadingCreatorVideos = $state(false);
   let isTogglingWatchlist = $state(false);
+  let isAssessingRisk = $state(false);
   let previewModalData = $state<{ url: string; title: string; text: string; domain: string } | null>(null);
   let googleAiModalData = $state<GoogleAiQueryResult | null>(null);
   let isGoogleAiQuerying = $state(false);
@@ -727,16 +729,180 @@
     };
   }
 
+  function formatRiskAssessment(ra: any) {
+    const level = ra.risk_level || 'unverified';
+    const conf = ra.confidence ?? 0.2;
+    const confPercent = Math.round(conf * 100);
+    const confLevel = ra.confidence_level || (conf >= 0.7 ? 'high' : conf >= 0.35 ? 'moderate' : 'low');
+
+    let label = '⚪ Непроверен профил';
+    let badgeClass = 'risk-unverified';
+    if (level === 'high') {
+      label = currentLang === 'bg' ? '🔴 Висок риск' : '🔴 High Risk';
+      badgeClass = 'risk-high';
+    } else if (level === 'moderate') {
+      label = currentLang === 'bg' ? '🟡 Умерен риск' : '🟡 Moderate Risk';
+      badgeClass = 'risk-moderate';
+    } else if (level === 'low') {
+      label = currentLang === 'bg' ? '🟢 Нисък риск' : '🟢 Low Risk';
+      badgeClass = 'risk-low';
+    } else {
+      label = currentLang === 'bg' ? '⚪ Непроверен / Недостатъчно данни' : '⚪ Unverified / Insufficient Data';
+    }
+
+    const confText = confLevel === 'high'
+      ? (currentLang === 'bg' ? 'Висока увереност' : 'High confidence')
+      : confLevel === 'moderate'
+        ? (currentLang === 'bg' ? 'Умерена увереност' : 'Moderate confidence')
+        : (currentLang === 'bg' ? 'Нисък доверителен интервал' : 'Low confidence');
+
+    return {
+      level,
+      label,
+      badgeClass,
+      confidenceScore: conf,
+      confidenceLevel: confLevel,
+      confidencePercent: confPercent,
+      confidenceClass: `conf-${confLevel}`,
+      confidenceText: confText,
+      confidenceReason: ra.confidence_reason || '',
+      rationale: ra.rationale || '',
+      webSources: ra.web_sources || [],
+      localStats: ra.local_stats || { total_videos: 1, flagged_videos: 0, contradicted_claims: 0, supported_claims: 0 },
+      lastCalculatedAt: ra.last_calculated_at || null,
+    };
+  }
+
   function computeAuthorRisk(creator: any) {
+    if (creator?.risk_assessment) {
+      return formatRiskAssessment(creator.risk_assessment);
+    }
+    if (creator?.risk_assessment_json) {
+      try {
+        const parsed = JSON.parse(creator.risk_assessment_json);
+        return formatRiskAssessment(parsed);
+      } catch (e) {
+      }
+    }
+
     const flagged = creator?.flagged_count ?? 0;
+    const totalVideos = creatorVideos.length || (creator?.total_videos ?? (detail?.video ? 1 : 0));
     const hasContradicted = detail?.claims?.some((c) => (c.claim.verdict || '').toUpperCase() === 'CONTRADICTED');
+    const hasSupported = detail?.claims?.some((c) => (c.claim.verdict || '').toUpperCase() === 'SUPPORTED');
+
+    let level: 'high' | 'moderate' | 'low' | 'unverified' = 'unverified';
+    let label = currentLang === 'bg' ? '⚪ Непроверен профил' : '⚪ Unverified Profile';
+    let badgeClass = 'risk-unverified';
+    let confidenceScore = 0.20;
+    let confidenceLevel: 'low' | 'moderate' | 'high' = 'low';
+    let confidencePercent = 20;
+    let confidenceText = currentLang === 'bg' ? 'Нисък доверителен интервал' : 'Low confidence';
+    let confidenceReason = currentLang === 'bg'
+      ? `Малък обем данни: само ${totalVideos} видео в локалната база без външни уеб данни.`
+      : `Small sample size: only ${totalVideos} video in local database without web data.`;
+    let rationale = currentLang === 'bg'
+      ? 'Липсват достатъчно записи или външни журналистически проверки за определяне на категоричен риск.'
+      : 'Insufficient local records or external journalistic checks to determine conclusive risk.';
+
     if (flagged >= 3 || hasContradicted) {
-      return { level: 'high', label: '🔴 Висок риск', badgeClass: 'risk-high' };
+      level = 'high';
+      label = currentLang === 'bg' ? '🔴 Висок риск' : '🔴 High Risk';
+      badgeClass = 'risk-high';
+      confidenceScore = totalVideos >= 3 ? 0.70 : 0.40;
+      confidenceLevel = totalVideos >= 3 ? 'high' : 'moderate';
+      confidencePercent = Math.round(confidenceScore * 100);
+      confidenceText = confidenceLevel === 'high'
+        ? (currentLang === 'bg' ? 'Висока увереност' : 'High confidence')
+        : (currentLang === 'bg' ? 'Умерен доверителен интервал' : 'Moderate confidence');
+      confidenceReason = currentLang === 'bg'
+        ? `Открито опровергано твърдение, но историята е ограничена до ${totalVideos} видео в базата.`
+        : `Contradicted claim detected, but history is limited to ${totalVideos} video in database.`;
+      rationale = currentLang === 'bg'
+        ? 'Авторът е разпространил съдържание с опровергани твърдения.'
+        : 'Author has distributed content containing contradicted claims.';
+    } else if (flagged > 0) {
+      level = 'moderate';
+      label = currentLang === 'bg' ? '🟡 Умерен риск' : '🟡 Moderate Risk';
+      badgeClass = 'risk-moderate';
+      confidenceScore = 0.35;
+      confidenceLevel = 'moderate';
+      confidencePercent = 35;
+      confidenceText = currentLang === 'bg' ? 'Умерен доверителен интервал' : 'Moderate confidence';
+      confidenceReason = currentLang === 'bg'
+        ? `Базирано на ${flagged} предишно сигнализирано видео.`
+        : `Based on ${flagged} previously flagged video.`;
+      rationale = currentLang === 'bg'
+        ? 'Авторът има предишни видеа с повишен риск в базата.'
+        : 'Author has previously flagged content in the database.';
+    } else if (totalVideos >= 3 && hasSupported) {
+      level = 'low';
+      label = currentLang === 'bg' ? '🟢 Нисък риск' : '🟢 Low Risk';
+      badgeClass = 'risk-low';
+      confidenceScore = 0.65;
+      confidenceLevel = 'moderate';
+      confidencePercent = 65;
+      confidenceText = currentLang === 'bg' ? 'Умерена увереност' : 'Moderate confidence';
+      confidenceReason = currentLang === 'bg'
+        ? `Базирано на ${totalVideos} видеа в базата без регистрирани нарушения.`
+        : `Based on ${totalVideos} videos in database without violations.`;
+      rationale = currentLang === 'bg'
+        ? 'Потвърдени надеждни твърдения в локалната база без нарушения.'
+        : 'Confirmed supported claims in local database without violations.';
     }
-    if (flagged > 0) {
-      return { level: 'moderate', label: '🟡 Умерен риск', badgeClass: 'risk-moderate' };
+
+    return {
+      level,
+      label,
+      badgeClass,
+      confidenceScore,
+      confidenceLevel,
+      confidencePercent,
+      confidenceClass: `conf-${confidenceLevel}`,
+      confidenceText,
+      confidenceReason,
+      rationale,
+      webSources: [],
+      localStats: {
+        total_videos: totalVideos,
+        flagged_videos: flagged,
+        contradicted_claims: hasContradicted ? 1 : 0,
+        supported_claims: hasSupported ? 1 : 0,
+      },
+      lastCalculatedAt: null,
+    };
+  }
+
+  async function handleAssessAuthorWebRisk() {
+    const handle = detail?.creator?.handle || detail?.video?.creator_handle;
+    if (!handle || isAssessingRisk) return;
+    isAssessingRisk = true;
+    try {
+      const res = await assessCreatorRisk(handle, detail?.creator?.display_name || detail?.video?.creator_display_name);
+      if (detail) {
+        if (!detail.creator) {
+          detail.creator = {
+            id: handle.toLowerCase(),
+            handle,
+            display_name: detail.video?.creator_display_name ?? null,
+            region: null,
+            follower_count: detail.video?.creator_follower_count ?? null,
+            first_seen_at: new Date().toISOString(),
+            watchlist: false,
+            flagged_count: 0,
+            expansion_depth: 0,
+            risk_assessment: res,
+            risk_assessment_json: JSON.stringify(res),
+          };
+        } else {
+          detail.creator.risk_assessment = res;
+          detail.creator.risk_assessment_json = JSON.stringify(res);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to assess author risk via web:', err);
+    } finally {
+      isAssessingRisk = false;
     }
-    return { level: 'low', label: '🟢 Нисък риск', badgeClass: 'risk-low' };
   }
 
   function stanceClass(stance: string): string {
@@ -1345,7 +1511,7 @@
       {/if}
 
       {#if detail.creator || detail.video.creator_handle}
-        {@const creator = detail.creator || { handle: detail.video.creator_handle, display_name: detail.video.creator_display_name, flagged_count: 0, watchlist: false }}
+        {@const creator = detail.creator || { id: (detail.video.creator_handle || '').toLowerCase(), handle: detail.video.creator_handle || '', display_name: detail.video.creator_display_name, follower_count: detail.video.creator_follower_count ?? null, region: 'BG', first_seen_at: new Date().toISOString(), flagged_count: 0, watchlist: false, expansion_depth: 0 }}
         {@const authorRisk = computeAuthorRisk(creator)}
         <div class="section-card creator-section">
           <div class="section-header">
@@ -1357,7 +1523,12 @@
                   : 'Author profile, risk tier and previous high-risk flagged videos'}
               </span>
             </div>
-            <span class="author-risk-badge {authorRisk.badgeClass}">{authorRisk.label}</span>
+            <div class="author-risk-header-badges">
+              <span class="author-risk-badge {authorRisk.badgeClass}">{authorRisk.label}</span>
+              <span class="author-confidence-pill {authorRisk.confidenceClass}" title={authorRisk.confidenceReason}>
+                📊 {currentLang === 'bg' ? 'Увереност: ' : 'Confidence: '}<strong>{authorRisk.confidencePercent}%</strong> ({authorRisk.confidenceText})
+              </span>
+            </div>
           </div>
 
           <div class="creator-box">
@@ -1405,6 +1576,18 @@
               >
                 🔍 Търси в Google
               </a>
+              <button
+                class="btn btn-outline btn-sm btn-web-risk"
+                onclick={handleAssessAuthorWebRisk}
+                disabled={isAssessingRisk}
+                title={currentLang === 'bg' ? 'Сканиране на мрежата за проверка на факти и надеждност на автора' : 'Scan web and fact-check archives for this creator'}
+              >
+                {#if isAssessingRisk}
+                  <span class="loading-mini-spin">...</span> {currentLang === 'bg' ? 'Сканиране в уеб...' : 'Searching web...'}
+                {:else}
+                  🌐 {currentLang === 'bg' ? 'Изчисли риск чрез уеб' : 'Calculate risk via web'}
+                {/if}
+              </button>
             </div>
 
             <div class="creator-stat-row">
@@ -1413,6 +1596,57 @@
                 <span>• Последователи: <strong>{(creator.follower_count).toLocaleString()}</strong></span>
               {/if}
               <span>• Регион: <strong>{creator.region || 'BG'}</strong></span>
+            </div>
+
+            <div class="author-risk-assessment-card">
+              <div class="risk-assessment-top">
+                <span class="risk-assessment-title">
+                  🛡️ {currentLang === 'bg' ? 'Оценка на риска и надеждност на автора' : 'Author Risk & Reputation Assessment'}
+                </span>
+                {#if authorRisk.lastCalculatedAt}
+                  <span class="risk-calc-time">
+                    🕒 {new Date(authorRisk.lastCalculatedAt).toLocaleTimeString()}
+                  </span>
+                {/if}
+              </div>
+
+              <p class="risk-rationale-text">{authorRisk.rationale}</p>
+
+              <div class="confidence-bar-container" title={authorRisk.confidenceReason}>
+                <div class="confidence-bar-label">
+                  <span>{currentLang === 'bg' ? 'Системно ниво на увереност:' : 'System confidence level:'}</span>
+                  <strong>{authorRisk.confidencePercent}% ({authorRisk.confidenceText})</strong>
+                </div>
+                <div class="confidence-bar-track">
+                  <div class="confidence-bar-fill {authorRisk.confidenceClass}" style="width: {authorRisk.confidencePercent}%"></div>
+                </div>
+                <span class="confidence-reason-hint">ℹ️ {authorRisk.confidenceReason}</span>
+              </div>
+
+              {#if authorRisk.webSources && authorRisk.webSources.length > 0}
+                <div class="author-web-sources-section">
+                  <span class="web-sources-heading">
+                    🌐 {currentLang === 'bg' ? 'Открити уеб източници и проверки на факти (' + authorRisk.webSources.length + '):' : 'Web sources & fact-checks found (' + authorRisk.webSources.length + '):'}
+                  </span>
+                  <div class="web-sources-chips">
+                    {#each authorRisk.webSources as src}
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="web-source-chip"
+                        onclick={(e) => {
+                          e.preventDefault();
+                          openExternalUrl(src.url);
+                        }}
+                      >
+                        <span class="source-domain-tag">{src.domain}</span>
+                        <span class="source-title-text">{src.title}</span> ↗
+                      </a>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
             </div>
           </div>
 
@@ -2754,11 +2988,44 @@
     flex-wrap: wrap;
   }
 
+  .author-risk-header-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
   .author-risk-badge {
     font-size: 0.72rem;
     font-weight: 800;
     padding: 2px 8px;
     border-radius: 999px;
+  }
+
+  .author-confidence-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    cursor: help;
+  }
+
+  .conf-high {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .conf-moderate {
+    background: rgba(217, 119, 6, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.3);
+  }
+
+  .conf-low {
+    background: rgba(225, 29, 72, 0.15);
+    color: #e11d48;
+    border: 1px solid rgba(225, 29, 72, 0.3);
   }
 
   .risk-high {
@@ -2777,6 +3044,153 @@
     background: rgba(16, 185, 129, 0.18);
     color: var(--verdict-supported);
     border: 1px solid rgba(16, 185, 129, 0.35);
+  }
+
+  .risk-unverified {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+
+  .btn-web-risk {
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #818cf8;
+  }
+
+  .btn-web-risk:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: #818cf8;
+  }
+
+  .author-risk-assessment-card {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .risk-assessment-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .risk-assessment-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .risk-calc-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
+  .risk-rationale-text {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--text-body);
+  }
+
+  .confidence-bar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+  }
+
+  .confidence-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .confidence-bar-track {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .confidence-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+
+  .confidence-bar-fill.conf-high {
+    background: #10b981;
+  }
+
+  .confidence-bar-fill.conf-moderate {
+    background: #d97706;
+  }
+
+  .confidence-bar-fill.conf-low {
+    background: #e11d48;
+  }
+
+  .confidence-reason-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
+  .author-web-sources-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .web-sources-heading {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .web-sources-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .web-source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 3px 8px;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    color: var(--text-body);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    max-width: 100%;
+  }
+
+  .web-source-chip:hover {
+    border-color: #818cf8;
+    background: rgba(99, 102, 241, 0.15);
+  }
+
+  .source-domain-tag {
+    font-weight: 700;
+    color: #818cf8;
+  }
+
+  .source-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 260px;
   }
 
   .author-other-header {

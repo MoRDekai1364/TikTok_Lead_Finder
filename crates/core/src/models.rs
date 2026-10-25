@@ -237,6 +237,37 @@ pub struct Creator {
     pub watchlist: bool,
     pub flagged_count: i64,
     pub expansion_depth: i64,
+    #[serde(default)]
+    pub risk_assessment_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatorRiskAssessment {
+    pub risk_level: String,
+    pub risk_score: f64,
+    pub confidence: f64,
+    pub confidence_level: String,
+    pub confidence_reason: String,
+    pub rationale: String,
+    pub web_sources: Vec<CreatorWebSource>,
+    pub local_stats: CreatorLocalStats,
+    pub last_calculated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatorWebSource {
+    pub title: String,
+    pub url: String,
+    pub snippet: String,
+    pub domain: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatorLocalStats {
+    pub total_videos: i64,
+    pub flagged_videos: i64,
+    pub contradicted_claims: i64,
+    pub supported_claims: i64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

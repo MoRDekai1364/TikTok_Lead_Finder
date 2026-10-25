@@ -247,6 +247,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/seeds/:id", delete(handle_delete_seed))
         .route("/api/creators", get(handle_list_creators))
         .route("/api/creators/watchlist", post(handle_set_watchlist))
+        .route("/api/creators/:handle/assess-risk", post(handle_assess_creator_risk))
         .route("/api/profile", get(handle_get_profile))
         .route("/api/calibrate", post(handle_calibrate))
         .route("/api/calibrate/status", get(handle_calibrate_status))
@@ -2080,6 +2081,29 @@ async fn handle_set_watchlist(
         Ok(creator) => Json(creator).into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct AssessRiskRequest {
+    display_name: Option<String>,
+    force_web: Option<bool>,
+}
+
+async fn handle_assess_creator_risk(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(handle): Path<String>,
+    body: Option<Json<AssessRiskRequest>>,
+) -> Response {
+    let req = body.map(|Json(b)| b).unwrap_or_default();
+    let force = req.force_web.unwrap_or(true);
+    match crate::creator_risk::assess_creator_risk(&ctx, &handle, req.display_name.as_deref(), force).await {
+        Ok(assessment) => Json(assessment).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
         )
             .into_response(),

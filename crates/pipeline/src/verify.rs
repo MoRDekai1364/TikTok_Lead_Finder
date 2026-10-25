@@ -718,6 +718,7 @@ impl PipelineContext {
                 if contradicted_claims >= 2 || (total_claims >= 3 && contradicted_claims > 0) {
                     let _ = self.db.set_creator_watchlist(creator_id, true).await;
                 }
+                let _ = crate::creator_risk::assess_creator_risk(self, creator_id, video.creator_display_name.as_deref(), false).await;
             }
         }
 

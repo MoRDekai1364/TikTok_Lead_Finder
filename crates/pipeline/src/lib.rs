@@ -1,5 +1,6 @@
 pub mod claims;
 pub mod concurrency;
+pub mod creator_risk;
 pub mod engine;
 pub mod export;
 pub mod funnel;
@@ -13,6 +14,7 @@ pub mod verify;
 
 pub use claims::*;
 pub use concurrency::*;
+pub use creator_risk::*;
 pub use engine::*;
 pub use export::*;
 pub use funnel::*;

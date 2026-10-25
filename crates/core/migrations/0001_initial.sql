@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS creators (
     first_seen_at TEXT NOT NULL,
     watchlist INTEGER NOT NULL DEFAULT 0,
     flagged_count INTEGER NOT NULL DEFAULT 0,
-    expansion_depth INTEGER NOT NULL DEFAULT 0
+    expansion_depth INTEGER NOT NULL DEFAULT 0,
+    risk_assessment_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS videos (

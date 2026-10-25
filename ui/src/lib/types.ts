@@ -104,6 +104,32 @@ export interface Person {
   entity_type?: EntityType | string;
 }
 
+export interface CreatorWebSource {
+  title: string;
+  url: string;
+  snippet: string;
+  domain: string;
+}
+
+export interface CreatorLocalStats {
+  total_videos: number;
+  flagged_videos: number;
+  contradicted_claims: number;
+  supported_claims: number;
+}
+
+export interface CreatorRiskAssessment {
+  risk_level: string;
+  risk_score: number;
+  confidence: number;
+  confidence_level: string;
+  confidence_reason: string;
+  rationale: string;
+  web_sources: CreatorWebSource[];
+  local_stats: CreatorLocalStats;
+  last_calculated_at: string;
+}
+
 export interface Creator {
   id: string;
   handle: string;
@@ -114,6 +140,8 @@ export interface Creator {
   watchlist: boolean;
   flagged_count: number;
   expansion_depth: number;
+  risk_assessment_json?: string | null;
+  risk_assessment?: CreatorRiskAssessment | null;
 }
 
 export interface TranscriptSegment {

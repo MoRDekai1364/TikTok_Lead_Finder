@@ -2,6 +2,7 @@ import type {
   BenchmarkProgress,
   BenchmarkStatusResponse,
   Creator,
+  CreatorRiskAssessment,
   CuratedModelCatalogItem,
   CustomScanConfig,
   CustomScanResult,
@@ -14,6 +15,7 @@ import type {
   ModelHubRolesConfig,
   ModelTestRequest,
   ModelTestResponse,
+  Person,
   PowerInfo,
   QueueCounts,
   ScaleStatus,
@@ -451,6 +453,14 @@ export async function setCreatorWatchlist(handle: string, watchlist: boolean): P
   return fetchJson<{ ok: boolean }>('/api/creators/watchlist', {
     method: 'POST',
     body: JSON.stringify({ handle, watchlist }),
+  });
+}
+
+export async function assessCreatorRisk(handle: string, displayName?: string | null): Promise<CreatorRiskAssessment> {
+  const clean = handle.trim().replace(/^@/, '');
+  return fetchJson<CreatorRiskAssessment>(`/api/creators/${encodeURIComponent(clean)}/assess-risk`, {
+    method: 'POST',
+    body: JSON.stringify({ display_name: displayName ?? null, force_web: true }),
   });
 }
 

@@ -61,6 +61,7 @@ impl Database {
             "ALTER TABLE people ADD COLUMN notes TEXT",
             "ALTER TABLE people ADD COLUMN detailed_profile_json TEXT",
             "ALTER TABLE people ADD COLUMN entity_type TEXT DEFAULT 'person'",
+            "ALTER TABLE creators ADD COLUMN risk_assessment_json TEXT",
         ];
         for mig in migrations {
             let _ = sqlx::raw_sql(mig).execute(&pool).await;
@@ -625,6 +626,7 @@ impl Database {
             watchlist: r.get::<i64, _>("watchlist") != 0,
             flagged_count: r.get("flagged_count"),
             expansion_depth: r.get("expansion_depth"),
+            risk_assessment_json: r.try_get("risk_assessment_json").ok().flatten(),
         }))
     }
 
@@ -644,8 +646,18 @@ impl Database {
                 watchlist: r.get::<i64, _>("watchlist") != 0,
                 flagged_count: r.get("flagged_count"),
                 expansion_depth: r.get("expansion_depth"),
+                risk_assessment_json: r.try_get("risk_assessment_json").ok().flatten(),
             })
             .collect())
+    }
+
+    pub async fn update_creator_risk_assessment(&self, creator_id: &str, risk_json: &str) -> Result<()> {
+        sqlx::query("UPDATE creators SET risk_assessment_json = ?1 WHERE id = ?2")
+            .bind(risk_json)
+            .bind(creator_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     pub async fn set_creator_watchlist(&self, handle_or_id: &str, watchlist: bool) -> Result<Creator> {
