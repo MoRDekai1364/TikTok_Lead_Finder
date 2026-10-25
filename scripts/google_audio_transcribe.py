@@ -71,7 +71,8 @@ def ensure_wav(input_path):
         return out_wav
     cmd = [
         'ffmpeg', '-y', '-i', input_path,
-        '-vn', '-ac', '1', '-ar', '16000',
+        '-vn', '-af', 'highpass=f=100,lowpass=f=3800,afftdn=nf=-25',
+        '-ac', '1', '-ar', '16000',
         out_wav
     ]
     try:

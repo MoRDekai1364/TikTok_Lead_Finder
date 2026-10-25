@@ -2,6 +2,7 @@ import type {
   Creator,
   CustomScanConfig,
   CustomScanResult,
+  GeminiStatus,
   HardwareProfile,
   LeadCard,
   QueueCounts,
@@ -389,6 +390,23 @@ export async function updateSettings(body: Record<string, unknown>): Promise<{ u
   });
 }
 
+export async function fetchGeminiStatus(): Promise<GeminiStatus> {
+  return fetchJson<GeminiStatus>('/api/settings/gemini-status');
+}
+
+export async function saveGeminiKey(key: string): Promise<{ ok: boolean; masked_key?: string; error?: string }> {
+  return fetchJson<{ ok: boolean; masked_key?: string; error?: string }>('/api/settings/gemini-key', {
+    method: 'POST',
+    body: JSON.stringify({ key }),
+  });
+}
+
+export async function deleteGeminiKey(): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>('/api/settings/gemini-key', {
+    method: 'DELETE',
+  });
+}
+
 export function subscribeSse(onEvent: (event: unknown) => void): () => void {
   const url = `${cachedBaseUrl}/api/events?token=${encodeURIComponent(cachedToken)}`;
   let eventSource: EventSource | null = null;
@@ -646,6 +664,20 @@ function getMockFallback<T>(endpoint: string, options: RequestInit): T {
       { id: 4, kind: 'keyword', value: 'еврозона цени', active: true, priority: 6, last_ran_at: null },
     ];
     return seeds as T;
+  }
+
+  if (endpoint === '/api/settings/gemini-status') {
+    const status: GeminiStatus = {
+      configured: false,
+      masked_key: null,
+      cloud_enabled: false,
+      model: 'gemini-2.5-flash',
+    };
+    return status as T;
+  }
+
+  if (endpoint === '/api/settings/gemini-key') {
+    return { ok: true } as T;
   }
 
   if (endpoint === '/api/creators') {

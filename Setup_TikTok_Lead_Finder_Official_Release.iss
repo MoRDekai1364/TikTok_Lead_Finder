@@ -1,5 +1,5 @@
 ﻿#define MyAppName "TikTok Lead Finder"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "LeadFinder Bulgaria"
 #define MyAppURL "https://github.com/MoRDekai1364/TikTok_Scan"
 #define MyAppExeName "leadfinder-desktop.exe"

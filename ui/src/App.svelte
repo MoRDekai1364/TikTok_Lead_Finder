@@ -22,6 +22,7 @@
   import DetailDrawer from './components/DetailDrawer.svelte';
   import ExportScreen from './components/ExportScreen.svelte';
   import HelpScreen from './components/HelpScreen.svelte';
+  import GoogleAiWizardModal from './components/GoogleAiWizardModal.svelte';
   import ScanModal from './components/ScanModal.svelte';
   import SeedsScreen from './components/SeedsScreen.svelte';
   import SettingsScreen from './components/SettingsScreen.svelte';
@@ -52,6 +53,7 @@
 
   let inboxRef = $state<{ focusSearch: () => void } | null>(null);
   let isScanModalOpen = $state(false);
+  let isGoogleAiWizardOpen = $state(false);
 
   onMount(() => {
     const savedTheme = localStorage.getItem('leadfinder_theme') as 'light' | 'dark' | null;
@@ -348,6 +350,7 @@
     onPasteUrls={handlePasteUrls}
     onJumpToVideo={handleJumpToVideo}
     onOpenScanModal={() => (isScanModalOpen = true)}
+    onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)}
     onToggleTheme={toggleTheme}
     onToggleLang={toggleLang}
   />
@@ -386,7 +389,7 @@
       {:else if activeScreen === 'calibration'}
         <CalibrationScreen {currentLang} />
       {:else if activeScreen === 'settings'}
-        <SettingsScreen {currentLang} />
+        <SettingsScreen {currentLang} onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)} />
       {:else if activeScreen === 'export'}
         <ExportScreen {currentLang} />
       {:else if activeScreen === 'help'}
@@ -426,6 +429,12 @@
       onScanComplete={() => {
         void loadInitialData();
       }}
+    />
+
+    <GoogleAiWizardModal
+      isOpen={isGoogleAiWizardOpen}
+      {currentLang}
+      onClose={() => (isGoogleAiWizardOpen = false)}
     />
   </main>
 </div>

@@ -324,3 +324,10 @@ export interface CustomScanResult {
   ingested_videos: VideoRefSummary[];
   errors: string[];
 }
+
+export interface GeminiStatus {
+  configured: boolean;
+  masked_key?: string | null;
+  cloud_enabled: boolean;
+  model: string;
+}

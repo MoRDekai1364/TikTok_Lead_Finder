@@ -64,6 +64,73 @@ impl Transcriber for CaptionFirstTranscriber {
             }
         }
 
+        if let Some(ref wav_path) = input.audio_wav_path {
+            if wav_path.is_file() {
+                let py_script = [
+                    PathBuf::from("scripts/google_audio_transcribe.py"),
+                    PathBuf::from("tools/google_audio_transcribe.py"),
+                ]
+                .into_iter()
+                .find(|p| p.is_file());
+
+                if let Some(script) = py_script {
+                    let mut cmd = Command::new("python");
+                    cmd.env("PYTHONIOENCODING", "utf-8");
+                    if let Some(key) = leadfinder_core::resolve_secret("GEMINI_API_KEY") {
+                        cmd.env("GEMINI_API_KEY", key);
+                    }
+                    cmd.arg(&script).arg("--audio").arg(wav_path);
+                    cmd.stdout(Stdio::piped());
+                    cmd.stderr(Stdio::piped());
+                    #[cfg(windows)]
+                    {
+                        cmd.creation_flags(0x08000000);
+                    }
+                    if let Ok(Ok(output)) = tokio::time::timeout(Duration::from_secs(45), cmd.output()).await {
+                        if output.status.success() {
+                            if let Ok(val) = serde_json::from_slice::<Value>(&output.stdout) {
+                                let corrected = val
+                                    .get("corrected_text")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default()
+                                    .trim();
+                                if corrected.chars().count() >= 5 {
+                                    let parsed_segs = val
+                                        .get("segments")
+                                        .and_then(|v| v.as_array())
+                                        .and_then(|arr| {
+                                            serde_json::from_value::<Vec<TranscriptSegment>>(
+                                                Value::Array(arr.clone()),
+                                            )
+                                            .ok()
+                                        })
+                                        .unwrap_or_default();
+                                    let src_model = val
+                                        .get("source")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("google_speech")
+                                        .to_string();
+                                    let mut rec = TranscriptRecord {
+                                        source: "asr".to_string(),
+                                        engine: "google_ai_speech".to_string(),
+                                        model: src_model,
+                                        language: "bg".to_string(),
+                                        quality: 0.95,
+                                        text: corrected.to_string(),
+                                        segments: parsed_segs,
+                                    };
+                                    if let Some(ref lex) = self.whisper.lexicon {
+                                        lex.normalize_transcript(&mut rec);
+                                    }
+                                    return Ok(rec);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         self.whisper.transcribe(input).await
     }
 }
@@ -148,6 +215,9 @@ impl WhisperCppTranscriber {
             self.models_dir.join(&self.model_name),
             self.bundled_models_dir.join(format!("ggml-{}.bin", self.model_name)),
             self.bundled_models_dir.join(&self.model_name),
+            self.models_dir.join("ggml-large-v3-turbo-q5_0.bin"),
+            self.models_dir.join("ggml-large-v3-turbo.bin"),
+            self.models_dir.join("ggml-medium.bin"),
             self.models_dir.join("ggml-small.bin"),
             self.bundled_models_dir.join("ggml-small.bin"),
             self.models_dir.join("ggml-base.bin"),

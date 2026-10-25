@@ -97,8 +97,8 @@ cloud_enabled = false
 local_llm_url = 'http://127.0.0.1:18080'
 local_llm_model = 'BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf'
 gemini_model = 'gemini-2.5-flash'
-transcriber_engine = 'whisper_cpp'
-whisper_model = 'small'
+transcriber_engine = 'google_ai_first'
+whisper_model = 'large-v3-turbo'
 ocr_engine = 'tesseract'
 searxng_url = ''
 

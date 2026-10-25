@@ -224,6 +224,8 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/calibrate", post(handle_calibrate))
         .route("/api/calibrate/overrides", post(handle_calibrate_overrides))
         .route("/api/settings", get(handle_list_settings).post(handle_update_settings))
+        .route("/api/settings/gemini-status", get(handle_gemini_status))
+        .route("/api/settings/gemini-key", post(handle_set_gemini_key).delete(handle_delete_gemini_key))
         .route("/api/export", get(handle_export))
         .route("/api/scale/status", get(handle_scale_status))
         .route_layer(middleware::from_fn_with_state(ctx.clone(), auth_middleware));
@@ -2083,6 +2085,132 @@ async fn handle_update_settings(
         }
     }
     Json(serde_json::json!({ "updated": body.len() })).into_response()
+}
+
+#[derive(Debug, Serialize)]
+pub struct GeminiStatusResponse {
+    pub configured: bool,
+    pub masked_key: Option<String>,
+    pub cloud_enabled: bool,
+    pub model: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetGeminiKeyRequest {
+    pub key: String,
+}
+
+fn mask_api_key(key: &str) -> String {
+    let trimmed = key.trim();
+    if trimmed.len() <= 8 {
+        return "********".to_string();
+    }
+    format!("{}...{}", &trimmed[..6], &trimmed[trimmed.len().saturating_sub(4)..])
+}
+
+async fn handle_gemini_status(
+    State(ctx): State<Arc<PipelineContext>>,
+) -> Response {
+    let cfg = ctx.config.read().await;
+    let resolved_key = leadfinder_core::resolve_secret("GEMINI_API_KEY");
+    let configured = resolved_key.is_some();
+    let masked_key = resolved_key.as_deref().map(mask_api_key);
+    let cloud_enabled = cfg.providers.cloud_enabled;
+    let model = cfg.providers.gemini_model.clone();
+
+    Json(GeminiStatusResponse {
+        configured,
+        masked_key,
+        cloud_enabled,
+        model,
+    })
+    .into_response()
+}
+
+async fn handle_set_gemini_key(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<SetGeminiKeyRequest>,
+) -> Response {
+    let key = body.key.trim().to_string();
+    if key.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "API key cannot be empty" })),
+        )
+            .into_response();
+    }
+
+    let test_url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build();
+
+    let client = match client {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Failed to create HTTP client: {e}") })),
+            )
+                .into_response();
+        }
+    };
+
+    match client.get(&test_url).send().await {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let err_body = resp.text().await.unwrap_or_default();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": format!("Google AI validation failed (status {status}): {err_body}")
+                    })),
+                )
+                    .into_response();
+            }
+        }
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": format!("Connection to Google AI failed: {e}")
+                })),
+            )
+                .into_response();
+        }
+    }
+
+    std::env::set_var("GEMINI_API_KEY", &key);
+    let _ = leadfinder_core::store_secret_in_os_credential_store("GEMINI_API_KEY", &key);
+
+    let _ = ctx.db.set_setting("cloud_enabled", &serde_json::json!(true)).await;
+    let _ = ctx.db.set_setting("gemini_configured", &serde_json::json!(true)).await;
+    ctx.config.write().await.providers.cloud_enabled = true;
+
+    Json(serde_json::json!({
+        "ok": true,
+        "masked_key": mask_api_key(&key),
+        "cloud_enabled": true,
+    }))
+    .into_response()
+}
+
+async fn handle_delete_gemini_key(
+    State(ctx): State<Arc<PipelineContext>>,
+) -> Response {
+    std::env::remove_var("GEMINI_API_KEY");
+    let _ = leadfinder_core::store_secret_in_os_credential_store("GEMINI_API_KEY", "");
+    let _ = ctx.db.set_setting("cloud_enabled", &serde_json::json!(false)).await;
+    let _ = ctx.db.set_setting("gemini_configured", &serde_json::json!(false)).await;
+    ctx.config.write().await.providers.cloud_enabled = false;
+
+    Json(serde_json::json!({
+        "ok": true,
+        "configured": false,
+        "cloud_enabled": false
+    }))
+    .into_response()
 }
 
 async fn handle_scale_status(State(ctx): State<Arc<PipelineContext>>) -> impl IntoResponse {

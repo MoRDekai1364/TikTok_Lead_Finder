@@ -147,6 +147,8 @@ impl MediaAcquirer {
                 "-i",
                 &video_path.to_string_lossy(),
                 "-vn",
+                "-af",
+                "highpass=f=100,lowpass=f=3800,afftdn=nf=-25",
                 "-acodec",
                 "pcm_s16le",
                 "-ar",

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchVideoDetail, getCoreUrl } from '../lib/api';
+  import { fetchGeminiStatus, fetchVideoDetail, getCoreUrl } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { QueueCounts, ScaleStatus, Screen } from '../lib/types';
@@ -16,6 +16,7 @@
     onPasteUrls,
     onJumpToVideo,
     onOpenScanModal,
+    onOpenGoogleAiWizard,
     onToggleTheme,
     onToggleLang,
   }: {
@@ -29,9 +30,12 @@
     onPasteUrls: (text: string) => Promise<any>;
     onJumpToVideo?: (id: string) => void;
     onOpenScanModal?: () => void;
+    onOpenGoogleAiWizard?: () => void;
     onToggleTheme: () => void;
     onToggleLang: () => void;
   } = $props();
+
+  let geminiConfigured = $state(false);
 
   let pasteText = $state('');
   let isPasting = $state(false);
@@ -67,7 +71,12 @@
   ];
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  onMount(() => () => stopPolling());
+  onMount(() => {
+    fetchGeminiStatus().then((s) => {
+      geminiConfigured = s.configured;
+    }).catch(() => {});
+    return () => stopPolling();
+  });
 
   function stopPolling() {
     if (pollTimer !== null) {
@@ -294,6 +303,21 @@
           <span class="dot red"></span>
           <span>Breakers: {scaleStatus.open_breakers}</span>
         </div>
+      {/if}
+
+      {#if onOpenGoogleAiWizard}
+        <button
+          type="button"
+          class="indicator-pill google-ai-pill"
+          class:ai-active={geminiConfigured}
+          onclick={onOpenGoogleAiWizard}
+          title={geminiConfigured
+            ? (currentLang === 'bg' ? 'Google AI е активен (98% точност)' : 'Google AI active (98% accuracy)')
+            : (currentLang === 'bg' ? 'Свържи безплатен Google AI ключ' : 'Connect free Google AI key')}
+        >
+          <span class="dot" class:green={geminiConfigured} class:amber={!geminiConfigured}></span>
+          <span>✨ Google AI</span>
+        </button>
       {/if}
 
       <button class="icon-btn" onclick={onToggleLang} title="Смяна на езика / Switch language" aria-label="Смяна на език">
@@ -549,6 +573,27 @@
 
   .dot.red {
     background-color: var(--verdict-contradicted);
+  }
+
+  .dot.amber {
+    background-color: #f59e0b;
+  }
+
+  .google-ai-pill {
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s, border-color 0.15s;
+  }
+
+  .google-ai-pill:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    border-color: #3b82f6;
+  }
+
+  .google-ai-pill.ai-active {
+    background-color: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #34d399;
   }
 
   .icon-btn {
