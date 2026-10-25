@@ -573,7 +573,7 @@ impl PipelineContext {
             &ling_ctx.prompt_notes,
         );
 
-        let runner = LlmChainRunner::from_runtime(&self.paths, &cfg, &self.db).await;
+        let runner = LlmChainRunner::from_role("claim_extraction", &self.paths, &cfg, &self.db).await;
         let llm_req = LlmJsonRequest {
             system_prompt,
             user_prompt,

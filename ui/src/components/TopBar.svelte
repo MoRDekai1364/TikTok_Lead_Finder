@@ -505,6 +505,9 @@
     <button class="nav-tab" class:active={activeScreen === 'calibration'} onclick={() => onNavigate('calibration')}>
       {t.tabCalibration}
     </button>
+    <button class="nav-tab" class:active={activeScreen === 'models'} onclick={() => onNavigate('models')}>
+      🤖 {t.tabModels}
+    </button>
     <button class="nav-tab" class:active={activeScreen === 'settings'} onclick={() => onNavigate('settings')}>
       {t.tabSettings}
     </button>

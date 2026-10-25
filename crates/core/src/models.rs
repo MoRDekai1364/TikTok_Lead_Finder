@@ -544,3 +544,147 @@ pub enum CoreEvent {
     BenchmarkProgress(serde_json::Value),
     PowerChanged(serde_json::Value),
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelRoleConfig {
+    pub role: String,
+    pub provider: String,
+    pub model_name: String,
+    #[serde(default)]
+    pub custom_url: Option<String>,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_consensus_threshold")]
+    pub threshold: f64,
+    #[serde(default = "default_secondary_provider")]
+    pub secondary_provider: String,
+    #[serde(default = "default_secondary_model")]
+    pub secondary_model: String,
+    #[serde(default)]
+    pub secondary_custom_url: Option<String>,
+}
+
+fn default_consensus_threshold() -> f64 {
+    0.70
+}
+
+fn default_secondary_provider() -> String {
+    "gemini".to_string()
+}
+
+fn default_secondary_model() -> String {
+    "gemini-2.5-flash".to_string()
+}
+
+impl Default for ConsensusSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            threshold: 0.70,
+            secondary_provider: "gemini".to_string(),
+            secondary_model: "gemini-2.5-flash".to_string(),
+            secondary_custom_url: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ModelHubRolesConfig {
+    pub roles: std::collections::HashMap<String, ModelRoleConfig>,
+    #[serde(default)]
+    pub consensus: ConsensusSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstalledModelInfo {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub filename: String,
+    pub file_path: String,
+    pub size_bytes: u64,
+    pub size_display: String,
+    pub modified_at: String,
+    pub recommended_roles: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CuratedModelCatalogItem {
+    pub id: String,
+    pub name: String,
+    pub author: String,
+    pub kind: String,
+    pub download_url: String,
+    pub filename: String,
+    pub size_bytes: u64,
+    pub size_display: String,
+    pub vram_estimate: String,
+    pub description_bg: String,
+    pub description_en: String,
+    pub recommended_for: Vec<String>,
+    pub is_installed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ModelDownloadProgress {
+    pub active: bool,
+    pub model_id: String,
+    pub filename: String,
+    pub bytes_downloaded: u64,
+    pub total_bytes: u64,
+    pub progress_pct: u8,
+    pub speed_bps: u64,
+    pub status: String,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalAiServerModel {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub parameter_size: Option<String>,
+    #[serde(default)]
+    pub quantization: Option<String>,
+    #[serde(default)]
+    pub size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalAiServerStatus {
+    pub server_type: String,
+    pub endpoint_url: String,
+    pub is_online: bool,
+    #[serde(default)]
+    pub latency_ms: Option<u64>,
+    pub models: Vec<ExternalAiServerModel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelTestRequest {
+    pub provider: String,
+    pub model: String,
+    #[serde(default)]
+    pub custom_url: Option<String>,
+    pub prompt: String,
+    #[serde(default)]
+    pub system_prompt: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelTestResponse {
+    pub success: bool,
+    pub elapsed_ms: u64,
+    pub tokens_in: u64,
+    pub tokens_out: u64,
+    pub tokens_per_second: f64,
+    pub raw_text: String,
+    pub parsed_json: Option<serde_json::Value>,
+    pub error: Option<String>,
+}

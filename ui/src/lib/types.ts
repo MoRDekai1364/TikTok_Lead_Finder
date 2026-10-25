@@ -1,6 +1,6 @@
 export type Lane = 'leads' | 'already_checked' | 'low_quality' | 'failed' | 'screened_out' | 'pasted';
 
-export type Screen = 'inbox' | 'creators' | 'people' | 'seeds' | 'calibration' | 'settings' | 'export' | 'help';
+export type Screen = 'inbox' | 'creators' | 'people' | 'seeds' | 'calibration' | 'models' | 'settings' | 'export' | 'help';
 
 export interface LeadCard {
   id: string;
@@ -485,4 +485,100 @@ export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): Capa
     equivChannels,
     secondsPerVideo,
   };
+}
+
+export interface ModelRoleConfig {
+  role: string;
+  provider: string;
+  model_name: string;
+  custom_url?: string | null;
+  temperature?: number | null;
+}
+
+export interface ConsensusSettings {
+  enabled: boolean;
+  threshold: number;
+  secondary_provider: string;
+  secondary_model: string;
+  secondary_custom_url?: string | null;
+}
+
+export interface ModelHubRolesConfig {
+  roles: Record<string, ModelRoleConfig>;
+  consensus: ConsensusSettings;
+}
+
+export interface InstalledModelInfo {
+  id: string;
+  name: string;
+  kind: string;
+  filename: string;
+  file_path: string;
+  size_bytes: number;
+  size_display: string;
+  modified_at: string;
+  recommended_roles: string[];
+}
+
+export interface CuratedModelCatalogItem {
+  id: string;
+  name: string;
+  author: string;
+  kind: string;
+  download_url: string;
+  filename: string;
+  size_bytes: number;
+  size_display: string;
+  vram_estimate: string;
+  description_bg: string;
+  description_en: string;
+  recommended_for: string[];
+  is_installed: boolean;
+}
+
+export interface ModelDownloadProgress {
+  active: boolean;
+  model_id: string;
+  filename: string;
+  bytes_downloaded: number;
+  total_bytes: number;
+  progress_pct: number;
+  speed_bps: number;
+  status: string;
+  error_message?: string | null;
+}
+
+export interface ExternalAiServerModel {
+  id: string;
+  name: string;
+  parameter_size?: string | null;
+  quantization?: string | null;
+  size_bytes?: number | null;
+}
+
+export interface ExternalAiServerStatus {
+  server_type: string;
+  endpoint_url: string;
+  is_online: boolean;
+  latency_ms?: number | null;
+  models: ExternalAiServerModel[];
+}
+
+export interface ModelTestRequest {
+  provider: string;
+  model: string;
+  custom_url?: string | null;
+  prompt: string;
+  system_prompt?: string | null;
+}
+
+export interface ModelTestResponse {
+  success: boolean;
+  elapsed_ms: number;
+  tokens_in: number;
+  tokens_out: number;
+  tokens_per_second: number;
+  raw_text: string;
+  parsed_json?: any;
+  error?: string | null;
 }

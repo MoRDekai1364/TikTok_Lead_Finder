@@ -38,6 +38,8 @@ pub struct PipelineContext {
     pub quota_guard: Arc<ProviderQuotaGuard>,
     pub auto_terminate_when_idle: Arc<std::sync::atomic::AtomicBool>,
     pub benchmark_state: Arc<tokio::sync::RwLock<leadfinder_probe::BenchmarkState>>,
+    pub model_download_state: Arc<tokio::sync::RwLock<leadfinder_core::ModelDownloadProgress>>,
+    pub model_download_cancel: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PipelineContext {
@@ -76,6 +78,8 @@ impl PipelineContext {
         let concurrency = Arc::new(AimdConcurrencyManager::new());
         let quota_guard = Arc::new(ProviderQuotaGuard::new());
         let benchmark_state = Arc::new(tokio::sync::RwLock::new(leadfinder_probe::BenchmarkState::default()));
+        let model_download_state = Arc::new(tokio::sync::RwLock::new(leadfinder_core::ModelDownloadProgress::default()));
+        let model_download_cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         Ok(Self {
             paths,
@@ -91,6 +95,8 @@ impl PipelineContext {
             quota_guard,
             auto_terminate_when_idle: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             benchmark_state,
+            model_download_state,
+            model_download_cancel,
         })
     }
 

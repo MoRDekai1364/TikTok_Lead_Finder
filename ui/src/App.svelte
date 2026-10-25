@@ -24,6 +24,7 @@
   import BenchmarkOverlay from './components/BenchmarkOverlay.svelte';
   import CalibrationScreen from './components/CalibrationScreen.svelte';
   import CreatorsScreen from './components/CreatorsScreen.svelte';
+  import ModelsScreen from './components/ModelsScreen.svelte';
   import PeopleScreen from './components/PeopleScreen.svelte';
   import DetailDrawer from './components/DetailDrawer.svelte';
   import ExitPromptModal from './components/ExitPromptModal.svelte';
@@ -492,6 +493,11 @@
         <CalibrationScreen
           {currentLang}
           onOpenBenchmarkModal={() => (isBenchmarkModalOpen = true)}
+        />
+      {:else if activeScreen === 'models'}
+        <ModelsScreen
+          {currentLang}
+          onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)}
         />
       {:else if activeScreen === 'settings'}
         <SettingsScreen {currentLang} onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)} />

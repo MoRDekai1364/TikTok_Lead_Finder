@@ -2,11 +2,18 @@ import type {
   BenchmarkProgress,
   BenchmarkStatusResponse,
   Creator,
+  CuratedModelCatalogItem,
   CustomScanConfig,
   CustomScanResult,
+  ExternalAiServerStatus,
   GeminiStatus,
   HardwareProfile,
+  InstalledModelInfo,
   LeadCard,
+  ModelDownloadProgress,
+  ModelHubRolesConfig,
+  ModelTestRequest,
+  ModelTestResponse,
   PowerInfo,
   QueueCounts,
   ScaleStatus,
@@ -549,6 +556,68 @@ export async function rotateGeminiKey(): Promise<{
 export async function deleteGeminiKey(): Promise<{ ok: boolean }> {
   return fetchJson<{ ok: boolean }>('/api/settings/gemini-key', {
     method: 'DELETE',
+  });
+}
+
+export async function fetchInstalledModels(): Promise<{ models: InstalledModelInfo[]; models_dir: string }> {
+  return fetchJson('/api/models');
+}
+
+export async function fetchModelCatalog(): Promise<{ catalog: CuratedModelCatalogItem[] }> {
+  return fetchJson('/api/models/catalog');
+}
+
+export async function startModelDownload(req: { model_id: string; url: string; filename: string; kind: string }): Promise<{ status: string }> {
+  return fetchJson('/api/models/download', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function fetchModelDownloadStatus(): Promise<ModelDownloadProgress> {
+  return fetchJson('/api/models/download/status');
+}
+
+export async function cancelModelDownload(): Promise<{ status: string }> {
+  return fetchJson('/api/models/download/cancel', {
+    method: 'POST',
+  });
+}
+
+export async function deleteModel(kind: string, filename: string): Promise<{ deleted: boolean }> {
+  return fetchJson(`/api/models/${encodeURIComponent(kind)}/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function scanModelsFolder(): Promise<{ models: InstalledModelInfo[]; models_dir: string }> {
+  return fetchJson('/api/models/scan-folder', {
+    method: 'POST',
+  });
+}
+
+export async function scanExternalAiServers(customUrl?: string): Promise<{ servers: ExternalAiServerStatus[] }> {
+  return fetchJson('/api/models/external/scan', {
+    method: 'POST',
+    body: JSON.stringify({ custom_url: customUrl || null }),
+  });
+}
+
+export async function fetchModelRoles(): Promise<ModelHubRolesConfig> {
+  return fetchJson('/api/models/roles');
+}
+
+export async function saveModelRoles(cfg: ModelHubRolesConfig): Promise<{ saved: boolean }> {
+  return fetchJson('/api/models/roles', {
+    method: 'POST',
+    body: JSON.stringify(cfg),
+  });
+}
+
+export async function testModelPrompt(req: ModelTestRequest): Promise<ModelTestResponse> {
+  return fetchJson('/api/models/test', {
+    method: 'POST',
+    body: JSON.stringify(req),
   });
 }
 

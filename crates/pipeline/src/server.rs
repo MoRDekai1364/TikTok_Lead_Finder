@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use axum::extract::{Path, Query, Request, State};
@@ -10,6 +11,7 @@ use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
 use tokio_stream::wrappers::BroadcastStream;
 use tower_http::cors::CorsLayer;
 use leadfinder_core::{CoreEvent, Search, Stage, VideoFilter};
@@ -254,6 +256,16 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/settings/gemini-status", get(handle_gemini_status))
         .route("/api/settings/gemini-key", post(handle_set_gemini_key).delete(handle_delete_gemini_key))
         .route("/api/settings/gemini-keys/rotate", post(handle_rotate_gemini_key))
+        .route("/api/models", get(handle_list_models))
+        .route("/api/models/catalog", get(handle_get_model_catalog))
+        .route("/api/models/download", post(handle_download_model))
+        .route("/api/models/download/status", get(handle_download_model_status))
+        .route("/api/models/download/cancel", post(handle_download_model_cancel))
+        .route("/api/models/:kind/:filename", delete(handle_delete_model))
+        .route("/api/models/scan-folder", post(handle_scan_models_folder))
+        .route("/api/models/external/scan", post(handle_scan_external_ai_servers))
+        .route("/api/models/roles", get(handle_get_model_roles).post(handle_update_model_roles))
+        .route("/api/models/test", post(handle_test_model))
         .route("/api/export", get(handle_export))
         .route("/api/scale/status", get(handle_scale_status))
         .route("/api/system/shutdown", post(handle_system_shutdown))
@@ -2753,3 +2765,806 @@ async fn handle_export(
             .into_response(),
     }
 }
+
+
+#[derive(Debug, Deserialize)]
+pub struct DownloadModelRequest {
+    pub model_id: String,
+    pub url: String,
+    pub filename: String,
+    pub kind: String,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ScanExternalAiServersRequest {
+    pub custom_url: Option<String>,
+}
+
+fn format_file_size(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.2} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+async fn handle_list_models(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let mut models: Vec<leadfinder_core::InstalledModelInfo> = Vec::new();
+
+    let llm_dirs = [
+        ctx.paths.models_dir.join("llm"),
+        ctx.paths.static_root.join("models").join("llm"),
+    ];
+    for dir in &llm_dirs {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("gguf") {
+                    let fname = p.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                    if !models.iter().any(|m| m.filename == fname) {
+                        let meta = entry.metadata().ok();
+                        let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+                        let modified = meta
+                            .and_then(|m| m.modified().ok())
+                            .and_then(|t| {
+                                chrono::DateTime::<chrono::Utc>::from(t)
+                                    .to_rfc3339()
+                                    .into()
+                            })
+                            .unwrap_or_default();
+                        models.push(leadfinder_core::InstalledModelInfo {
+                            id: format!("local_llm_{fname}"),
+                            name: fname.clone(),
+                            kind: "llm_gguf".to_string(),
+                            filename: fname,
+                            file_path: p.to_string_lossy().to_string(),
+                            size_bytes: size,
+                            size_display: format_file_size(size),
+                            modified_at: modified,
+                            recommended_roles: vec!["claim_extraction".to_string(), "fact_verification".to_string()],
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    let whisper_dirs = [
+        ctx.paths.models_dir.join("whisper"),
+        ctx.paths.static_root.join("models").join("whisper"),
+    ];
+    for dir in &whisper_dirs {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("bin") {
+                    let fname = p.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                    if !models.iter().any(|m| m.filename == fname) {
+                        let meta = entry.metadata().ok();
+                        let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+                        let modified = meta
+                            .and_then(|m| m.modified().ok())
+                            .and_then(|t| {
+                                chrono::DateTime::<chrono::Utc>::from(t)
+                                    .to_rfc3339()
+                                    .into()
+                            })
+                            .unwrap_or_default();
+                        models.push(leadfinder_core::InstalledModelInfo {
+                            id: format!("whisper_{fname}"),
+                            name: fname.clone(),
+                            kind: "whisper_bin".to_string(),
+                            filename: fname,
+                            file_path: p.to_string_lossy().to_string(),
+                            size_bytes: size,
+                            size_display: format_file_size(size),
+                            modified_at: modified,
+                            recommended_roles: vec!["asr".to_string()],
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    models.push(leadfinder_core::InstalledModelInfo {
+        id: "cloud_gemini_flash".to_string(),
+        name: "gemini-2.5-flash".to_string(),
+        kind: "cloud_gemini".to_string(),
+        filename: "gemini-2.5-flash".to_string(),
+        file_path: "Google AI Cloud".to_string(),
+        size_bytes: 0,
+        size_display: "Cloud API".to_string(),
+        modified_at: "Online".to_string(),
+        recommended_roles: vec!["claim_extraction".to_string(), "fact_verification".to_string(), "osint_dossier".to_string()],
+    });
+
+    models.push(leadfinder_core::InstalledModelInfo {
+        id: "cloud_gemini_pro".to_string(),
+        name: "gemini-1.5-pro".to_string(),
+        kind: "cloud_gemini".to_string(),
+        filename: "gemini-1.5-pro".to_string(),
+        file_path: "Google AI Cloud".to_string(),
+        size_bytes: 0,
+        size_display: "Cloud API".to_string(),
+        modified_at: "Online".to_string(),
+        recommended_roles: vec!["fact_verification".to_string(), "osint_dossier".to_string()],
+    });
+
+    models.push(leadfinder_core::InstalledModelInfo {
+        id: "offline_heuristics".to_string(),
+        name: "heuristics".to_string(),
+        kind: "offline_engine".to_string(),
+        filename: "heuristics".to_string(),
+        file_path: "Embedded Rust Rules".to_string(),
+        size_bytes: 0,
+        size_display: "0 MB (Built-in)".to_string(),
+        modified_at: "Ready".to_string(),
+        recommended_roles: vec!["claim_extraction".to_string()],
+    });
+
+    Json(serde_json::json!({
+        "models": models,
+        "models_dir": ctx.paths.models_dir.to_string_lossy(),
+    }))
+    .into_response()
+}
+
+async fn handle_get_model_catalog(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let mut catalog = vec![
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "bggpt-gemma-3-4b-it".to_string(),
+            name: "BgGPT-Gemma-3-4B-IT-Q4_K_M".to_string(),
+            author: "INSAIT Institute".to_string(),
+            kind: "llm_gguf".to_string(),
+            download_url: "https://huggingface.co/INSAIT-Institute/BgGPT-Gemma-3-4B-IT-GGUF/resolve/main/BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf".to_string(),
+            filename: "BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf".to_string(),
+            size_bytes: 2_489_893_728,
+            size_display: "2.49 GB".to_string(),
+            vram_estimate: "~3.5 GB VRAM".to_string(),
+            description_bg: "Най-добрият специализиран български AI езиков модел. Перфектен за екстракция на твърдения и сложни формулировки.".to_string(),
+            description_en: "State-of-the-art Bulgarian AI language model. Ideal for claim extraction and nuanced Bulgarian syntax.".to_string(),
+            recommended_for: vec!["claim_extraction".to_string(), "fact_verification".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "bggpt-gemma-2-2b-it".to_string(),
+            name: "BgGPT-Gemma-2-2B-IT-v1.0.Q4_K_M".to_string(),
+            author: "INSAIT Institute".to_string(),
+            kind: "llm_gguf".to_string(),
+            download_url: "https://huggingface.co/INSAIT-Institute/BgGPT-Gemma-2-2.6B-IT-v1.0-GGUF/resolve/main/BgGPT-Gemma-2-2B-IT-v1.0.Q4_K_M.gguf".to_string(),
+            filename: "BgGPT-Gemma-2-2B-IT-v1.0.Q4_K_M.gguf".to_string(),
+            size_bytes: 1_708_582_400,
+            size_display: "1.71 GB".to_string(),
+            vram_estimate: "~2.2 GB VRAM".to_string(),
+            description_bg: "Ултра-лек и бърз български модел. Отличен за слаби лаптопи и режим на батерия.".to_string(),
+            description_en: "Ultra-compact and fast Bulgarian model. Optimal for low-end laptops and battery mode.".to_string(),
+            recommended_for: vec!["claim_extraction".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "qwen-2.5-3b-instruct".to_string(),
+            name: "Qwen2.5-3B-Instruct-Q4_K_M".to_string(),
+            author: "Qwen Team (Alibaba)".to_string(),
+            kind: "llm_gguf".to_string(),
+            download_url: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf".to_string(),
+            filename: "qwen2.5-3b-instruct-q4_k_m.gguf".to_string(),
+            size_bytes: 2_050_000_000,
+            size_display: "2.05 GB".to_string(),
+            vram_estimate: "~2.8 GB VRAM".to_string(),
+            description_bg: "Глобален шампион по скорост и точност в 3B класа. Превъзходно структуриране в JSON.".to_string(),
+            description_en: "Top-tier 3B model for speed and accuracy. Excellent JSON adherence.".to_string(),
+            recommended_for: vec!["claim_extraction".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "qwen-2.5-7b-instruct".to_string(),
+            name: "Qwen2.5-7B-Instruct-Q4_K_M".to_string(),
+            author: "Qwen Team (Alibaba)".to_string(),
+            kind: "llm_gguf".to_string(),
+            download_url: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf".to_string(),
+            filename: "qwen2.5-7b-instruct-q4_k_m.gguf".to_string(),
+            size_bytes: 4_480_000_000,
+            size_display: "4.48 GB".to_string(),
+            vram_estimate: "~5.8 GB VRAM".to_string(),
+            description_bg: "Мощен аналитичен модел за дълбоко логическо разсъждение и проверка на сложни твърдения.".to_string(),
+            description_en: "Powerful analytical model for deep logical reasoning and fact verification.".to_string(),
+            recommended_for: vec!["fact_verification".to_string(), "osint_dossier".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "llama-3.2-3b-instruct".to_string(),
+            name: "Llama-3.2-3B-Instruct-Q4_K_M".to_string(),
+            author: "Meta AI".to_string(),
+            kind: "llm_gguf".to_string(),
+            download_url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf".to_string(),
+            filename: "Llama-3.2-3B-Instruct-Q4_K_M.gguf".to_string(),
+            size_bytes: 2_020_000_000,
+            size_display: "2.02 GB".to_string(),
+            vram_estimate: "~2.7 GB VRAM".to_string(),
+            description_bg: "Бърз и надежден многоезичен модел от Meta за филтриране на факти.".to_string(),
+            description_en: "Fast and reliable multilingual model from Meta for fact screening.".to_string(),
+            recommended_for: vec!["claim_extraction".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "whisper-large-v3-turbo".to_string(),
+            name: "Whisper Large-v3-Turbo".to_string(),
+            author: "OpenAI".to_string(),
+            kind: "whisper_bin".to_string(),
+            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin".to_string(),
+            filename: "ggml-large-v3-turbo-q5_0.bin".to_string(),
+            size_bytes: 574_041_195,
+            size_display: "574 MB".to_string(),
+            vram_estimate: "~1.2 GB VRAM".to_string(),
+            description_bg: "Препоръчителният флагман за разпознаване на българска реч с под 5% грешка (WER).".to_string(),
+            description_en: "Recommended flagship Bulgarian speech recognition with <5% WER.".to_string(),
+            recommended_for: vec!["asr".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "whisper-small".to_string(),
+            name: "Whisper Small".to_string(),
+            author: "OpenAI".to_string(),
+            kind: "whisper_bin".to_string(),
+            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin".to_string(),
+            filename: "ggml-small.bin".to_string(),
+            size_bytes: 487_601_967,
+            size_display: "488 MB".to_string(),
+            vram_estimate: "~1.0 GB VRAM".to_string(),
+            description_bg: "Балансиран модел за по-слаби компютри и лаптопи на батерия.".to_string(),
+            description_en: "Balanced ASR model for lower-spec machines and battery power.".to_string(),
+            recommended_for: vec!["asr".to_string()],
+            is_installed: false,
+        },
+        leadfinder_core::CuratedModelCatalogItem {
+            id: "whisper-base".to_string(),
+            name: "Whisper Base".to_string(),
+            author: "OpenAI".to_string(),
+            kind: "whisper_bin".to_string(),
+            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin".to_string(),
+            filename: "ggml-base.bin".to_string(),
+            size_bytes: 147_951_465,
+            size_display: "148 MB".to_string(),
+            vram_estimate: "~500 MB VRAM".to_string(),
+            description_bg: "Ултра-лек ASR модел за максимална скорост на стари машини.".to_string(),
+            description_en: "Ultra-lightweight ASR model for maximum speed on legacy systems.".to_string(),
+            recommended_for: vec!["asr".to_string()],
+            is_installed: false,
+        },
+    ];
+
+    for item in &mut catalog {
+        let sub = if item.kind == "whisper_bin" { "whisper" } else { "llm" };
+        let check_paths = [
+            ctx.paths.models_dir.join(sub).join(&item.filename),
+            ctx.paths.static_root.join("models").join(sub).join(&item.filename),
+        ];
+        item.is_installed = check_paths.iter().any(|p| p.is_file());
+    }
+
+    Json(serde_json::json!({ "catalog": catalog })).into_response()
+}
+
+async fn handle_download_model(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(req): Json<DownloadModelRequest>,
+) -> Response {
+    if ctx.model_download_state.read().await.active {
+        return (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({ "error": "Another model download is already running." })),
+        )
+            .into_response();
+    }
+
+    let sub = if req.kind == "whisper" || req.filename.ends_with(".bin") { "whisper" } else { "llm" };
+    let dest_dir = ctx.paths.models_dir.join(sub);
+    let _ = std::fs::create_dir_all(&dest_dir);
+    let final_dest = dest_dir.join(&req.filename);
+    let part_dest = dest_dir.join(format!("{}.part", req.filename));
+
+    ctx.model_download_cancel.store(false, Ordering::SeqCst);
+    {
+        let mut st = ctx.model_download_state.write().await;
+        st.active = true;
+        st.model_id = req.model_id.clone();
+        st.filename = req.filename.clone();
+        st.bytes_downloaded = 0;
+        st.total_bytes = 0;
+        st.progress_pct = 0;
+        st.speed_bps = 0;
+        st.status = "downloading".to_string();
+        st.error_message = None;
+    }
+
+    let state_arc = ctx.model_download_state.clone();
+    let cancel_arc = ctx.model_download_cancel.clone();
+    let events_tx = ctx.events_tx.clone();
+
+    tokio::spawn(async move {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(3600))
+            .build()
+            .unwrap_or_default();
+
+        let resp_res = client.get(&req.url).send().await;
+        let resp = match resp_res {
+            Ok(r) => match r.error_for_status() {
+                Ok(ok_r) => ok_r,
+                Err(e) => {
+                    let mut st = state_arc.write().await;
+                    st.active = false;
+                    st.status = "error".to_string();
+                    st.error_message = Some(e.to_string());
+                    return;
+                }
+            },
+            Err(e) => {
+                let mut st = state_arc.write().await;
+                st.active = false;
+                st.status = "error".to_string();
+                st.error_message = Some(e.to_string());
+                return;
+            }
+        };
+
+        let total_size = resp.content_length().unwrap_or(0);
+        {
+            let mut st = state_arc.write().await;
+            st.total_bytes = total_size;
+        }
+
+        let mut file = match tokio::fs::File::create(&part_dest).await {
+            Ok(f) => f,
+            Err(e) => {
+                let mut st = state_arc.write().await;
+                st.active = false;
+                st.status = "error".to_string();
+                st.error_message = Some(e.to_string());
+                return;
+            }
+        };
+
+        let mut stream = resp.bytes_stream();
+        let mut downloaded: u64 = 0;
+        let mut last_instant = std::time::Instant::now();
+        let mut last_bytes: u64 = 0;
+
+        while let Some(chunk_res) = stream.next().await {
+            if cancel_arc.load(Ordering::SeqCst) {
+                let _ = tokio::fs::remove_file(&part_dest).await;
+                let mut st = state_arc.write().await;
+                st.active = false;
+                st.status = "cancelled".to_string();
+                return;
+            }
+
+            match chunk_res {
+                Ok(chunk) => {
+                    if let Err(e) = file.write_all(&chunk).await {
+                        let mut st = state_arc.write().await;
+                        st.active = false;
+                        st.status = "error".to_string();
+                        st.error_message = Some(e.to_string());
+                        return;
+                    }
+                    downloaded += chunk.len() as u64;
+
+                    if last_instant.elapsed() >= Duration::from_millis(500) {
+                        let elapsed_s = last_instant.elapsed().as_secs_f64().max(0.001);
+                        let bps = ((downloaded - last_bytes) as f64 / elapsed_s) as u64;
+                        last_bytes = downloaded;
+                        last_instant = std::time::Instant::now();
+
+                        let pct = if total_size > 0 {
+                            ((downloaded as f64 / total_size as f64) * 100.0).min(100.0) as u8
+                        } else {
+                            0
+                        };
+
+                        let mut st = state_arc.write().await;
+                        st.bytes_downloaded = downloaded;
+                        st.progress_pct = pct;
+                        st.speed_bps = bps;
+                    }
+                }
+                Err(e) => {
+                    let mut st = state_arc.write().await;
+                    st.active = false;
+                    st.status = "error".to_string();
+                    st.error_message = Some(e.to_string());
+                    return;
+                }
+            }
+        }
+
+        let _ = file.flush().await;
+        drop(file);
+
+        if cancel_arc.load(Ordering::SeqCst) {
+            let _ = tokio::fs::remove_file(&part_dest).await;
+            let mut st = state_arc.write().await;
+            st.active = false;
+            st.status = "cancelled".to_string();
+            return;
+        }
+
+        if let Err(e) = std::fs::rename(&part_dest, &final_dest) {
+            let mut st = state_arc.write().await;
+            st.active = false;
+            st.status = "error".to_string();
+            st.error_message = Some(e.to_string());
+            return;
+        }
+
+        {
+            let mut st = state_arc.write().await;
+            st.active = false;
+            st.bytes_downloaded = total_size;
+            st.progress_pct = 100;
+            st.status = "completed".to_string();
+        }
+
+        let _ = events_tx.send(leadfinder_core::CoreEvent::CalibrationUpdated { capacity_per_day: None });
+    });
+
+    Json(serde_json::json!({ "status": "started", "filename": req.filename })).into_response()
+}
+
+async fn handle_download_model_status(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let st = ctx.model_download_state.read().await.clone();
+    Json(st).into_response()
+}
+
+async fn handle_download_model_cancel(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    ctx.model_download_cancel.store(true, Ordering::SeqCst);
+    Json(serde_json::json!({ "status": "cancelling" })).into_response()
+}
+
+async fn handle_delete_model(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path((kind, filename)): Path<(String, String)>,
+) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid filename" }))).into_response();
+    }
+    let sub = if kind == "whisper" { "whisper" } else { "llm" };
+    let path = ctx.paths.models_dir.join(sub).join(&filename);
+    if path.is_file() {
+        if let Err(e) = std::fs::remove_file(&path) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    }
+    Json(serde_json::json!({ "deleted": true, "filename": filename })).into_response()
+}
+
+async fn handle_scan_models_folder(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let _ = std::fs::create_dir_all(ctx.paths.models_dir.join("llm"));
+    let _ = std::fs::create_dir_all(ctx.paths.models_dir.join("whisper"));
+    handle_list_models(State(ctx)).await
+}
+
+async fn handle_scan_external_ai_servers(
+    State(_ctx): State<Arc<PipelineContext>>,
+    Json(req): Json<ScanExternalAiServersRequest>,
+) -> Response {
+    let mut servers: Vec<leadfinder_core::ExternalAiServerStatus> = Vec::new();
+    let client = reqwest::Client::builder().timeout(Duration::from_millis(2000)).build().unwrap_or_default();
+
+    let t0 = std::time::Instant::now();
+    let ollama_res = client.get("http://127.0.0.1:11434/api/tags").send().await;
+    let mut ollama_status = leadfinder_core::ExternalAiServerStatus {
+        server_type: "ollama".to_string(),
+        endpoint_url: "http://localhost:11434".to_string(),
+        is_online: false,
+        latency_ms: None,
+        models: Vec::new(),
+    };
+    if let Ok(resp) = ollama_res {
+        if resp.status().is_success() {
+            ollama_status.is_online = true;
+            ollama_status.latency_ms = Some(t0.elapsed().as_millis() as u64);
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                if let Some(arr) = body.get("models").and_then(|v| v.as_array()) {
+                    for m in arr {
+                        let name = m.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let size = m.get("size").and_then(|v| v.as_u64());
+                        let param = m.get("details").and_then(|d| d.get("parameter_size")).and_then(|v| v.as_str()).map(|s| s.to_string());
+                        let quant = m.get("details").and_then(|d| d.get("quantization_level")).and_then(|v| v.as_str()).map(|s| s.to_string());
+                        if !name.is_empty() {
+                            ollama_status.models.push(leadfinder_core::ExternalAiServerModel {
+                                id: format!("ollama_{name}"),
+                                name,
+                                parameter_size: param,
+                                quantization: quant,
+                                size_bytes: size,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    servers.push(ollama_status);
+
+    let t1 = std::time::Instant::now();
+    let lm_res = client.get("http://127.0.0.1:1234/v1/models").send().await;
+    let mut lm_status = leadfinder_core::ExternalAiServerStatus {
+        server_type: "lmstudio".to_string(),
+        endpoint_url: "http://localhost:1234".to_string(),
+        is_online: false,
+        latency_ms: None,
+        models: Vec::new(),
+    };
+    if let Ok(resp) = lm_res {
+        if resp.status().is_success() {
+            lm_status.is_online = true;
+            lm_status.latency_ms = Some(t1.elapsed().as_millis() as u64);
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                if let Some(arr) = body.get("data").and_then(|v| v.as_array()) {
+                    for m in arr {
+                        let id = m.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        if !id.is_empty() {
+                            lm_status.models.push(leadfinder_core::ExternalAiServerModel {
+                                id: format!("lmstudio_{id}"),
+                                name: id,
+                                parameter_size: None,
+                                quantization: None,
+                                size_bytes: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    servers.push(lm_status);
+
+    if let Some(custom_url) = req.custom_url.filter(|s| !s.is_empty()) {
+        let t2 = std::time::Instant::now();
+        let target_url = if custom_url.ends_with("/models") {
+            custom_url.clone()
+        } else if custom_url.ends_with("/v1") {
+            format!("{custom_url}/models")
+        } else {
+            format!("{}/v1/models", custom_url.trim_end_matches('/'))
+        };
+
+        let custom_res = client.get(&target_url).send().await;
+        let mut custom_status = leadfinder_core::ExternalAiServerStatus {
+            server_type: "custom".to_string(),
+            endpoint_url: custom_url,
+            is_online: false,
+            latency_ms: None,
+            models: Vec::new(),
+        };
+        if let Ok(resp) = custom_res {
+            if resp.status().is_success() {
+                custom_status.is_online = true;
+                custom_status.latency_ms = Some(t2.elapsed().as_millis() as u64);
+                if let Ok(body) = resp.json::<serde_json::Value>().await {
+                    if let Some(arr) = body.get("data").and_then(|v| v.as_array()) {
+                        for m in arr {
+                            let id = m.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                            if !id.is_empty() {
+                                custom_status.models.push(leadfinder_core::ExternalAiServerModel {
+                                    id: format!("custom_{id}"),
+                                    name: id,
+                                    parameter_size: None,
+                                    quantization: None,
+                                    size_bytes: None,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        servers.push(custom_status);
+    }
+
+    Json(serde_json::json!({ "servers": servers })).into_response()
+}
+
+async fn handle_get_model_roles(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    if let Ok(Some(roles_val)) = ctx.db.get_setting("model_roles").await {
+        if let Ok(cfg) = serde_json::from_value::<leadfinder_core::ModelHubRolesConfig>(roles_val) {
+            return Json(cfg).into_response();
+        }
+    }
+
+    let prof = ctx.db.get_profile().await.ok().flatten();
+    let eff_asr = prof.as_ref().and_then(|p| p.chosen_json.get("effective")).and_then(|e| e.get("asr_model")).and_then(|v| v.as_str()).unwrap_or("large-v3-turbo");
+    let eff_llm_prov = prof.as_ref().and_then(|p| p.chosen_json.get("effective")).and_then(|e| e.get("llm_provider")).and_then(|v| v.as_str()).unwrap_or("local");
+    let eff_llm_model = prof.as_ref().and_then(|p| p.chosen_json.get("effective")).and_then(|e| e.get("llm_model")).and_then(|v| v.as_str()).unwrap_or("BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf");
+
+    let mut roles = std::collections::HashMap::new();
+    roles.insert("asr".to_string(), leadfinder_core::ModelRoleConfig {
+        role: "asr".to_string(),
+        provider: "whisper".to_string(),
+        model_name: eff_asr.to_string(),
+        custom_url: None,
+        temperature: None,
+    });
+    roles.insert("claim_extraction".to_string(), leadfinder_core::ModelRoleConfig {
+        role: "claim_extraction".to_string(),
+        provider: eff_llm_prov.to_string(),
+        model_name: eff_llm_model.to_string(),
+        custom_url: None,
+        temperature: Some(0.0),
+    });
+    roles.insert("fact_verification".to_string(), leadfinder_core::ModelRoleConfig {
+        role: "fact_verification".to_string(),
+        provider: eff_llm_prov.to_string(),
+        model_name: eff_llm_model.to_string(),
+        custom_url: None,
+        temperature: Some(0.0),
+    });
+    roles.insert("osint_dossier".to_string(), leadfinder_core::ModelRoleConfig {
+        role: "osint_dossier".to_string(),
+        provider: "gemini".to_string(),
+        model_name: "gemini-2.5-flash".to_string(),
+        custom_url: None,
+        temperature: Some(0.2),
+    });
+    roles.insert("ocr".to_string(), leadfinder_core::ModelRoleConfig {
+        role: "ocr".to_string(),
+        provider: "tesseract".to_string(),
+        model_name: "bul+eng".to_string(),
+        custom_url: None,
+        temperature: None,
+    });
+
+    let defaults = leadfinder_core::ModelHubRolesConfig {
+        roles,
+        consensus: leadfinder_core::ConsensusSettings::default(),
+    };
+
+    Json(defaults).into_response()
+}
+
+async fn handle_update_model_roles(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(cfg): Json<leadfinder_core::ModelHubRolesConfig>,
+) -> Response {
+    let val = serde_json::to_value(&cfg).unwrap_or(serde_json::Value::Null);
+    if let Err(e) = ctx.db.set_setting("model_roles", &val).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response();
+    }
+    Json(serde_json::json!({ "saved": true })).into_response()
+}
+
+async fn handle_test_model(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(req): Json<leadfinder_core::ModelTestRequest>,
+) -> Response {
+    let start = std::time::Instant::now();
+    let app_cfg = ctx.config.read().await.clone();
+
+    let llm_provider: Arc<dyn leadfinder_core::Llm> = match req.provider.as_str() {
+        "gemini" => {
+            let key = leadfinder_core::resolve_secret("GEMINI_API_KEY");
+            Arc::new(leadfinder_providers::GeminiLlm::new(
+                &req.model,
+                key,
+                true,
+                Duration::from_secs(45),
+            ))
+        }
+        "ollama" => {
+            let raw_url = req.custom_url.as_deref().unwrap_or("http://localhost:11434");
+            let norm_url = if raw_url.ends_with("/v1") {
+                raw_url.to_string()
+            } else {
+                format!("{}/v1", raw_url.trim_end_matches('/'))
+            };
+            Arc::new(leadfinder_providers::OpenAiCompatLlm::new(
+                "ollama",
+                norm_url,
+                &req.model,
+                None,
+                Duration::from_secs(45),
+            ))
+        }
+        "lmstudio" => {
+            let raw_url = req.custom_url.as_deref().unwrap_or("http://localhost:1234");
+            let norm_url = if raw_url.ends_with("/v1") {
+                raw_url.to_string()
+            } else {
+                format!("{}/v1", raw_url.trim_end_matches('/'))
+            };
+            Arc::new(leadfinder_providers::OpenAiCompatLlm::new(
+                "lmstudio",
+                norm_url,
+                &req.model,
+                None,
+                Duration::from_secs(45),
+            ))
+        }
+        "heuristics" => {
+            Arc::new(leadfinder_providers::HeuristicLlm::new())
+        }
+        _ => {
+            let model_rel = format!("llm/{}", req.model);
+            let resolved = ctx
+                .paths
+                .resolve_model_path(&model_rel)
+                .or_else(|| ctx.paths.resolve_model_path(&req.model))
+                .unwrap_or_else(|| ctx.paths.models_dir.join("llm").join(&req.model));
+            let llama_bin = ctx
+                .paths
+                .resolve_binary("llama-server")
+                .unwrap_or_else(|| ctx.paths.tools_dir.join("llama-server.exe"));
+            Arc::new(
+                leadfinder_providers::OpenAiCompatLlm::new(
+                    "local",
+                    &app_cfg.providers.local_llm_url,
+                    &req.model,
+                    None,
+                    Duration::from_secs(60),
+                )
+                .with_local_autolaunch(leadfinder_providers::LocalLlamaLaunchSpec {
+                    llama_bin,
+                    model_path: resolved,
+                    use_gpu: true,
+                    context_size: 4096,
+                }),
+            )
+        }
+    };
+
+    let llm_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: req.system_prompt.unwrap_or_else(|| "You are an AI assistant. Return strictly valid JSON with an answer field.".to_string()),
+        user_prompt: req.prompt,
+        json_schema: None,
+        temperature: 0.1,
+        max_tokens: 1024,
+    };
+
+    match llm_provider.complete_json(&llm_req).await {
+        Ok(resp) => {
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+            let elapsed_s = (elapsed_ms as f64 / 1000.0).max(0.001);
+            let tokens_per_second = (resp.tokens_out as f64 / elapsed_s * 10.0).round() / 10.0;
+            Json(leadfinder_core::ModelTestResponse {
+                success: true,
+                elapsed_ms,
+                tokens_in: resp.tokens_in,
+                tokens_out: resp.tokens_out,
+                tokens_per_second,
+                raw_text: resp.raw_text,
+                parsed_json: Some(resp.parsed_json),
+                error: None,
+            })
+            .into_response()
+        }
+        Err(e) => {
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+            Json(leadfinder_core::ModelTestResponse {
+                success: false,
+                elapsed_ms,
+                tokens_in: 0,
+                tokens_out: 0,
+                tokens_per_second: 0.0,
+                raw_text: String::new(),
+                parsed_json: None,
+                error: Some(e.to_string()),
+            })
+            .into_response()
+        }
+    }
+}
+

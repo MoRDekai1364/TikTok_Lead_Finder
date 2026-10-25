@@ -530,7 +530,7 @@ impl PipelineContext {
                     &top_passages,
                     video.posted_at.as_deref(),
                 );
-                let runner = LlmChainRunner::from_runtime(&self.paths, &cfg, &self.db).await;
+                let runner = LlmChainRunner::from_role("fact_verification", &self.paths, &cfg, &self.db).await;
                 let llm_req = LlmJsonRequest {
                     system_prompt,
                     user_prompt,
@@ -541,12 +541,45 @@ impl PipelineContext {
                 let validated = runner.complete_validated(&llm_req, &self.db).await?;
                 let raw_parsed: RawVerificationLlmOutput =
                     serde_json::from_value(validated.response.parsed_json)?;
-                enforce_verification_rules(
+                let (v, mut l, stored_evidence, mut r, mut s, forced_reason) = enforce_verification_rules(
                     &claim,
                     &raw_parsed,
                     &top_passages,
                     cfg.verification.min_independent_news_outlets,
-                )
+                );
+
+                if let Ok(Some(roles_val)) = self.db.get_setting("model_roles").await {
+                    let consensus_enabled = roles_val
+                        .get("consensus")
+                        .and_then(|c| c.get("enabled"))
+                        .and_then(|val| val.as_bool())
+                        .unwrap_or(false);
+                    if consensus_enabled {
+                        let sec_runner = LlmChainRunner::from_role("consensus_secondary", &self.paths, &cfg, &self.db).await;
+                        if let Ok(sec_val) = sec_runner.complete_validated(&llm_req, &self.db).await {
+                            if let Ok(sec_parsed) = serde_json::from_value::<RawVerificationLlmOutput>(sec_val.response.parsed_json) {
+                                let (sec_v, _sec_l, _sec_ev, sec_r, sec_s, _sec_fr) = enforce_verification_rules(
+                                    &claim,
+                                    &sec_parsed,
+                                    &top_passages,
+                                    cfg.verification.min_independent_news_outlets,
+                                );
+                                if v == sec_v {
+                                    r = format!("{}\n\n[Мулти-моделен консенсус]: Единодушно съгласие между {} и {}.", r, validated.response.model, sec_val.response.model);
+                                    s = (s + sec_s) / 2.0;
+                                } else {
+                                    r = format!("{}\n\n[Разминаване в консенсуса]: Модел 1 ({}) даде: {:?} ({:.0}%). Модел 2 ({}) даде: {:?} ({:.0}%).\nАргумент 2: {}",
+                                        r, validated.response.model, v, s * 100.0,
+                                        sec_val.response.model, sec_v, sec_s * 100.0, sec_r
+                                    );
+                                    l = format!("{l} [Двойна оценка]");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                (v, l, stored_evidence, r, s, forced_reason)
             };
 
         self.db

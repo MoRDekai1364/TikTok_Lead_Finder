@@ -753,6 +753,169 @@ impl LlmChainRunner {
         }
     }
 
+    pub async fn from_role(
+        role: &str,
+        paths: &RuntimePaths,
+        cfg: &AppConfig,
+        db: &Database,
+    ) -> Self {
+        let mut role_provider: Option<Arc<dyn Llm>> = None;
+        if let Ok(Some(roles_val)) = db.get_setting("model_roles").await {
+            if let Some(role_obj) = roles_val.get("roles").and_then(|r| r.get(role)) {
+                let provider_type = role_obj.get("provider").and_then(|v| v.as_str()).unwrap_or("local");
+                let model_name = role_obj.get("model_name").and_then(|v| v.as_str()).unwrap_or("");
+                let custom_url = role_obj.get("custom_url").and_then(|v| v.as_str());
+
+                match provider_type {
+                    "ollama" => {
+                        let raw_url = custom_url.unwrap_or("http://localhost:11434");
+                        let norm_url = if raw_url.ends_with("/v1") {
+                            raw_url.to_string()
+                        } else {
+                            format!("{}/v1", raw_url.trim_end_matches('/'))
+                        };
+                        role_provider = Some(Arc::new(OpenAiCompatLlm::new(
+                            "ollama",
+                            norm_url,
+                            model_name,
+                            None,
+                            Duration::from_secs(120),
+                        )));
+                    }
+                    "lmstudio" => {
+                        let raw_url = custom_url.unwrap_or("http://localhost:1234");
+                        let norm_url = if raw_url.ends_with("/v1") {
+                            raw_url.to_string()
+                        } else {
+                            format!("{}/v1", raw_url.trim_end_matches('/'))
+                        };
+                        role_provider = Some(Arc::new(OpenAiCompatLlm::new(
+                            "lmstudio",
+                            norm_url,
+                            model_name,
+                            None,
+                            Duration::from_secs(120),
+                        )));
+                    }
+                    "gemini" => {
+                        let gem_key = resolve_secret("GEMINI_API_KEY");
+                        let m = if model_name.is_empty() { &cfg.providers.gemini_model } else { model_name };
+                        role_provider = Some(Arc::new(GeminiLlm::new(
+                            m,
+                            gem_key,
+                            cfg.providers.cloud_enabled,
+                            Duration::from_secs(60),
+                        )));
+                    }
+                    "local" => {
+                        if !model_name.is_empty() {
+                            let model_rel = format!("llm/{model_name}");
+                            let resolved = paths
+                                .resolve_model_path(&model_rel)
+                                .or_else(|| paths.resolve_model_path(model_name))
+                                .unwrap_or_else(|| paths.models_dir.join("llm").join(model_name));
+                            let llama_bin = paths
+                                .resolve_binary("llama-server")
+                                .unwrap_or_else(|| paths.tools_dir.join("llama-server.exe"));
+                            let local_client = OpenAiCompatLlm::new(
+                                "local",
+                                &cfg.providers.local_llm_url,
+                                model_name,
+                                None,
+                                Duration::from_secs(120),
+                            )
+                            .with_local_autolaunch(LocalLlamaLaunchSpec {
+                                llama_bin,
+                                model_path: resolved,
+                                use_gpu: true,
+                                context_size: 8192,
+                            });
+                            role_provider = Some(Arc::new(local_client));
+                        }
+                    }
+                    "heuristics" => {
+                        role_provider = Some(Arc::new(HeuristicLlm::new()));
+                    }
+                    _ => {}
+                }
+            } else if role == "consensus_secondary" {
+                if let Some(cons_obj) = roles_val.get("consensus") {
+                    let sec_provider = cons_obj.get("secondary_provider").and_then(|v| v.as_str()).unwrap_or("gemini");
+                    let sec_model = cons_obj.get("secondary_model").and_then(|v| v.as_str()).unwrap_or("gemini-2.5-flash");
+                    let custom_url = cons_obj.get("secondary_custom_url").and_then(|v| v.as_str());
+
+                    match sec_provider {
+                        "gemini" => {
+                            let gem_key = resolve_secret("GEMINI_API_KEY");
+                            role_provider = Some(Arc::new(GeminiLlm::new(
+                                sec_model,
+                                gem_key,
+                                cfg.providers.cloud_enabled,
+                                Duration::from_secs(60),
+                            )));
+                        }
+                        "ollama" => {
+                            let raw_url = custom_url.unwrap_or("http://localhost:11434");
+                            let norm_url = if raw_url.ends_with("/v1") {
+                                raw_url.to_string()
+                            } else {
+                                format!("{}/v1", raw_url.trim_end_matches('/'))
+                            };
+                            role_provider = Some(Arc::new(OpenAiCompatLlm::new(
+                                "ollama",
+                                norm_url,
+                                sec_model,
+                                None,
+                                Duration::from_secs(120),
+                            )));
+                        }
+                        "local" => {
+                            let model_rel = format!("llm/{sec_model}");
+                            let resolved = paths
+                                .resolve_model_path(&model_rel)
+                                .or_else(|| paths.resolve_model_path(sec_model))
+                                .unwrap_or_else(|| paths.models_dir.join("llm").join(sec_model));
+                            let llama_bin = paths
+                                .resolve_binary("llama-server")
+                                .unwrap_or_else(|| paths.tools_dir.join("llama-server.exe"));
+                            let local_client = OpenAiCompatLlm::new(
+                                "local",
+                                &cfg.providers.local_llm_url,
+                                sec_model,
+                                None,
+                                Duration::from_secs(120),
+                            )
+                            .with_local_autolaunch(LocalLlamaLaunchSpec {
+                                llama_bin,
+                                model_path: resolved,
+                                use_gpu: true,
+                                context_size: 8192,
+                            });
+                            role_provider = Some(Arc::new(local_client));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let fallback_runner = Self::from_runtime(paths, cfg, db).await;
+        if let Some(primary) = role_provider {
+            let mut combined = vec![primary];
+            for p in fallback_runner.providers {
+                if !combined.iter().any(|existing| existing.name() == p.name()) {
+                    combined.push(p);
+                }
+            }
+            Self {
+                providers: combined,
+                daily_budget: cfg.funnel.daily_llm_budget,
+            }
+        } else {
+            fallback_runner
+        }
+    }
+
     pub async fn complete_validated(
         &self,
         req: &LlmJsonRequest,
