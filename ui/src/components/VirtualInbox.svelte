@@ -40,7 +40,7 @@
     onSelectCard: (id: string) => void;
     onToggleCheck: (id: string) => void;
     onChangeLane: (lane: Lane) => void;
-    onPullMore: () => Promise<void>;
+    onPullMore: () => Promise<{ promoted: number } | void>;
     onKeep: (id: string) => void;
     onDiscard: (id: string) => void;
     onResearchMore: (id: string) => void;
@@ -53,6 +53,32 @@
 
   let feedToast = $state<string | null>(null);
   let isAiCheckingFeed = $state(false);
+  let pullToast = $state<string | null>(null);
+  let isPullingMore = $state(false);
+
+  async function handlePullMoreClick() {
+    if (isPullingMore) return;
+    isPullingMore = true;
+    try {
+      const res = await onPullMore();
+      if (res && typeof res.promoted === 'number') {
+        if (res.promoted > 0) {
+          pullToast = currentLang === 'bg' ? `📥 +${res.promoted} нови лийда` : `📥 +${res.promoted} new leads`;
+        } else {
+          pullToast = currentLang === 'bg' ? 'Няма чакащи лийдове' : 'No queued leads';
+        }
+      } else {
+        pullToast = currentLang === 'bg' ? 'Готово' : 'Done';
+      }
+    } catch {
+      pullToast = currentLang === 'bg' ? 'Грешка при изтегляне' : 'Pull error';
+    } finally {
+      isPullingMore = false;
+    }
+    setTimeout(() => {
+      pullToast = null;
+    }, 3000);
+  }
 
   let searchQuery = $state('');
   let verdictFilter = $state('all');
@@ -282,9 +308,17 @@
       </button>
 
       {#if activeLane === 'leads'}
-        <button class="btn btn-secondary btn-sm" onclick={onPullMore} title={t.pullMoreButton}>
-          +15 {t.pullMoreButton}
+        <button
+          class="btn btn-secondary btn-sm"
+          onclick={handlePullMoreClick}
+          disabled={isPullingMore}
+          title={t.pullMoreTooltip}
+        >
+          📥 {t.pullMoreButton}
         </button>
+        {#if pullToast}
+          <span class="pull-toast">{pullToast}</span>
+        {/if}
       {/if}
     </div>
   </div>
@@ -584,6 +618,16 @@
     background: var(--primary-accent);
     color: #fff;
     border-color: var(--primary-accent);
+  }
+
+  .pull-toast {
+    font-size: 0.8rem;
+    color: var(--primary-accent);
+    padding: 3px 8px;
+    background: rgba(37, 99, 235, 0.12);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    border-radius: 4px;
+    font-weight: 500;
   }
 
   .feed-sidebar {

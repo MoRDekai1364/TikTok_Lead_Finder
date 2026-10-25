@@ -370,7 +370,11 @@ async fn handle_pull_more(
 ) -> Response {
     let count = body.count.unwrap_or(10).clamp(1, 200);
     match ctx.pull_more(count).await {
-        Ok(promoted) => Json(serde_json::json!({ "promoted": promoted })).into_response(),
+        Ok(promoted) => Json(serde_json::json!({
+            "promoted": promoted,
+            "pulled_count": promoted
+        }))
+        .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),

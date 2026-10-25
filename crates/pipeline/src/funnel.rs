@@ -3,7 +3,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use leadfinder_core::{
-    AppConfig, Database, FunnelConfig, RankingConfig, Video, VideoState,
+    AppConfig, CoreEvent, Database, FunnelConfig, RankingConfig, Video, VideoState,
 };
 use leadfinder_providers::global_lexicon;
 use crate::engine::PipelineContext;
@@ -728,7 +728,7 @@ impl PipelineContext {
     }
 
     pub async fn pull_more(&self, count: usize) -> Result<usize> {
-        let mut queued = self
+        let queued = self
             .db
             .list_videos(&leadfinder_core::VideoFilter {
                 lane: Some("leads_queued".to_string()),
@@ -736,7 +736,17 @@ impl PipelineContext {
                 ..Default::default()
             })
             .await?;
-        if queued.is_empty() {
+        let mut candidates: Vec<Video> = queued
+            .into_iter()
+            .filter(|v| {
+                v.state != "DISCARDED"
+                    && !v.id.starts_with("rv")
+                    && !v.id.starts_with("73000")
+                    && !v.id.starts_with("73999")
+                    && v.creator_id.as_deref() != Some("creator_soak")
+            })
+            .collect();
+        if candidates.is_empty() {
             let all = self
                 .db
                 .list_videos(&leadfinder_core::VideoFilter {
@@ -744,20 +754,31 @@ impl PipelineContext {
                     ..Default::default()
                 })
                 .await?;
-            queued = all
-                .into_iter()
-                .filter(|v| v.lane.as_deref() != Some("leads") && v.lane.as_deref() != Some("failed"))
-                .collect();
+            for v in all {
+                if v.lane.as_deref() == Some("leads")
+                    || v.lane.as_deref() == Some("failed")
+                    || v.lane.as_deref() == Some("discarded")
+                    || v.state == "DISCARDED"
+                    || v.id.starts_with("rv")
+                    || v.id.starts_with("73000")
+                    || v.id.starts_with("73999")
+                    || v.creator_id.as_deref() == Some("creator_soak")
+                {
+                    continue;
+                }
+                if self.db.get_transcript(&v.id).await?.is_some() {
+                    candidates.push(v);
+                }
+            }
         }
-        let mut sorted = queued;
-        sorted.sort_by(|a, b| {
+        candidates.sort_by(|a, b| {
             b.lead_score
                 .unwrap_or(0.0)
                 .partial_cmp(&a.lead_score.unwrap_or(0.0))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         let mut promoted = 0usize;
-        for v in sorted.into_iter().take(count) {
+        for v in candidates.into_iter().take(count) {
             self.db
                 .set_video_ranking(
                     &v.id,
@@ -765,9 +786,14 @@ impl PipelineContext {
                     "leads",
                     v.cluster_id,
                     VideoState::Ready,
-                    Some("pulled_from_pool"),
+                    Some("pulled_from_cap"),
                 )
                 .await?;
+            self.emit(CoreEvent::VideoUpdated {
+                video_id: v.id.clone(),
+                state: VideoState::Ready.as_str().to_string(),
+                lane: Some("leads".to_string()),
+            });
             promoted += 1;
         }
         Ok(promoted)

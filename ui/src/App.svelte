@@ -163,9 +163,10 @@
     drawerVideoId = id;
   }
 
-  async function handlePullMore() {
-    await pullMore(15);
+  async function handlePullMore(): Promise<{ promoted: number }> {
+    const res = await pullMore(15);
     await loadInitialData();
+    return { promoted: res.promoted ?? res.pulled_count ?? 0 };
   }
 
   async function handleKeep(id: string) {

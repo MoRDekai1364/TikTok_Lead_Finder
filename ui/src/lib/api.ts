@@ -153,8 +153,8 @@ export async function triggerDiscovery(maxPerSeed: number = 10): Promise<{ count
   });
 }
 
-export async function pullMore(count: number = 10): Promise<{ pulled_count: number }> {
-  return fetchJson<{ pulled_count: number }>('/api/rank/pull-more', {
+export async function pullMore(count: number = 15): Promise<{ promoted: number; pulled_count: number }> {
+  return fetchJson<{ promoted: number; pulled_count: number }>('/api/rank/pull-more', {
     method: 'POST',
     body: JSON.stringify({ count }),
   });

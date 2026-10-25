@@ -341,6 +341,8 @@ impl Database {
                     OR v.lane = ?1)
                AND (?2 IS NULL OR v.state = ?2)
                AND (?1 = 'discarded' OR ?2 = 'DISCARDED' OR (v.state != 'DISCARDED' AND COALESCE(v.lane, '') != 'discarded'))
+               AND (v.creator_id IS NULL OR v.creator_id != 'creator_soak')
+               AND v.id NOT LIKE 'rv%'
                AND (?3 IS NULL OR v.creator_id = ?3 OR c.handle = ?3 OR c.handle = REPLACE(?3, '@', ''))
                AND (?4 IS NULL OR COALESCE(v.lead_score, 0.0) >= ?4)
                AND (?5 IS NULL OR COALESCE(v.views, 0) >= ?5)
@@ -351,7 +353,6 @@ impl Database {
                AND (?8 IS NULL OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND cl.label = ?8))
              ORDER BY
                 CASE WHEN v.discovered_via LIKE 'paste%' OR v.lane = 'pasted' THEN 1000.0 ELSE 0.0 END +
-                CASE WHEN v.lane IS NULL OR v.state != 'VERIFIED' THEN 500.0 ELSE 0.0 END +
                 COALESCE(v.lead_score, -1.0) DESC,
                 v.discovered_at DESC
              LIMIT ?9 OFFSET ?10",
