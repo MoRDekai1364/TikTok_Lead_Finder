@@ -291,3 +291,36 @@ export function formatVerdictDisplay(verdict: string | null | undefined, label: 
     }
   }
 }
+
+export interface CustomScanConfig {
+  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags';
+  targets?: string[];
+  max_per_target?: number;
+  min_views?: number | null;
+  min_likes?: number | null;
+  max_age_days?: number | null;
+  auto_process?: boolean;
+  max_targets?: number | null;
+}
+
+export interface VideoRefSummary {
+  id: string;
+  url: string;
+  creator_handle?: string | null;
+  creator_display_name?: string | null;
+  caption?: string | null;
+  views?: number | null;
+  likes?: number | null;
+  posted_at?: string | null;
+  duration_s?: number | null;
+}
+
+export interface CustomScanResult {
+  targets_scanned: number;
+  videos_found: number;
+  videos_ingested: number;
+  videos_skipped_existing: number;
+  videos_skipped_filter: number;
+  ingested_videos: VideoRefSummary[];
+  errors: string[];
+}

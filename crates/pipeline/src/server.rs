@@ -14,7 +14,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tower_http::cors::CorsLayer;
 use leadfinder_core::{CoreEvent, Search, Stage, VideoFilter};
 use leadfinder_probe::{apply_calibration_overrides, run_calibration, CalibrationOverrides};
-use crate::engine::PipelineContext;
+use crate::engine::{CustomScanConfig, PipelineContext};
 
 #[derive(Debug, Deserialize)]
 pub struct TokenQuery {
@@ -193,6 +193,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/inbox/paste", post(handle_paste))
         .route("/api/inbox/import", post(handle_import))
         .route("/api/discover/run", post(handle_discover_run))
+        .route("/api/discover/scan", post(handle_discover_scan))
         .route("/api/rank/run", post(handle_rank_run))
         .route("/api/rank/pull-more", post(handle_pull_more))
         .route("/api/rank/tune", post(handle_tune))
@@ -403,6 +404,20 @@ async fn handle_discover_run(
 ) -> Response {
     match ctx.run_automated_discovery(body.max_per_seed).await {
         Ok(summary) => Json(summary).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_discover_scan(
+    State(ctx): State<Arc<PipelineContext>>,
+    Json(body): Json<CustomScanConfig>,
+) -> Response {
+    match ctx.scan_tiktok_custom(&body).await {
+        Ok(result) => Json(result).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),

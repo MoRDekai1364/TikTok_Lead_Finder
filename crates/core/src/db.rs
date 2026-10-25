@@ -327,6 +327,15 @@ impl Database {
         Ok(())
     }
 
+    pub async fn set_video_lane(&self, video_id: &str, lane: &str) -> Result<()> {
+        sqlx::query("UPDATE videos SET lane = ?2 WHERE id = ?1")
+            .bind(video_id)
+            .bind(lane)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn list_videos(&self, filter: &VideoFilter) -> Result<Vec<Video>> {
         let limit = filter.limit.unwrap_or(200).clamp(1, 5000);
         let offset = filter.offset.unwrap_or(0).max(0);

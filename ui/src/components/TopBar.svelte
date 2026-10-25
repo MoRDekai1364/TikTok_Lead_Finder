@@ -15,6 +15,7 @@
     onNavigate,
     onPasteUrls,
     onJumpToVideo,
+    onOpenScanModal,
     onToggleTheme,
     onToggleLang,
   }: {
@@ -27,6 +28,7 @@
     onNavigate: (s: Screen) => void;
     onPasteUrls: (text: string) => Promise<any>;
     onJumpToVideo?: (id: string) => void;
+    onOpenScanModal?: () => void;
     onToggleTheme: () => void;
     onToggleLang: () => void;
   } = $props();
@@ -259,6 +261,16 @@
       <button class="btn btn-primary" onclick={handlePaste} disabled={isPasting || !pasteText.trim()}>
         {isPasting ? '...' : t.pasteButton}
       </button>
+      {#if onOpenScanModal}
+        <button
+          type="button"
+          class="btn scan-trigger-btn"
+          onclick={onOpenScanModal}
+          title={currentLang === 'bg' ? 'Фин скенер на TikTok профили и теми' : 'Fine-tuned TikTok scanner'}
+        >
+          🎯 {currentLang === 'bg' ? 'Фин скенер' : 'Fine Scanner'}
+        </button>
+      {/if}
       {#if toastMessage}
         <span class="paste-toast" class:toast-error={toastIsError}>{toastMessage}</span>
       {/if}
@@ -466,6 +478,25 @@
 
   .paste-bar input:focus {
     border-color: var(--primary-accent);
+  }
+
+  .scan-trigger-btn {
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-body);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.45rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+
+  .scan-trigger-btn:hover {
+    border-color: var(--primary-accent);
+    color: var(--primary-accent);
+    background: var(--hover-bg);
   }
 
   .paste-toast {

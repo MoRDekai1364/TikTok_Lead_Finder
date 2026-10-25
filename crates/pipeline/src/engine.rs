@@ -14,9 +14,8 @@ use leadfinder_core::{
     VideoSource, VideoState,
 };
 use leadfinder_providers::{
-    compute_wer, CaptionFirstTranscriber, DirectHttpDiscoverySource,
-    HeadlessBrowserDiscoverySource, MediaAcquirer, PaddleOnnxOcr, PasteLinkSource, TesseractOcr,
-    WhisperCppTranscriber, YtDlpClient, YtDlpDiscoverySource,
+    compute_wer, CaptionFirstTranscriber, MediaAcquirer, PaddleOnnxOcr, PasteLinkSource,
+    TesseractOcr, WhisperCppTranscriber, YtDlpClient, YtDlpDiscoverySource,
 };
 
 use crate::concurrency::{AimdConcurrencyManager, AimdStage};
@@ -106,8 +105,8 @@ impl PipelineContext {
     ) -> Result<Vec<Video>> {
         let mut stored = Vec::with_capacity(refs.len());
         for vref in refs {
-            let (video, _created) = self.db.upsert_video_discovered(&vref, expansion_depth).await?;
-            if enqueue_next {
+            let (video, created) = self.db.upsert_video_discovered(&vref, expansion_depth).await?;
+            if enqueue_next && (created || vref.discovered_via.starts_with("paste")) {
                 let job = self.db.enqueue_job(Some(&video.id), Stage::ScreenCheap).await?;
                 self.emit(CoreEvent::JobUpdated {
                     job_id: job.id,
@@ -524,46 +523,25 @@ impl PipelineContext {
         }
 
         let ytdlp_source = YtDlpDiscoverySource::new(self.ytdlp.clone());
-        let http_source = DirectHttpDiscoverySource::new(self.guard.clone());
-        let headless_source =
-            HeadlessBrowserDiscoverySource::new(self.guard.clone(), Duration::from_secs(25));
 
-        let seeds = self.db.list_seeds(true).await?;
-        for seed in seeds {
-            let query = match seed.kind.as_str() {
-                "hashtag" => DiscoveryQuery::Hashtag {
-                    tag: seed.value.clone(),
-                    max_results: max_per_seed,
-                },
-                "creator" => DiscoveryQuery::Creator {
-                    handle: seed.value.clone(),
-                    max_results: max_per_seed,
-                    expansion_depth: 0,
-                },
-                _ => DiscoveryQuery::Keyword {
-                    keyword: seed.value.clone(),
-                    max_results: max_per_seed,
-                },
-            };
+        let creators = self.db.list_creators().await.unwrap_or_default();
+        let watchlist_creators: Vec<_> = creators.into_iter().filter(|c| c.watchlist).collect();
 
+        for creator in watchlist_creators {
             summary.seeds_attempted += 1;
-            let res = match ytdlp_source.discover(&query).await {
-                Ok(v) if !v.is_empty() => Ok(v),
-                Err(e) if e.kind == ProviderErrorKind::CircuitOpen => Err(e),
-                _ => match headless_source.discover(&query).await {
-                    Ok(v) if !v.is_empty() => Ok(v),
-                    _ => http_source.discover(&query).await,
-                },
+            let query = DiscoveryQuery::Creator {
+                handle: creator.handle.clone(),
+                max_results: cfg.expansion.max_videos_per_creator.min(max_per_seed).max(3),
+                expansion_depth: creator.expansion_depth,
             };
-
-            match res {
+            match ytdlp_source.discover(&query).await {
                 Ok(refs) => {
-                    let stored = self.ingest_video_refs(refs, 0, true).await?;
-                    summary.videos_discovered += stored.len();
-                    let _ = self.db.mark_seed_ran(seed.id).await;
+                    if let Ok(stored) = self.ingest_video_refs(refs, creator.expansion_depth, true).await {
+                        summary.videos_discovered += stored.len();
+                    }
                 }
                 Err(err) => {
-                    summary.errors.push(err.to_string());
+                    summary.errors.push(format!("@{}: {err}", creator.handle));
                     if err.kind == ProviderErrorKind::CircuitOpen {
                         summary.paused_by_breaker = true;
                         self.emit(CoreEvent::DiscoveryStatus {
@@ -577,22 +555,195 @@ impl PipelineContext {
             }
         }
 
-        let creators = self.db.list_creators().await?;
-        for creator in creators.into_iter().filter(|c| c.watchlist) {
+        let seeds = self.db.list_seeds(true).await.unwrap_or_default();
+        for seed in seeds.into_iter().filter(|s| s.kind == "creator") {
+            summary.seeds_attempted += 1;
             let query = DiscoveryQuery::Creator {
-                handle: creator.handle.clone(),
-                max_results: cfg.expansion.max_videos_per_creator,
-                expansion_depth: creator.expansion_depth,
+                handle: seed.value.clone(),
+                max_results: max_per_seed.max(3),
+                expansion_depth: 0,
             };
             if let Ok(refs) = ytdlp_source.discover(&query).await {
-                let stored = self
-                    .ingest_video_refs(refs, creator.expansion_depth, true)
-                    .await?;
-                summary.videos_discovered += stored.len();
+                if let Ok(stored) = self.ingest_video_refs(refs, 0, true).await {
+                    summary.videos_discovered += stored.len();
+                }
+                let _ = self.db.mark_seed_ran(seed.id).await;
             }
         }
 
         Ok(summary)
+    }
+
+    pub async fn scan_tiktok_custom(&self, cfg: &CustomScanConfig) -> Result<CustomScanResult> {
+        let mut result = CustomScanResult {
+            targets_scanned: 0,
+            videos_found: 0,
+            videos_ingested: 0,
+            videos_skipped_existing: 0,
+            videos_skipped_filter: 0,
+            ingested_videos: Vec::new(),
+            errors: Vec::new(),
+        };
+
+        let ytdlp_source = YtDlpDiscoverySource::new(self.ytdlp.clone());
+        let mut target_handles: Vec<String> = Vec::new();
+        let is_keyword_mode = cfg.target_mode == "keywords" || cfg.target_mode == "hashtags";
+
+        if cfg.target_mode == "watchlist" || is_keyword_mode {
+            let creators = self.db.list_creators().await.unwrap_or_default();
+            let mut wl: Vec<String> = creators
+                .into_iter()
+                .filter(|c| c.watchlist)
+                .map(|c| c.handle.trim().trim_start_matches('@').to_lowercase())
+                .filter(|h| !h.is_empty())
+                .collect();
+            if wl.is_empty() {
+                let seeds = self.db.list_seeds(true).await.unwrap_or_default();
+                wl = seeds
+                    .into_iter()
+                    .filter(|s| s.kind == "creator")
+                    .map(|s| s.value.trim().trim_start_matches('@').to_lowercase())
+                    .filter(|h| !h.is_empty())
+                    .collect();
+            }
+            target_handles.extend(wl);
+        }
+
+        if cfg.target_mode == "creators" {
+            for t in &cfg.targets {
+                for part in t.split([',', ' ', ';', '\n', '\r', '\t']) {
+                    let clean = part.trim().trim_start_matches('@').to_lowercase();
+                    if !clean.is_empty() && !target_handles.contains(&clean) {
+                        target_handles.push(clean);
+                    }
+                }
+            }
+        }
+
+        if let Some(max_t) = cfg.max_targets {
+            if max_t > 0 && target_handles.len() > max_t {
+                target_handles.truncate(max_t);
+            }
+        }
+
+        let search_terms: Vec<String> = if is_keyword_mode {
+            cfg.targets
+                .iter()
+                .flat_map(|t| t.split([',', ';', '\n', '\r', '\t']))
+                .map(|s| s.trim().trim_start_matches('#').to_lowercase())
+                .filter(|s| !s.is_empty())
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let max_v = cfg.max_per_target.max(1).min(30);
+
+        for handle in target_handles {
+            result.targets_scanned += 1;
+            let query = DiscoveryQuery::Creator {
+                handle: handle.clone(),
+                max_results: max_v,
+                expansion_depth: 0,
+            };
+
+            let refs = match ytdlp_source.discover(&query).await {
+                Ok(r) => r,
+                Err(e) => {
+                    result.errors.push(format!("@{handle}: {e}"));
+                    continue;
+                }
+            };
+
+            for vref in refs {
+                result.videos_found += 1;
+
+                if let Some(mv) = cfg.min_views {
+                    if vref.views.unwrap_or(0) < mv {
+                        result.videos_skipped_filter += 1;
+                        continue;
+                    }
+                }
+
+                if let Some(ml) = cfg.min_likes {
+                    if vref.likes.unwrap_or(0) < ml {
+                        result.videos_skipped_filter += 1;
+                        continue;
+                    }
+                }
+
+                if let Some(max_days) = cfg.max_age_days {
+                    if let Some(p) = &vref.posted_at {
+                        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(p) {
+                            let age = Utc::now().signed_duration_since(dt.with_timezone(&Utc));
+                            if age.num_days() > max_days {
+                                result.videos_skipped_filter += 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                if !search_terms.is_empty() {
+                    let caption_lower = vref.caption.as_deref().unwrap_or("").to_lowercase();
+                    let matches_term = search_terms.iter().any(|term| {
+                        caption_lower.contains(term)
+                            || vref.hashtags.iter().any(|h| h.to_lowercase().contains(term))
+                    });
+                    if !matches_term {
+                        result.videos_skipped_filter += 1;
+                        continue;
+                    }
+                }
+
+                let exists = match self.db.get_video(&vref.id).await {
+                    Ok(Some(_)) => true,
+                    _ => false,
+                };
+
+                if exists {
+                    result.videos_skipped_existing += 1;
+                    continue;
+                }
+
+                match self.db.upsert_video_discovered(&vref, 0).await {
+                    Ok((video, created)) => {
+                        if created {
+                            if cfg.auto_process {
+                                let _ = self.db.set_video_lane(&video.id, "pasted").await;
+                                let _ = self.db.enqueue_job(Some(&video.id), Stage::ScreenCheap).await;
+                            } else {
+                                let _ = self.db.set_video_lane(&video.id, "pasted").await;
+                            }
+                            self.emit(CoreEvent::VideoUpdated {
+                                video_id: video.id.clone(),
+                                state: video.state.clone(),
+                                lane: Some("pasted".to_string()),
+                            });
+                            result.ingested_videos.push(VideoRefSummary {
+                                id: video.id.clone(),
+                                url: video.url.clone(),
+                                creator_handle: video.creator_handle.clone(),
+                                creator_display_name: vref.creator_display_name.clone(),
+                                caption: video.caption.clone(),
+                                views: video.views,
+                                likes: video.likes,
+                                posted_at: video.posted_at.clone(),
+                                duration_s: video.duration_s,
+                            });
+                            result.videos_ingested += 1;
+                        } else {
+                            result.videos_skipped_existing += 1;
+                        }
+                    }
+                    Err(e) => {
+                        result.errors.push(format!("video {}: {e}", vref.id));
+                    }
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     pub fn spawn_worker_loop(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
@@ -608,6 +759,21 @@ impl PipelineContext {
                     cfg.funnel.retention_days,
                 )
                 .await;
+            }
+        });
+
+        let discovery_ctx = Arc::clone(&self);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(15)).await;
+            loop {
+                let is_enabled = {
+                    let c = discovery_ctx.config.read().await;
+                    c.discovery.automated_discovery_enabled
+                };
+                if is_enabled {
+                    let _ = discovery_ctx.run_automated_discovery(5).await;
+                }
+                tokio::time::sleep(Duration::from_secs(1800)).await;
             }
         });
 
@@ -793,4 +959,60 @@ pub struct WerReport {
     pub clips_evaluated: usize,
     pub mean_wer: f64,
     pub clips: Vec<WerClipEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CustomScanConfig {
+    #[serde(default = "default_target_mode")]
+    pub target_mode: String,
+    #[serde(default)]
+    pub targets: Vec<String>,
+    #[serde(default = "default_max_per_target")]
+    pub max_per_target: usize,
+    #[serde(default)]
+    pub min_views: Option<i64>,
+    #[serde(default)]
+    pub min_likes: Option<i64>,
+    #[serde(default)]
+    pub max_age_days: Option<i64>,
+    #[serde(default = "default_auto_process")]
+    pub auto_process: bool,
+    #[serde(default)]
+    pub max_targets: Option<usize>,
+}
+
+fn default_target_mode() -> String {
+    "watchlist".to_string()
+}
+
+fn default_max_per_target() -> usize {
+    5
+}
+
+fn default_auto_process() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomScanResult {
+    pub targets_scanned: usize,
+    pub videos_found: usize,
+    pub videos_ingested: usize,
+    pub videos_skipped_existing: usize,
+    pub videos_skipped_filter: usize,
+    pub ingested_videos: Vec<VideoRefSummary>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VideoRefSummary {
+    pub id: String,
+    pub url: String,
+    pub creator_handle: Option<String>,
+    pub creator_display_name: Option<String>,
+    pub caption: Option<String>,
+    pub views: Option<i64>,
+    pub likes: Option<i64>,
+    pub posted_at: Option<String>,
+    pub duration_s: Option<f64>,
 }

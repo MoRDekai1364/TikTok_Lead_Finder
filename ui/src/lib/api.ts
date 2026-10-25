@@ -1,11 +1,14 @@
 import type {
   Creator,
+  CustomScanConfig,
+  CustomScanResult,
   HardwareProfile,
   LeadCard,
   QueueCounts,
   ScaleStatus,
   Seed,
   VideoDetail,
+  VideoRefSummary,
 } from './types';
 
 let cachedBaseUrl = localStorage.getItem('leadfinder_core_url') || 'http://127.0.0.1:17420';
@@ -150,6 +153,13 @@ export async function triggerDiscovery(maxPerSeed: number = 10): Promise<{ count
   return fetchJson<{ count: number }>('/api/discover/run', {
     method: 'POST',
     body: JSON.stringify({ max_per_seed: maxPerSeed }),
+  });
+}
+
+export async function runCustomTikTokScan(config: CustomScanConfig): Promise<CustomScanResult> {
+  return fetchJson<CustomScanResult>('/api/discover/scan', {
+    method: 'POST',
+    body: JSON.stringify(config),
   });
 }
 
@@ -551,6 +561,30 @@ function getMockFallback<T>(endpoint: string, options: RequestInit): T {
       video_id: 'mock_vid_1',
       corrected_text: 'Коригиран примерен текст след warm-start преработка с речника и AI.',
       warm_start: true,
+    } as T;
+  }
+
+  if (endpoint === '/api/discover/scan') {
+    return {
+      targets_scanned: 1,
+      videos_found: 3,
+      videos_ingested: 2,
+      videos_skipped_existing: 1,
+      videos_skipped_filter: 0,
+      ingested_videos: [
+        {
+          id: 'mock_scan_1',
+          url: 'https://www.tiktok.com/@darik_bg/video/mock_scan_1',
+          creator_handle: 'darik_bg',
+          creator_display_name: 'Darik.bg',
+          caption: 'Примерно видео за избори и новини от България',
+          views: 12500,
+          likes: 340,
+          posted_at: '2026-10-25T10:00:00Z',
+          duration_s: 45,
+        },
+      ],
+      errors: [],
     } as T;
   }
 

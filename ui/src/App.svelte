@@ -22,6 +22,7 @@
   import DetailDrawer from './components/DetailDrawer.svelte';
   import ExportScreen from './components/ExportScreen.svelte';
   import HelpScreen from './components/HelpScreen.svelte';
+  import ScanModal from './components/ScanModal.svelte';
   import SeedsScreen from './components/SeedsScreen.svelte';
   import SettingsScreen from './components/SettingsScreen.svelte';
   import TopBar from './components/TopBar.svelte';
@@ -50,6 +51,7 @@
   let undoStack = $state<{ id: string; prevLane: string }[]>([]);
 
   let inboxRef = $state<{ focusSearch: () => void } | null>(null);
+  let isScanModalOpen = $state(false);
 
   onMount(() => {
     const savedTheme = localStorage.getItem('leadfinder_theme') as 'light' | 'dark' | null;
@@ -345,6 +347,7 @@
     onNavigate={(s: Screen) => (activeScreen = s)}
     onPasteUrls={handlePasteUrls}
     onJumpToVideo={handleJumpToVideo}
+    onOpenScanModal={() => (isScanModalOpen = true)}
     onToggleTheme={toggleTheme}
     onToggleLang={toggleLang}
   />
@@ -406,6 +409,24 @@
         />
       {/key}
     {/if}
+
+    <ScanModal
+      isOpen={isScanModalOpen}
+      {currentLang}
+      onClose={() => (isScanModalOpen = false)}
+      onJumpToVideo={(id) => {
+        activeScreen = 'inbox';
+        activeLane = 'pasted';
+        selectedId = id;
+        if (isVideoFeedOpen) {
+          drawerVideoId = id;
+        }
+        void loadInitialData();
+      }}
+      onScanComplete={() => {
+        void loadInitialData();
+      }}
+    />
   </main>
 </div>
 
