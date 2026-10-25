@@ -11,6 +11,7 @@
 
 ## Key Directories & Files
 - `crates/providers/src/transcriber.rs`: Hybrid speech transcriber with Whisper sentence segmentation, language detection routing, and Google AI speech integration.
+- `crates/pipeline/src/creator_risk.rs`: Web-based author risk calculation engine using Factcheck.bg, BNT, Google search, and local statistical confidence.
 - `crates/providers/src/passages.rs`: Passage extraction and HTML sanitizer regex.
 - `crates/pipeline/src/engine.rs`: Pipeline worker loop, stage transitions, event emissions, panic-supervised job tasks.
 - `scripts/google_audio_transcribe.py` & `tools/google_audio_transcribe.py`: Hybrid speech transcription script, sequence word alignment, Gemini multimodal audio segmentation, Google Web Speech API.
