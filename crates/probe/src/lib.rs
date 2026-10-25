@@ -814,7 +814,7 @@ async fn benchmark_whisper_candidates(
     if !sample_wav.is_file() {
         return Vec::new();
     }
-    let candidate_names = ["tiny", "base", "small-q5_1", "small", "medium", "large-v3"];
+    let candidate_names = ["tiny", "base", "small-q5_1", "small", "medium", "large-v3-turbo", "large-v3"];
     let mut results = Vec::new();
     let window_s = cfg.capacity.processing_window_hours * 3600.0;
     let total_candidates = candidate_names.len();

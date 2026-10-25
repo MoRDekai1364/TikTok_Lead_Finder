@@ -22,9 +22,18 @@
 
   let isStarting = $state(false);
   let errorMessage = $state<string | null>(null);
+  let localProgress = $state<BenchmarkProgress | null>(null);
+  let localPower = $state<PowerInfo | null>(null);
+
+  const effectiveProgress = $derived(
+    localProgress || (progress as any)?.state || progress || null
+  );
+  const effectivePower = $derived(
+    localPower || (powerInfo as any)?.power || powerInfo || null
+  );
 
   const isBattery = $derived(
-    progress?.power_source === 'battery' || powerInfo?.power_source === 'battery'
+    effectiveProgress?.power_source === 'battery' || effectivePower?.power_source === 'battery'
   );
 
   const stages = [
@@ -34,14 +43,34 @@
     { id: 'capacity_calc', labelBg: 'Капацитет', labelEn: 'Capacity', num: 4 },
   ];
 
+  $effect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    if (isOpen && effectiveProgress?.is_running) {
+      timer = setInterval(async () => {
+        try {
+          const st = await fetchCalibrationStatus();
+          if (st?.progress) {
+            localProgress = st.progress;
+          }
+          if (st?.power) {
+            localPower = st.power;
+          }
+        } catch {}
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  });
+
   function getStageActive(stageIndex: number): boolean {
-    const cur = progress?.stage_index ?? 0;
+    const cur = effectiveProgress?.stage_index ?? 0;
     return cur === stageIndex;
   }
 
   function getStageDone(stageIndex: number): boolean {
-    const cur = progress?.stage_index ?? 0;
-    if (progress && !progress.is_running && progress.completed_at) return true;
+    const cur = effectiveProgress?.stage_index ?? 0;
+    if (effectiveProgress && !effectiveProgress.is_running && effectiveProgress.completed_at) return true;
     return cur > stageIndex;
   }
 
@@ -50,7 +79,10 @@
     errorMessage = null;
     try {
       const pSource = targetPower || (isBattery ? 'battery' : 'ac');
-      await triggerBenchmark({ power_source: pSource, force_rerun: true });
+      const res = await triggerBenchmark({ power_source: pSource, force_rerun: true });
+      if (res?.progress) {
+        localProgress = res.progress;
+      }
       if (onBenchmarkStarted) {
         onBenchmarkStarted();
       }
@@ -84,8 +116,8 @@
               <span class="power-badge" class:is-battery={isBattery}>
                 {#if isBattery}
                   🔋 {currentLang === 'bg' ? 'Режим на батерия' : 'Battery Mode'}
-                  {#if powerInfo?.battery_percent !== null && powerInfo?.battery_percent !== undefined}
-                    ({powerInfo.battery_percent}%)
+                  {#if effectivePower?.battery_percent !== null && effectivePower?.battery_percent !== undefined}
+                    ({effectivePower.battery_percent}%)
                   {/if}
                 {:else}
                   ⚡ {currentLang === 'bg' ? 'Мрежово захранване (AC)' : 'AC Plugged In'}
@@ -129,28 +161,28 @@
           </div>
         {/if}
 
-        {#if progress?.is_running}
+        {#if effectiveProgress?.is_running}
           <div class="running-card">
             <div class="progress-bar-container">
               <div class="progress-track">
                 <div
                   class="progress-fill"
-                  style="width: {Math.max(5, Math.min(100, progress.progress_pct))}%"
+                  style="width: {Math.max(5, Math.min(100, effectiveProgress.progress_pct))}%"
                 ></div>
               </div>
               <div class="progress-meta">
                 <span class="progress-text">
-                  {currentLang === 'bg' ? progress.status_text : (progress.status_text_en || progress.status_text)}
+                  {currentLang === 'bg' ? effectiveProgress.status_text : (effectiveProgress.status_text_en || effectiveProgress.status_text)}
                 </span>
-                <span class="progress-pct">{progress.progress_pct}%</span>
+                <span class="progress-pct">{effectiveProgress.progress_pct}%</span>
               </div>
             </div>
 
-            {#if progress.current_model}
+            {#if effectiveProgress.current_model}
               <div class="current-model-pill">
                 <span class="pulse-indicator"></span>
                 <span class="cm-label">{currentLang === 'bg' ? 'Текущ тест:' : 'Testing:'}</span>
-                <span class="cm-value mono">{progress.current_model}</span>
+                <span class="cm-value mono">{effectiveProgress.current_model}</span>
               </div>
             {/if}
 
@@ -170,7 +202,7 @@
               </button>
             </div>
           </div>
-        {:else if progress && !progress.is_running && progress.completed_at}
+        {:else if effectiveProgress && !effectiveProgress.is_running && effectiveProgress.completed_at}
           <div class="completed-card">
             <div class="success-banner">
               <span class="success-icon">✓</span>
@@ -183,7 +215,7 @@
                     ? `Измерен дневен капацитет за профил "${isBattery ? 'Батерия' : 'AC Захранване'}":`
                     : `Measured daily capacity for "${isBattery ? 'Battery' : 'AC Power'}" profile:`}
                   <strong class="capacity-stat">
-                    {Math.round(progress.final_capacity || 0).toLocaleString()} {currentLang === 'bg' ? 'видеа / 24ч' : 'videos / 24h'}
+                    {Math.round(effectiveProgress.final_capacity || 0).toLocaleString()} {currentLang === 'bg' ? 'видеа / 24ч' : 'videos / 24h'}
                   </strong>
                 </p>
               </div>
@@ -217,13 +249,13 @@
           </div>
         {/if}
 
-        {#if (progress?.asr_results && progress.asr_results.length > 0) || (progress?.llm_results && progress.llm_results.length > 0)}
+        {#if (effectiveProgress?.asr_results && effectiveProgress.asr_results.length > 0) || (effectiveProgress?.llm_results && effectiveProgress.llm_results.length > 0)}
           <div class="results-container">
             <h4 class="results-heading">
               {currentLang === 'bg' ? 'Резултати от тестовете на кандидатите' : 'Candidate Benchmark Results'}
             </h4>
 
-            {#if progress?.asr_results && progress.asr_results.length > 0}
+            {#if effectiveProgress?.asr_results && effectiveProgress.asr_results.length > 0}
               <div class="table-card">
                 <div class="table-title">🎙️ Whisper ASR Модели</div>
                 <table class="bench-table">
@@ -237,7 +269,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each progress.asr_results as r}
+                    {#each effectiveProgress.asr_results as r}
                       <tr>
                         <td class="mono font-bold">{r.model}</td>
                         <td>
@@ -257,7 +289,7 @@
               </div>
             {/if}
 
-            {#if progress?.llm_results && progress.llm_results.length > 0}
+            {#if effectiveProgress?.llm_results && effectiveProgress.llm_results.length > 0}
               <div class="table-card mt-3">
                 <div class="table-title">🧠 LLM Извличане на факти и твърдения</div>
                 <table class="bench-table">
@@ -270,7 +302,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each progress.llm_results as l}
+                    {#each effectiveProgress.llm_results as l}
                       <tr>
                         <td class="mono font-bold">{l.model}</td>
                         <td><span class="backend-pill">{l.backend}</span></td>
@@ -288,7 +320,7 @@
 
       <footer class="overlay-footer">
         <div class="footer-left">
-          {#if !progress?.is_running}
+          {#if !effectiveProgress?.is_running}
             <button
               class="btn btn-secondary"
               onclick={() => handleStartRun(isBattery ? 'battery' : 'ac')}
@@ -299,7 +331,7 @@
           {/if}
         </div>
         <div class="footer-right">
-          {#if progress?.is_running}
+          {#if effectiveProgress?.is_running}
             <button class="btn btn-secondary" onclick={onClose}>
               {currentLang === 'bg' ? 'Продължи на заден план' : 'Run in background'}
             </button>

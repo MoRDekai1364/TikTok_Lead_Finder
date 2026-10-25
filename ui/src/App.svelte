@@ -171,17 +171,39 @@
     } catch {}
   }
 
+  $effect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    if (benchmarkProgress?.is_running) {
+      timer = setInterval(async () => {
+        try {
+          const st = await fetchCalibrationStatus();
+          if (st?.progress) {
+            benchmarkProgress = st.progress;
+            if (st.progress.completed_at && !st.progress.is_running) {
+              void loadInitialData();
+            }
+          }
+        } catch {}
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  });
+
   function handleLiveEvent(ev: any) {
     if (ev?.event === 'benchmark_progress' && ev.data) {
-      benchmarkProgress = ev.data;
-      if (benchmarkProgress?.completed_at) {
+      const p = ev.data.state || ev.data;
+      benchmarkProgress = p;
+      if (p?.completed_at) {
         void loadInitialData();
       }
       return;
     }
     if (ev?.event === 'power_changed' && ev.data) {
-      powerInfo = ev.data;
-      const isBatt = powerInfo?.power_source === 'battery';
+      const p = ev.data.power || ev.data;
+      powerInfo = p;
+      const isBatt = p?.power_source === 'battery';
       powerToast = currentLang === 'bg'
         ? (isBatt ? '🔋 Преминаване на батерия: Активиран енергоспестяващ профил.' : '⚡ Включено зарядно: Активиран пълноскоростен AC профил.')
         : (isBatt ? '🔋 Battery power detected: Switched to power-saver profile.' : '⚡ AC power connected: Switched to high-throughput profile.');

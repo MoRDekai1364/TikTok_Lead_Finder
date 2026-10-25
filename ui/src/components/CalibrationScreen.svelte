@@ -39,6 +39,21 @@
     await loadStatus();
   });
 
+  $effect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    if (status?.progress?.is_running) {
+      timer = setInterval(async () => {
+        try {
+          status = await fetchCalibrationStatus();
+          populateOverrides();
+        } catch {}
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  });
+
   async function loadStatus() {
     try {
       status = await fetchCalibrationStatus();
@@ -59,7 +74,10 @@
   async function handleStartBenchmark(targetPower: 'ac' | 'battery') {
     isCalibrating = true;
     try {
-      await triggerBenchmark({ power_source: targetPower, force_rerun: true });
+      const res = await triggerBenchmark({ power_source: targetPower, force_rerun: true });
+      if (status && res?.progress) {
+        status.progress = res.progress;
+      }
       await loadStatus();
       if (onOpenBenchmarkModal) {
         onOpenBenchmarkModal();

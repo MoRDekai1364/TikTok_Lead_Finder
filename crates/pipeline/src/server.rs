@@ -276,16 +276,15 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
                     if let Some(ref p) = prof {
                         let _ = ctx.db.save_profile(p).await;
                     }
-                    let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::PowerChanged {
-                        power: serde_json::json!({
-                            "old_source": old,
-                            "new_source": current.power_source,
-                            "ac_online": current.ac_online,
-                            "battery_percent": current.battery_percent,
-                            "has_profile": has_profile,
-                            "capacity_per_day": prof.and_then(|p| p.capacity_per_day),
-                        }),
-                    });
+                    let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::PowerChanged(serde_json::json!({
+                        "power_source": current.power_source,
+                        "old_source": old,
+                        "new_source": current.power_source,
+                        "ac_online": current.ac_online,
+                        "battery_percent": current.battery_percent,
+                        "has_profile": has_profile,
+                        "capacity_per_day": prof.and_then(|p| p.capacity_per_day),
+                    })));
                 }
             }
         }
@@ -2127,9 +2126,8 @@ async fn handle_calibrate(
         state.completed_at = None;
     }
 
-    let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress {
-        state: serde_json::to_value(&*ctx.benchmark_state.read().await).unwrap_or_default(),
-    });
+    let initial_payload = serde_json::to_value(&*ctx.benchmark_state.read().await).unwrap_or_default();
+    let _ = ctx.events_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress(initial_payload));
 
     let ctx_clone = ctx.clone();
     let power_source_clone = power_source.clone();
@@ -2138,14 +2136,12 @@ async fn handle_calibrate(
         let bstate = ctx_clone.benchmark_state.clone();
         let ev_tx = ctx_clone.events_tx.clone();
 
-        let progress_cb: leadfinder_probe::BenchmarkProgressCallback = {
-            let bstate = bstate.clone();
-            let ev_tx = ev_tx.clone();
-            Arc::new(move |update: leadfinder_probe::BenchmarkProgressUpdate| {
-                let mut st = match bstate.try_write() {
-                    Ok(guard) => guard,
-                    Err(_) => return,
-                };
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<leadfinder_probe::BenchmarkProgressUpdate>();
+        let bstate_worker = bstate.clone();
+        let ev_tx_worker = ev_tx.clone();
+        let updater = tokio::spawn(async move {
+            while let Some(update) = rx.recv().await {
+                let mut st = bstate_worker.write().await;
                 st.current_stage = update.stage.clone();
                 st.stage_index = update.stage_index;
                 st.total_stages = update.total_stages;
@@ -2166,11 +2162,18 @@ async fn handle_calibrate(
                     }
                 }
                 let payload = serde_json::to_value(&*st).unwrap_or_default();
-                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress { state: payload });
+                let _ = ev_tx_worker.send(leadfinder_core::CoreEvent::BenchmarkProgress(payload));
+            }
+        });
+
+        let progress_cb: leadfinder_probe::BenchmarkProgressCallback = {
+            let tx = tx.clone();
+            Arc::new(move |update: leadfinder_probe::BenchmarkProgressUpdate| {
+                let _ = tx.send(update);
             })
         };
 
-        match leadfinder_probe::run_calibration_for_power(
+        let cal_res = leadfinder_probe::run_calibration_for_power(
             &ctx_clone.paths,
             &cfg,
             &ctx_clone.db,
@@ -2178,8 +2181,12 @@ async fn handle_calibrate(
             Some(&power_source_clone),
             Some(progress_cb),
         )
-        .await
-        {
+        .await;
+
+        drop(tx);
+        let _ = updater.await;
+
+        match cal_res {
             Ok(profile) => {
                 let mut st = bstate.write().await;
                 st.is_running = false;
@@ -2198,7 +2205,7 @@ async fn handle_calibrate(
                     power_source_clone.to_uppercase()
                 );
                 let payload = serde_json::to_value(&*st).unwrap_or_default();
-                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress { state: payload });
+                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress(payload));
                 let _ = ev_tx.send(leadfinder_core::CoreEvent::CalibrationUpdated {
                     capacity_per_day: profile.capacity_per_day,
                 });
@@ -2211,7 +2218,7 @@ async fn handle_calibrate(
                 st.status_text = format!("Грешка при калибриране: {e}");
                 st.status_text_en = format!("Calibration failed: {e}");
                 let payload = serde_json::to_value(&*st).unwrap_or_default();
-                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress { state: payload });
+                let _ = ev_tx.send(leadfinder_core::CoreEvent::BenchmarkProgress(payload));
             }
         }
     });
