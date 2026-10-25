@@ -254,6 +254,56 @@ export async function deleteVideo(id: string): Promise<{ ok: boolean }> {
   });
 }
 
+export async function requestSystemShutdown(): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>('/api/system/shutdown', {
+    method: 'POST',
+  });
+}
+
+export async function requestSystemShutdownWhenIdle(): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>('/api/system/shutdown-when-idle', {
+    method: 'POST',
+  });
+}
+
+export async function terminateApplication(): Promise<void> {
+  try {
+    await requestSystemShutdown();
+  } catch {}
+  if ('__TAURI_INTERNALS__' in window) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('terminate_desktop');
+      return;
+    } catch {}
+  }
+}
+
+export async function exitAndRunBackground(): Promise<void> {
+  try {
+    await requestSystemShutdownWhenIdle();
+  } catch {}
+  if ('__TAURI_INTERNALS__' in window) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('exit_and_run_background');
+      return;
+    } catch {}
+  }
+}
+
+export async function listenToExitPrompt(onPrompt: () => void): Promise<() => void> {
+  if ('__TAURI_INTERNALS__' in window) {
+    try {
+      const { listen } = await import('@tauri-apps/api/event');
+      return await listen('request-exit-prompt', () => {
+        onPrompt();
+      });
+    } catch {}
+  }
+  return () => {};
+}
+
 export async function fetchEvidencePreview(url: string): Promise<{ url: string; title: string; text: string; domain: string }> {
   return fetchJson<{ url: string; title: string; text: string; domain: string }>(`/api/evidence/preview?url=${encodeURIComponent(url)}`);
 }
@@ -677,6 +727,10 @@ function getMockFallback<T>(endpoint: string, options: RequestInit): T {
   }
 
   if (endpoint === '/api/settings/gemini-key') {
+    return { ok: true } as T;
+  }
+
+  if (endpoint.startsWith('/api/system/shutdown')) {
     return { ok: true } as T;
   }
 

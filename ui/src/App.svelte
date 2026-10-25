@@ -3,15 +3,18 @@
   import {
     initDesktopConnection,
     deleteVideo,
+    exitAndRunBackground,
     fetchProfile,
     fetchQueueStatus,
     fetchScaleStatus,
     fetchVideos,
+    listenToExitPrompt,
     logDecision,
     openExternalUrl,
     pasteLinks,
     pullMore,
     subscribeSse,
+    terminateApplication,
   } from './lib/api';
   import type { Language } from './lib/i18n';
   import type { Lane, LeadCard, QueueCounts, ScaleStatus, Screen } from './lib/types';
@@ -20,6 +23,7 @@
   import CreatorsScreen from './components/CreatorsScreen.svelte';
   import PeopleScreen from './components/PeopleScreen.svelte';
   import DetailDrawer from './components/DetailDrawer.svelte';
+  import ExitPromptModal from './components/ExitPromptModal.svelte';
   import ExportScreen from './components/ExportScreen.svelte';
   import HelpScreen from './components/HelpScreen.svelte';
   import GoogleAiWizardModal from './components/GoogleAiWizardModal.svelte';
@@ -54,6 +58,7 @@
   let inboxRef = $state<{ focusSearch: () => void } | null>(null);
   let isScanModalOpen = $state(false);
   let isGoogleAiWizardOpen = $state(false);
+  let isExitPromptOpen = $state(false);
 
   onMount(() => {
     const savedTheme = localStorage.getItem('leadfinder_theme') as 'light' | 'dark' | null;
@@ -69,6 +74,7 @@
     }
 
     let unsub: () => void = () => {};
+    let unlistenExit: () => void = () => {};
     let disposed = false;
 
     initDesktopConnection().then(() => {
@@ -77,6 +83,20 @@
       unsub = subscribeSse((event) => {
         handleLiveEvent(event);
       });
+    });
+
+    listenToExitPrompt(() => {
+      const neverAsk = localStorage.getItem('leadfinder_never_ask_exit') === 'true';
+      const savedAction = localStorage.getItem('leadfinder_exit_action');
+      if (neverAsk && savedAction === 'background') {
+        void exitAndRunBackground();
+      } else if (neverAsk && savedAction === 'terminate') {
+        void terminateApplication();
+      } else {
+        isExitPromptOpen = true;
+      }
+    }).then((un) => {
+      unlistenExit = un;
     });
 
     const handleDocumentClick = (e: MouseEvent) => {
@@ -93,6 +113,7 @@
     return () => {
       disposed = true;
       unsub();
+      unlistenExit();
       document.removeEventListener('click', handleDocumentClick);
       window.removeEventListener('keydown', handleGlobalKeydown);
     };
@@ -351,6 +372,7 @@
     onJumpToVideo={handleJumpToVideo}
     onOpenScanModal={() => (isScanModalOpen = true)}
     onOpenGoogleAiWizard={() => (isGoogleAiWizardOpen = true)}
+    onRequestExit={() => (isExitPromptOpen = true)}
     onToggleTheme={toggleTheme}
     onToggleLang={toggleLang}
   />
@@ -435,6 +457,13 @@
       isOpen={isGoogleAiWizardOpen}
       {currentLang}
       onClose={() => (isGoogleAiWizardOpen = false)}
+    />
+
+    <ExitPromptModal
+      isOpen={isExitPromptOpen}
+      {currentLang}
+      {queueCounts}
+      onClose={() => (isExitPromptOpen = false)}
     />
   </main>
 </div>

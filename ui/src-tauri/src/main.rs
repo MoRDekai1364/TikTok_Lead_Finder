@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::{Path, PathBuf};
+use tauri::Emitter;
 
 #[derive(serde::Serialize)]
 struct CoreConnection {
@@ -80,6 +81,26 @@ async fn open_in_webview(app: tauri::AppHandle, url: String) -> Result<(), Strin
     Err("Invalid URL".to_string())
 }
 
+#[tauri::command]
+fn terminate_application(app: tauri::AppHandle) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/IM", "leadfinder.exe", "/T"])
+            .creation_flags(0x08000000)
+            .status();
+    }
+    app.exit(0);
+    std::process::exit(0);
+}
+
+#[tauri::command]
+fn exit_and_run_background(app: tauri::AppHandle) {
+    app.exit(0);
+    std::process::exit(0);
+}
+
 fn ensure_core_running() {
     use std::net::TcpStream;
     use std::time::Duration;
@@ -114,7 +135,19 @@ fn ensure_core_running() {
 fn main() {
     ensure_core_running();
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![core_connection, open_in_browser, open_in_webview])
+        .invoke_handler(tauri::generate_handler![
+            core_connection,
+            open_in_browser,
+            open_in_webview,
+            terminate_application,
+            exit_and_run_background
+        ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.emit("request-exit-prompt", ());
+            }
+        })
         .run(tauri::generate_context!())
         .expect("failed to run tauri desktop application");
 }

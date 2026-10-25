@@ -36,6 +36,7 @@ pub struct PipelineContext {
     pub events_tx: broadcast::Sender<CoreEvent>,
     pub concurrency: Arc<AimdConcurrencyManager>,
     pub quota_guard: Arc<ProviderQuotaGuard>,
+    pub auto_terminate_when_idle: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PipelineContext {
@@ -86,6 +87,7 @@ impl PipelineContext {
             events_tx,
             concurrency,
             quota_guard,
+            auto_terminate_when_idle: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -778,6 +780,7 @@ impl PipelineContext {
         });
 
         tokio::spawn(async move {
+            let mut idle_ticks: usize = 0;
             loop {
                 let counts = self
                     .db
@@ -789,6 +792,7 @@ impl PipelineContext {
 
                 match self.db.claim_next_job(None).await {
                     Ok(Some(job)) => {
+                        idle_ticks = 0;
                         let st_opt = Stage::from_db(&job.stage);
                         let aimd_stage = match st_opt {
                             Some(Stage::ScreenCheap) => AimdStage::ScreenCheap,
@@ -907,6 +911,26 @@ impl PipelineContext {
                         }
                     }
                     _ => {
+                        if self
+                            .auto_terminate_when_idle
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            let counts = self
+                                .db
+                                .queue_counts()
+                                .await
+                                .unwrap_or_else(|_| serde_json::json!({}));
+                            let queued = counts.get("queued").and_then(|v| v.as_i64()).unwrap_or(0);
+                            let running = counts.get("running").and_then(|v| v.as_i64()).unwrap_or(0);
+                            if queued == 0 && running == 0 {
+                                idle_ticks += 1;
+                                if idle_ticks >= 6 {
+                                    std::process::exit(0);
+                                }
+                            } else {
+                                idle_ticks = 0;
+                            }
+                        }
                         tokio::time::sleep(Duration::from_millis(500)).await;
                     }
                 }

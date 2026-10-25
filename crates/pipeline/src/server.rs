@@ -228,6 +228,9 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/settings/gemini-key", post(handle_set_gemini_key).delete(handle_delete_gemini_key))
         .route("/api/export", get(handle_export))
         .route("/api/scale/status", get(handle_scale_status))
+        .route("/api/system/shutdown", post(handle_system_shutdown))
+        .route("/api/system/shutdown-when-idle", post(handle_system_shutdown_when_idle))
+        .route("/api/system/exit-status", get(handle_system_exit_status))
         .route_layer(middleware::from_fn_with_state(ctx.clone(), auth_middleware));
 
     Router::new()
@@ -2209,6 +2212,50 @@ async fn handle_delete_gemini_key(
         "ok": true,
         "configured": false,
         "cloud_enabled": false
+    }))
+    .into_response()
+}
+
+async fn handle_system_shutdown(State(_ctx): State<Arc<PipelineContext>>) -> Response {
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        std::process::exit(0);
+    });
+    Json(serde_json::json!({
+        "ok": true,
+        "terminating": true
+    }))
+    .into_response()
+}
+
+async fn handle_system_shutdown_when_idle(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    ctx.auto_terminate_when_idle
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    let counts = ctx
+        .db
+        .queue_counts()
+        .await
+        .unwrap_or_else(|_| serde_json::json!({}));
+    Json(serde_json::json!({
+        "ok": true,
+        "auto_terminate_enabled": true,
+        "queue_counts": counts
+    }))
+    .into_response()
+}
+
+async fn handle_system_exit_status(State(ctx): State<Arc<PipelineContext>>) -> Response {
+    let auto_term = ctx
+        .auto_terminate_when_idle
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let counts = ctx
+        .db
+        .queue_counts()
+        .await
+        .unwrap_or_else(|_| serde_json::json!({}));
+    Json(serde_json::json!({
+        "auto_terminate_when_idle": auto_term,
+        "queue_counts": counts
     }))
     .into_response()
 }

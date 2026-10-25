@@ -29,9 +29,20 @@
   let isSaving = $state(false);
   let saveSuccess = $state(false);
   let geminiStatus = $state<GeminiStatus | null>(null);
+  let exitBehavior = $state<'ask' | 'background' | 'terminate'>('ask');
 
   onMount(async () => {
     try {
+      const neverAsk = localStorage.getItem('leadfinder_never_ask_exit') === 'true';
+      const savedAction = localStorage.getItem('leadfinder_exit_action');
+      if (neverAsk && savedAction === 'background') {
+        exitBehavior = 'background';
+      } else if (neverAsk && savedAction === 'terminate') {
+        exitBehavior = 'terminate';
+      } else {
+        exitBehavior = 'ask';
+      }
+
       const [settings, gStatus] = await Promise.all([
         fetchSettings(),
         fetchGeminiStatus().catch(() => null),
@@ -58,6 +69,13 @@
         cloud_enabled: cloudEnabled,
         retention_days: retentionDays,
       });
+      if (exitBehavior === 'ask') {
+        localStorage.removeItem('leadfinder_never_ask_exit');
+        localStorage.removeItem('leadfinder_exit_action');
+      } else {
+        localStorage.setItem('leadfinder_never_ask_exit', 'true');
+        localStorage.setItem('leadfinder_exit_action', exitBehavior);
+      }
       saveSuccess = true;
       setTimeout(() => (saveSuccess = false), 3000);
     } finally {
@@ -133,6 +151,24 @@
           ? 'Google AI осигурява над 95% точност при транскрибиране на български говор от TikTok и детайлно факт-чекинг досие. Безплатен план с до 1500 заявки дневно.'
           : 'Google AI enables >95% speech-to-text accuracy in Bulgarian and automated fact dossiers. Free tier with up to 1,500 requests per day.'}
       </p>
+    </div>
+
+    <div class="section-card">
+      <h3>🚪 {currentLang === 'bg' ? 'Поведение при затваряне на прозореца' : 'Window Exit Behavior'}</h3>
+      <div class="form-group">
+        <label class="radio-label">
+          <input type="radio" name="exit_behavior" value="ask" bind:group={exitBehavior} />
+          <span>{currentLang === 'bg' ? 'Винаги питай преди излизане (Препоръчително)' : 'Always prompt before closing (Recommended)'}</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="exit_behavior" value="background" bind:group={exitBehavior} />
+          <span>{currentLang === 'bg' ? 'Продължи на заден план до приключване на задачите и автоматично изключване' : 'Run in background until tasks finish, then auto-terminate'}</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="exit_behavior" value="terminate" bind:group={exitBehavior} />
+          <span>{currentLang === 'bg' ? 'Прекрати напълно и спри всички фонови процеси веднага' : 'Terminate all processes immediately (nothing stays running)'}</span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -213,12 +249,18 @@
     color: var(--text-body);
   }
 
-  .checkbox-label {
+  .checkbox-label,
+  .radio-label {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     cursor: pointer;
     font-size: 0.85rem;
+    color: var(--text-body);
+  }
+
+  .radio-label input[type='radio'] {
+    accent-color: #3b82f6;
   }
 
   .notice-box {
