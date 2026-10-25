@@ -6,7 +6,8 @@
   let activeSection = $state<'signs' | 'actions' | 'lanes' | 'verdicts' | 'dictionary'>('signs');
 </script>
 
-<div class="help-container">
+<div class="help-scroll-wrapper">
+  <div class="help-container">
   <header class="help-header">
     <div class="help-title-group">
       <h1>{currentLang === 'bg' ? 'Помощен център & Ръководство' : 'Help Center & Documentation'}</h1>
@@ -468,8 +469,18 @@ standard = "човек"</code></pre>
     {/if}
   </div>
 </div>
+</div>
 
 <style>
+  .help-scroll-wrapper {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    background: var(--bg-canvas);
+    box-sizing: border-box;
+  }
+
   .help-container {
     max-width: 1040px;
     margin: 0 auto;
@@ -477,6 +488,7 @@ standard = "човек"</code></pre>
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+    box-sizing: border-box;
   }
 
   .help-header {
