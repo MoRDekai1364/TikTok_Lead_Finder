@@ -345,7 +345,11 @@ impl PipelineContext {
         self.db
             .save_transcript(&Transcript {
                 video_id: video.id.clone(),
-                source: tr_record.source,
+                source: if tr_record.source == "found" {
+                    "found".to_string()
+                } else {
+                    "generated".to_string()
+                },
                 engine: Some(tr_record.engine),
                 model: Some(tr_record.model),
                 language: Some(tr_record.language),
@@ -612,9 +616,9 @@ impl PipelineContext {
 
         let ytdlp_source = YtDlpDiscoverySource::new(self.ytdlp.clone());
         let mut target_handles: Vec<String> = Vec::new();
-        let is_keyword_mode = (cfg.target_mode == "keywords" || cfg.target_mode == "hashtags") && !cfg.allow_no_keywords;
+        let is_keyword_mode = (cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" || cfg.target_mode == "general") && !cfg.allow_no_keywords;
 
-        if cfg.target_mode == "watchlist" || cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" || cfg.target_mode == "all" || cfg.target_mode == "no_keywords" {
+        if cfg.target_mode == "watchlist" || cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" {
             let creators = self.db.list_creators().await.unwrap_or_default();
             let mut wl: Vec<String> = creators
                 .into_iter()
@@ -632,6 +636,21 @@ impl PipelineContext {
                     .collect();
             }
             target_handles.extend(wl);
+        } else if cfg.target_mode == "general" || cfg.target_mode == "all" || cfg.target_mode == "no_keywords" {
+            let creators = self.db.list_creators().await.unwrap_or_default();
+            let mut all_creators: Vec<String> = creators
+                .into_iter()
+                .map(|c| c.handle.trim().trim_start_matches('@').to_lowercase())
+                .filter(|h| !h.is_empty())
+                .collect();
+            let seeds = self.db.list_seeds(true).await.unwrap_or_default();
+            for s in seeds.into_iter().filter(|s| s.kind == "creator") {
+                let clean = s.value.trim().trim_start_matches('@').to_lowercase();
+                if !clean.is_empty() && !all_creators.contains(&clean) {
+                    all_creators.push(clean);
+                }
+            }
+            target_handles.extend(all_creators);
         }
 
         if cfg.target_mode == "creators" {
@@ -787,13 +806,21 @@ impl PipelineContext {
             loop {
                 tokio::time::sleep(Duration::from_secs(60)).await;
                 let _ = maintenance_ctx.db.recover_stalled_jobs(300).await;
-                let cfg = maintenance_ctx.config.read().await.clone();
-                let _ = run_media_retention_janitor(
-                    &maintenance_ctx.db,
-                    &maintenance_ctx.media_root(),
-                    cfg.funnel.retention_days,
-                )
+                let ctx = Arc::clone(&maintenance_ctx);
+                let outcome = supervise_job(async move {
+                    let cfg = ctx.config.read().await.clone();
+                    let _ = run_media_retention_janitor(
+                        &ctx.db,
+                        &ctx.media_root(),
+                        cfg.funnel.retention_days,
+                    )
+                    .await;
+                    Ok::<(), anyhow::Error>(())
+                })
                 .await;
+                if let Err(err) = outcome {
+                    tracing::error!("maintenance task failed: {err}");
+                }
             }
         });
 
@@ -806,7 +833,14 @@ impl PipelineContext {
                     c.discovery.automated_discovery_enabled
                 };
                 if is_enabled {
-                    let _ = discovery_ctx.run_automated_discovery(5).await;
+                    let ctx = Arc::clone(&discovery_ctx);
+                    let outcome = supervise_job(async move {
+                        ctx.run_automated_discovery(5).await.map(|_| ())
+                    })
+                    .await;
+                    if let Err(err) = outcome {
+                        tracing::error!("discovery task failed: {err}");
+                    }
                 }
                 tokio::time::sleep(Duration::from_secs(1800)).await;
             }
@@ -837,121 +871,126 @@ impl PipelineContext {
 
                         let permit = self.concurrency.acquire_permit(aimd_stage).await;
 
+                        let worker_ctx = Arc::clone(&self);
                         let job_ctx = Arc::clone(&self);
-                        let job_vid = job.video_id.clone();
+                        let task_vid = job.video_id.clone();
+                        let result_vid = job.video_id.clone();
                         let job_st = st_opt;
-                        let job_task = tokio::spawn(async move {
-                            match job_st {
-                                Some(Stage::ScreenCheap) => {
-                                    if let Some(vid) = &job_vid {
-                                        job_ctx.run_screen_cheap_job(vid).await
-                                    } else {
-                                        Ok(())
+                        let job_id = job.id;
+                        let job_stage = job.stage.clone();
+                        let job_clone = job.clone();
+
+                        tokio::spawn(async move {
+                            let job_task = supervise_job(async move {
+                                match job_st {
+                                    Some(Stage::ScreenCheap) => {
+                                        if let Some(vid) = &task_vid {
+                                            job_ctx.run_screen_cheap_job(vid).await
+                                        } else {
+                                            Ok(())
+                                        }
+                                    }
+                                    Some(Stage::Acquire) | Some(Stage::Extract) => {
+                                        if let Some(vid) = &task_vid {
+                                            job_ctx.process_single_video(vid).await.map(|_| ())
+                                        } else {
+                                            Ok(())
+                                        }
+                                    }
+                                    Some(Stage::Claims) | Some(Stage::Checkworthy) => {
+                                        if let Some(vid) = &task_vid {
+                                            job_ctx.run_claims_job(vid).await
+                                        } else {
+                                            Ok(())
+                                        }
+                                    }
+                                    Some(Stage::Verify) => {
+                                        if let Some(vid) = &task_vid {
+                                            job_ctx.run_verify_job(vid).await
+                                        } else {
+                                            Ok(())
+                                        }
+                                    }
+                                    Some(Stage::ResearchMore) => {
+                                        if let Some(vid) = &task_vid {
+                                            job_ctx.run_research_more_job(vid).await
+                                        } else {
+                                            Ok(())
+                                        }
+                                    }
+                                    _ => Ok(()),
+                                }
+                            });
+
+                            let res = job_task.await;
+
+                            match res {
+                                Ok(()) => {
+                                    permit.finish(true).await;
+                                    let _ = worker_ctx.db.complete_job(job_id).await;
+                                    worker_ctx.emit(CoreEvent::JobUpdated {
+                                        job_id,
+                                        video_id: result_vid.clone(),
+                                        stage: job_stage,
+                                        status: "succeeded".to_string(),
+                                    });
+                                    if let Some(vid) = &result_vid {
+                                        if let Ok(Some(v)) = worker_ctx.db.get_video(vid).await {
+                                            worker_ctx.emit(CoreEvent::VideoUpdated {
+                                                video_id: vid.clone(),
+                                                state: v.state,
+                                                lane: v.lane,
+                                            });
+                                        }
                                     }
                                 }
-                                Some(Stage::Acquire) | Some(Stage::Extract) => {
-                                    if let Some(vid) = &job_vid {
-                                        job_ctx.process_single_video(vid).await.map(|_| ())
+                                Err(err) => {
+                                    permit.finish(false).await;
+                                    let err_str = err.to_string();
+                                    let is_quota = err_str.contains("429")
+                                        || err_str.contains("quota")
+                                        || err_str.contains("RateLimited")
+                                        || err_str.contains("QuotaExhausted");
+
+                                    if is_quota {
+                                        let provider_err = ProviderError::new(
+                                            ProviderErrorKind::QuotaExhausted,
+                                            "llm",
+                                            &err_str,
+                                            false,
+                                        );
+                                        let chain = vec![
+                                            "local".to_string(),
+                                            "gemini".to_string(),
+                                            "heuristics".to_string(),
+                                        ];
+                                        let _ = worker_ctx
+                                            .quota_guard
+                                            .handle_error(
+                                                "local",
+                                                "BgGPT",
+                                                &provider_err,
+                                                &chain,
+                                                &worker_ctx.db,
+                                                &job_clone,
+                                            )
+                                            .await;
                                     } else {
-                                        Ok(())
+                                        let _ = worker_ctx
+                                            .db
+                                            .fail_or_retry_job(&job_clone, &err_str, 3, true)
+                                            .await;
                                     }
+
+                                    worker_ctx.emit(CoreEvent::JobUpdated {
+                                        job_id,
+                                        video_id: result_vid.clone(),
+                                        stage: job_stage,
+                                        status: "failed".to_string(),
+                                    });
                                 }
-                                Some(Stage::Claims) | Some(Stage::Checkworthy) => {
-                                    if let Some(vid) = &job_vid {
-                                        job_ctx.run_claims_job(vid).await
-                                    } else {
-                                        Ok(())
-                                    }
-                                }
-                                Some(Stage::Verify) => {
-                                    if let Some(vid) = &job_vid {
-                                        job_ctx.run_verify_job(vid).await
-                                    } else {
-                                        Ok(())
-                                    }
-                                }
-                                Some(Stage::ResearchMore) => {
-                                    if let Some(vid) = &job_vid {
-                                        job_ctx.run_research_more_job(vid).await
-                                    } else {
-                                        Ok(())
-                                    }
-                                }
-                                _ => Ok(()),
                             }
                         });
-
-                        let res = match job_task.await {
-                            Ok(r) => r,
-                            Err(panic_err) => Err(anyhow::anyhow!("Worker panic: {panic_err}")),
-                        };
-
-                        match res {
-                            Ok(()) => {
-                                permit.finish(true).await;
-                                let _ = self.db.complete_job(job.id).await;
-                                self.emit(CoreEvent::JobUpdated {
-                                    job_id: job.id,
-                                    video_id: job.video_id.clone(),
-                                    stage: job.stage,
-                                    status: "succeeded".to_string(),
-                                });
-                                if let Some(vid) = &job.video_id {
-                                    if let Ok(Some(v)) = self.db.get_video(vid).await {
-                                        self.emit(CoreEvent::VideoUpdated {
-                                            video_id: vid.clone(),
-                                            state: v.state,
-                                            lane: v.lane,
-                                        });
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                permit.finish(false).await;
-                                let err_str = err.to_string();
-                                let is_quota = err_str.contains("429")
-                                    || err_str.contains("quota")
-                                    || err_str.contains("RateLimited")
-                                    || err_str.contains("QuotaExhausted");
-
-                                if is_quota {
-                                    let provider_err = ProviderError::new(
-                                        ProviderErrorKind::QuotaExhausted,
-                                        "llm",
-                                        &err_str,
-                                        false,
-                                    );
-                                    let chain = vec![
-                                        "local".to_string(),
-                                        "gemini".to_string(),
-                                        "heuristics".to_string(),
-                                    ];
-                                    let _ = self
-                                        .quota_guard
-                                        .handle_error(
-                                            "local",
-                                            "BgGPT",
-                                            &provider_err,
-                                            &chain,
-                                            &self.db,
-                                            &job,
-                                        )
-                                        .await;
-                                } else {
-                                    let _ = self
-                                        .db
-                                        .fail_or_retry_job(&job, &err_str, 3, true)
-                                        .await;
-                                }
-
-                                self.emit(CoreEvent::JobUpdated {
-                                    job_id: job.id,
-                                    video_id: job.video_id.clone(),
-                                    stage: job.stage,
-                                    status: "failed".to_string(),
-                                });
-                            }
-                        }
                     }
                     _ => {
                         if self
@@ -1050,6 +1089,16 @@ pub struct CustomScanConfig {
     pub allow_no_keywords: bool,
 }
 
+pub(crate) async fn supervise_job<F>(job: F) -> Result<()>
+where
+    F: std::future::Future<Output = Result<()>> + Send + 'static,
+{
+    match tokio::spawn(job).await {
+        Ok(r) => r,
+        Err(panic_err) => Err(anyhow::anyhow!("Worker panic: {panic_err}")),
+    }
+}
+
 fn default_target_mode() -> String {
     "watchlist".to_string()
 }
@@ -1084,4 +1133,22 @@ pub struct VideoRefSummary {
     pub likes: Option<i64>,
     pub posted_at: Option<String>,
     pub duration_s: Option<f64>,
+}
+#[cfg(test)]
+mod supervise_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn panicking_job_becomes_error_and_next_job_still_runs() {
+        let first = supervise_job(async {
+            if true {
+                panic!("boom");
+            }
+            Ok::<(), anyhow::Error>(())
+        })
+        .await;
+        assert!(first.unwrap_err().to_string().contains("Worker panic"));
+        let second = supervise_job(async { Ok::<(), anyhow::Error>(()) }).await;
+        assert!(second.is_ok());
+    }
 }

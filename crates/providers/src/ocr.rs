@@ -140,9 +140,11 @@ impl Ocr for TesseractOcr {
             )
         })?;
 
+        let futures = frames.iter().map(|frame| self.ocr_single_frame(bin, frame));
+        let results = futures::future::join_all(futures).await;
         let mut raw_lines = Vec::new();
-        for frame in frames {
-            if let Ok(Some(line)) = self.ocr_single_frame(bin, frame).await {
+        for res in results {
+            if let Ok(Some(line)) = res {
                 raw_lines.push(line);
             }
         }

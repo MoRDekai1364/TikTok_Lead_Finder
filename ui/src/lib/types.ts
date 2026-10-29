@@ -323,7 +323,7 @@ export function formatVerdictDisplay(verdict: string | null | undefined, label: 
 }
 
 export interface CustomScanConfig {
-  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags' | 'all' | 'no_keywords';
+  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags' | 'all' | 'no_keywords' | 'general';
   targets?: string[];
   allow_no_keywords?: boolean;
   max_per_target?: number;

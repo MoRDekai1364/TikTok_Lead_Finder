@@ -18,9 +18,10 @@
     onScanComplete?: () => void;
   } = $props();
 
-  let targetMode = $state<'watchlist' | 'creators' | 'keywords'>('watchlist');
+  let targetMode = $state<'watchlist' | 'creators' | 'keywords' | 'general'>('watchlist');
   let customTargetsText = $state('');
   let keywordQuery = $state('');
+  let generalQuery = $state('');
   let allowNoKeywords = $state(false);
   let maxPerTarget = $state(5);
   let minViewsChoice = $state(0);
@@ -78,9 +79,10 @@
       maxTargetsChoice = 5;
       autoProcess = true;
     } else if (name === 'open') {
-      targetMode = 'watchlist';
+      targetMode = 'general';
       allowNoKeywords = true;
       keywordQuery = '';
+      generalQuery = '';
       maxPerTarget = 5;
       minViewsChoice = 0;
       recencyDays = 7;
@@ -120,6 +122,16 @@
           isScanning = false;
           stopTimer();
           return;
+        }
+      } else if (targetMode === 'general') {
+        if (!allowNoKeywords && generalQuery.trim().length > 0) {
+          targets = generalQuery
+            .split(/[\n,;]+/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+        } else {
+          targets = [];
+          allowNoKeywords = true;
         }
       } else if (targetMode === 'keywords') {
         if (!allowNoKeywords && keywordQuery.trim().length > 0) {
@@ -228,6 +240,24 @@
               1. {currentLang === 'bg' ? 'Цел на сканирането' : 'Scan Target'}
             </h4>
             <div class="target-mode-selector">
+              <label class="mode-card" class:active={targetMode === 'general'}>
+                <input
+                  type="radio"
+                  name="target_mode"
+                  value="general"
+                  checked={targetMode === 'general'}
+                  onchange={() => (targetMode = 'general')}
+                />
+                <div class="mode-info">
+                  <span class="mode-name">🌐 {currentLang === 'bg' ? 'Общо търсене (General Search)' : 'General Search'}</span>
+                  <span class="mode-desc">
+                    {currentLang === 'bg'
+                      ? 'Търсене в TikTok по тема, личност или отворено обхождане на всички източници и автори'
+                      : 'Search TikTok by topic, entity, or open scan across all sources and creators'}
+                  </span>
+                </div>
+              </label>
+
               <label class="mode-card" class:active={targetMode === 'watchlist'}>
                 <input
                   type="radio"
@@ -282,6 +312,35 @@
                 </div>
               </label>
             </div>
+
+            {#if targetMode === 'general'}
+              <div class="input-subgroup">
+                <div class="field-label-row">
+                  <label for="general-query" class="field-label">
+                    {currentLang === 'bg' ? 'Тема / Ключова фраза за общо търсене (по избор):' : 'Topic / Search phrase for general search (optional):'}
+                  </label>
+                  <label class="toggle-pill-label">
+                    <input type="checkbox" bind:checked={allowNoKeywords} />
+                    <span>⚡ {currentLang === 'bg' ? 'Без филтър (общо обхождане)' : 'No filter (broad scan)'}</span>
+                  </label>
+                </div>
+                <input
+                  id="general-query"
+                  type="text"
+                  class="custom-input"
+                  placeholder={allowNoKeywords
+                    ? (currentLang === 'bg' ? 'Широко обхождане на всички източници и автори без ограничение...' : 'Broad scan across all sources and creators without filter...')
+                    : (currentLang === 'bg' ? 'избори, протест, Румен Радев, бюджет, инфлация (или оставете празно)' : 'elections, protest, budget, inflation (or leave blank)')}
+                  disabled={allowNoKeywords}
+                  bind:value={generalQuery}
+                />
+                <span class="field-hint">
+                  {allowNoKeywords || generalQuery.trim().length === 0
+                    ? (currentLang === 'bg' ? '✓ Общо търсене: скенерът ще обходи всички достъпни автори и източници без тематични ограничения.' : '✓ General search: scanner will traverse all available creators and sources without topical restrictions.')
+                    : (currentLang === 'bg' ? '✓ Търсене в заглавия, хаштагове и описания сред цялата мрежа от източници и автори.' : '✓ Searching titles, hashtags and captions across the entire network of sources and creators.')}
+                </span>
+              </div>
+            {/if}
 
             {#if targetMode === 'creators'}
               <div class="input-subgroup">
@@ -479,7 +538,7 @@
                   <button
                     type="button"
                     class="pill-choice"
-                    class:active={allowNoKeywords || (targetMode === 'keywords' && keywordQuery.trim().length === 0) || targetMode !== 'keywords'}
+                    class:active={allowNoKeywords}
                     onclick={() => {
                       allowNoKeywords = true;
                     }}
@@ -489,9 +548,8 @@
                   <button
                     type="button"
                     class="pill-choice"
-                    class:active={!allowNoKeywords && targetMode === 'keywords' && keywordQuery.trim().length > 0}
+                    class:active={!allowNoKeywords}
                     onclick={() => {
-                      targetMode = 'keywords';
                       allowNoKeywords = false;
                     }}
                   >

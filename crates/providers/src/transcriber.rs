@@ -136,7 +136,7 @@ impl Transcriber for CaptionFirstTranscriber {
                                         .unwrap_or("google_speech")
                                         .to_string();
                                     let mut rec = TranscriptRecord {
-                                        source: "asr".to_string(),
+                                        source: "generated".to_string(),
                                         engine: "google_ai_speech".to_string(),
                                         model: src_model,
                                         language: "bg".to_string(),

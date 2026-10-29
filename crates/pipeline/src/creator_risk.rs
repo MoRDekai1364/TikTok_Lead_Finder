@@ -67,13 +67,16 @@ pub async fn assess_creator_risk(
         .build()
         .unwrap_or_else(|_| Client::new());
 
+    let mut factcheck_ok = false;
+    let mut bnt_ok = false;
     let mut web_sources: Vec<CreatorWebSource> = Vec::new();
     let mut seen_urls: HashSet<String> = HashSet::new();
 
     let encoded_handle: String = url::form_urlencoded::byte_serialize(clean_handle.as_bytes()).collect();
     let factcheck_search_url = format!("https://factcheck.bg/?s={}", encoded_handle);
-    if let Ok(resp) = client.get(&factcheck_search_url).send().await {
+    if let Some(resp) = client.get(&factcheck_search_url).send().await.ok().filter(|r| r.status().is_success()) {
         if let Ok(html) = resp.text().await {
+            factcheck_ok = true;
             let re_article = Regex::new(r#"(?is)<h[23][^>]*class="[^"]*entry-title[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([^<]+)</a>"#).unwrap();
             for cap in re_article.captures_iter(&html).take(6) {
                 let link = cap[1].trim().to_string();
@@ -92,8 +95,9 @@ pub async fn assess_creator_risk(
     }
 
     let bnt_search_url = format!("https://bntnews.bg/search?q={}", encoded_handle);
-    if let Ok(resp) = client.get(&bnt_search_url).send().await {
+    if let Some(resp) = client.get(&bnt_search_url).send().await.ok().filter(|r| r.status().is_success()) {
         if let Ok(html) = resp.text().await {
+            bnt_ok = true;
             let re_bnt = Regex::new(r#"(?is)<a[^>]+href="([^"]*bntnews\.bg/[^"]+)"[^>]*title="([^"]+)"#).unwrap();
             for cap in re_bnt.captures_iter(&html).take(4) {
                 let link = cap[1].trim().to_string();
@@ -153,6 +157,19 @@ pub async fn assess_creator_risk(
         }
     }
 
+    let mut unreachable: Vec<&str> = Vec::new();
+    if !factcheck_ok {
+        unreachable.push("factcheck.bg");
+    }
+    if !bnt_ok {
+        unreachable.push("bntnews.bg");
+    }
+    let sources_note = if unreachable.is_empty() {
+        String::new()
+    } else {
+        format!(" Недостъпни източници: {}.", unreachable.join(", "))
+    };
+
     let mut factcheck_count = 0i64;
     let mut risk_keyword_count = 0i64;
 
@@ -194,7 +211,7 @@ pub async fn assess_creator_risk(
         (0.20 + (web_sources.len() as f64 * 0.07) + (factcheck_count as f64 * 0.20)).clamp(0.15, 0.95)
     };
 
-    let raw_confidence = (db_sample_score * 0.40 + web_sample_score * 0.60).clamp(0.10, 0.95);
+    let raw_confidence = (db_sample_score * 0.40 + web_sample_score * 0.60).clamp(0.10, if factcheck_ok { 0.95 } else { 0.50 });
     let confidence = (raw_confidence * 100.0).round() / 100.0;
 
     let confidence_level = if confidence >= 0.70 {
@@ -221,7 +238,7 @@ pub async fn assess_creator_risk(
             web_sources.len()
         );
         ("moderate".to_string(), score, rat)
-    } else if total_videos >= 3 && contradicted_claims == 0 && supported_claims >= 1 {
+    } else if total_videos >= 3 && contradicted_claims == 0 && supported_claims >= 1 && factcheck_ok {
         let score = 0.15;
         let rat = format!(
             "Установена положителна история от {} видеа с потвърдени твърдения в базата данни и липса на фактчек опровержения.",
@@ -266,8 +283,8 @@ pub async fn assess_creator_risk(
         risk_score: (risk_score * 100.0).round() / 100.0,
         confidence,
         confidence_level,
-        confidence_reason,
-        rationale,
+        confidence_reason: format!("{confidence_reason}{sources_note}"),
+        rationale: format!("{rationale}{sources_note}"),
         web_sources,
         local_stats: CreatorLocalStats {
             total_videos,
