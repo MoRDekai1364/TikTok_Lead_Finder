@@ -45,6 +45,23 @@ impl TesseractOcr {
         }
     }
 
+        async fn ocr_with_prep(&self, bin: &Path, frame: &FrameSample) -> Result<Vec<OcrLine>, ProviderError> {
+        let mut lines = Vec::new();
+        for band in prepare_frame_bands(frame) {
+            let res = self.ocr_single_frame(bin, &band).await;
+            let _ = std::fs::remove_file(&band.image_path);
+            if let Ok(Some(line)) = res {
+                lines.push(line);
+            }
+        }
+        if lines.is_empty() {
+            if let Ok(Some(line)) = self.ocr_single_frame(bin, frame).await {
+                lines.push(line);
+            }
+        }
+        Ok(lines)
+    }
+
     pub fn is_available(&self) -> bool {
         self.binary_path.is_some()
     }
@@ -56,7 +73,7 @@ impl TesseractOcr {
             .arg("-l")
             .arg(&self.languages)
             .arg("--psm")
-            .arg("6");
+            .arg("11");
 
         if let Some(td) = &self.tessdata_dir {
             cmd.arg("--tessdata-dir").arg(td);
@@ -97,7 +114,7 @@ impl TesseractOcr {
             if cols.len() >= 12 {
                 let conf = cols[10].parse::<f64>().unwrap_or(-1.0);
                 let word = cols[11].trim();
-                if conf >= 42.0 && !word.is_empty() && word.chars().any(|c| c.is_alphanumeric()) {
+                if conf >= 30.0 && !word.is_empty() && word.chars().any(|c| c.is_alphanumeric()) {
                     words.push(word.to_string());
                     confs.push(conf / 100.0);
                 }
@@ -112,7 +129,7 @@ impl TesseractOcr {
             return Ok(None);
         }
         let mean_conf = confs.iter().sum::<f64>() / confs.len() as f64;
-        if mean_conf < 0.45 {
+        if mean_conf < 0.35 {
             return Ok(None);
         }
 
@@ -140,12 +157,12 @@ impl Ocr for TesseractOcr {
             )
         })?;
 
-        let futures = frames.iter().map(|frame| self.ocr_single_frame(bin, frame));
-        let results = futures::future::join_all(futures).await;
+        let futures = futures::stream::iter(frames.iter().map(|frame| self.ocr_with_prep(bin, frame)));
+        let results: Vec<_> = futures::StreamExt::collect(futures::StreamExt::buffer_unordered(futures, 4)).await;
         let mut raw_lines = Vec::new();
         for res in results {
-            if let Ok(Some(line)) = res {
-                raw_lines.push(line);
+            if let Ok(lines) = res {
+                raw_lines.extend(lines);
             }
         }
 
@@ -200,7 +217,7 @@ impl Ocr for PaddleOnnxOcr {
             .collect();
         let payload_json = serde_json::to_string(&payload).unwrap_or_else(|_| "[]".to_string());
 
-        let script = "import sys, json\nfrom rapidocr_onnxruntime import RapidOCR\nengine = RapidOCR()\nitems = json.loads(sys.stdin.read())\nout = []\nfor it in items:\n    res, _ = engine(it['path'])\n    if res:\n        txts = [r[1].strip() for r in res if float(r[2]) >= 0.45 and len(r[1].strip()) > 0]\n        confs = [float(r[2]) for r in res if float(r[2]) >= 0.45 and len(r[1].strip()) > 0]\n        if txts:\n            joined = ' '.join(txts)\n            if sum(c.isalnum() for c in joined) >= 3:\n                out.append({'frame_ms': it['frame_ms'], 'text': joined, 'confidence': round(sum(confs)/len(confs), 3)})\nprint(json.dumps(out, ensure_ascii=False))\n";
+        let script = "import sys, json\nfrom rapidocr_onnxruntime import RapidOCR\ndef make_engine():\n    try:\n        from huggingface_hub import hf_hub_download\n        repo = 'monkt/paddleocr-onnx'\n        return RapidOCR(det_model_path=hf_hub_download(repo, 'detection/v5/det.onnx'), rec_model_path=hf_hub_download(repo, 'languages/eslav/rec.onnx'), rec_keys_path=hf_hub_download(repo, 'languages/eslav/dict.txt'))\n    except Exception:\n        return RapidOCR()\nengine = make_engine()\nitems = json.loads(sys.stdin.read())\nout = []\nfor it in items:\n    res, _ = engine(it['path'])\n    if res:\n        txts = [r[1].strip() for r in res if float(r[2]) >= 0.45 and len(r[1].strip()) > 0]\n        confs = [float(r[2]) for r in res if float(r[2]) >= 0.45 and len(r[1].strip()) > 0]\n        if txts:\n            joined = ' '.join(txts)\n            if sum(c.isalnum() for c in joined) >= 3:\n                out.append({'frame_ms': it['frame_ms'], 'text': joined, 'confidence': round(sum(confs)/len(confs), 3)})\nprint(json.dumps(out, ensure_ascii=False))\n";
 
         let mut cmd = Command::new(py);
         cmd.args(["-c", script])
@@ -247,8 +264,94 @@ impl Ocr for PaddleOnnxOcr {
     }
 }
 
-pub fn deduplicate_ocr_lines(lines: Vec<OcrLine>, similarity_threshold: f64) -> Vec<OcrLine> {
+fn prepare_frame_bands(frame: &FrameSample) -> Vec<FrameSample> {
+    use std::hash::{Hash, Hasher};
+    let img = match image::open(&frame.image_path) {
+        Ok(i) => i,
+        Err(_) => return Vec::new(),
+    };
+    let gray = img.grayscale();
+    let (w, h) = (gray.width(), gray.height());
+    let scale = if w < 1400 { 2 } else { 1 };
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    frame.image_path.hash(&mut hasher);
+    let key = hasher.finish();
+    let spans: [(f32, f32); 3] = [(0.0, 0.38), (0.31, 0.69), (0.62, 1.0)];
+    let mut out = Vec::new();
+    for (idx, &(a, b)) in spans.iter().enumerate() {
+        let y0 = (h as f32 * a) as u32;
+        let y1 = ((h as f32 * b) as u32).min(h);
+        if y1 <= y0 + 8 {
+            continue;
+        }
+        let band_h = y1 - y0;
+        let crop = gray.crop_imm(0, y0, w, band_h);
+        let resized = if scale > 1 {
+            crop.resize_exact(w * scale, band_h * scale, image::imageops::FilterType::Lanczos3)
+        } else {
+            crop
+        };
+        let mut luma = resized.to_luma8();
+        image::imageops::contrast_in_place(&mut luma, 30.0);
+        let path = std::env::temp_dir().join(format!("lf_ocr_{:x}_{}.png", key, idx));
+        if luma.save(&path).is_ok() {
+            out.push(FrameSample {
+                frame_ms: frame.frame_ms,
+                image_path: path,
+            });
+        }
+    }
+    out
+}
+
+#[derive(Clone)]
+pub struct CombinedOcr {
+    tesseract: TesseractOcr,
+    paddle: PaddleOnnxOcr,
+    dedup_similarity: f64,
+}
+
+impl CombinedOcr {
+    pub fn new(paths: &RuntimePaths, cfg: &ExtractionConfig) -> Self {
+        Self {
+            tesseract: TesseractOcr::new(paths, cfg),
+            paddle: PaddleOnnxOcr::new(paths, cfg),
+            dedup_similarity: cfg.ocr_dedup_similarity,
+        }
+    }
+}
+
+#[async_trait]
+impl Ocr for CombinedOcr {
+    fn name(&self) -> &str {
+        "combined"
+    }
+
+    async fn extract_frames(&self, frames: &[FrameSample]) -> Result<Vec<OcrLine>, ProviderError> {
+        let (t, p) = tokio::join!(
+            self.tesseract.extract_frames(frames),
+            self.paddle.extract_frames(frames)
+        );
+        let mut merged: Vec<OcrLine> = Vec::new();
+        let mut failures: Vec<ProviderError> = Vec::new();
+        for res in [p, t] {
+            match res {
+                Ok(v) => merged.extend(v),
+                Err(e) => failures.push(e),
+            }
+        }
+        if merged.is_empty() && failures.len() == 2 {
+            return Err(failures.remove(0));
+        }
+        merged.sort_by_key(|l| l.frame_ms);
+        Ok(deduplicate_ocr_lines(merged, self.dedup_similarity))
+    }
+}
+
+pub fn deduplicate_ocr_lines(lines: Vec<OcrLine>, similarity_threshold: f64) -> Vec<OcrLine> {  
     let mut kept: Vec<OcrLine> = Vec::new();
+    let mut lines = lines;
+    lines.sort_by_key(|l| l.frame_ms);
     for candidate in lines {
         let cand_norm = normalize_ocr_text(&candidate.text);
         if cand_norm.len() < 3 {

@@ -409,6 +409,7 @@
           <select bind:value={ocrOverride}>
             <option value="tesseract">Tesseract (bul+eng)</option>
             <option value="paddle_onnx">PaddleOCR ONNX (RapidOCR)</option>
+            <option value="combined">Tesseract + RapidOCR (combined)</option>
           </select>
         </label>
 

@@ -14,7 +14,7 @@ use leadfinder_core::{
     VideoSource, VideoState,
 };
 use leadfinder_providers::{
-    compute_wer, CaptionFirstTranscriber, MediaAcquirer, PaddleOnnxOcr, PasteLinkSource,
+    compute_wer, CaptionFirstTranscriber, CombinedOcr, MediaAcquirer, PaddleOnnxOcr, PasteLinkSource,
     TesseractOcr, WhisperCppTranscriber, YtDlpClient, YtDlpDiscoverySource,
 };
 
@@ -360,7 +360,16 @@ impl PipelineContext {
             })
             .await?;
 
-        let ocr_lines = if cfg.providers.ocr_engine == "paddle_onnx" {
+        let ocr_lines = if cfg.providers.ocr_engine == "combined" {
+            let c = CombinedOcr::new(&self.paths, &cfg.extraction);
+            match c.extract_frames(&acquired.keyframes).await {
+                Ok(lines) => lines,
+                Err(e) => {
+                    tracing::warn!("ocr failed: {}", e);
+                    Vec::new()
+                }
+            }
+        } else if cfg.providers.ocr_engine == "paddle_onnx" {
             let p = PaddleOnnxOcr::new(&self.paths, &cfg.extraction);
             p.extract_frames(&acquired.keyframes).await.unwrap_or_default()
         } else {

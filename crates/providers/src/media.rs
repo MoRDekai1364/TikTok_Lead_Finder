@@ -196,7 +196,7 @@ impl MediaAcquirer {
         let max_frames = extraction_cfg.max_keyframes.max(1);
         let frame_pattern = frames_dir.join("frame_%03d.jpg");
         if collect_keyframes(&frames_dir, interval).is_empty() {
-            let vf_filter = format!("fps=1/{interval},scale='min(720,iw)':-2");
+            let vf_filter = format!("fps=1/{interval},scale='min(1080,iw)':-2");
             let max_str = max_frames.to_string();
             let mut fcmd = Command::new(ffmpeg);
             fcmd.args([

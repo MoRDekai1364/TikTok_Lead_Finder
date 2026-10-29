@@ -232,7 +232,7 @@
 <div class="people-screen">
   <header class="screen-header">
     <div class="header-titles">
-      <h2>👥 {currentLang === 'bg' ? 'Регистър на публични личности и профилиране' : 'People Registry & OSINT Profiling'}</h2>
+      <h2>👥 {currentLang === 'bg' ? 'Регистър на засечените обекти и профилиране' : 'Detected Objects Registry & OSINT Profiling'}</h2>
       <p class="header-desc">
         {currentLang === 'bg'
           ? 'Постоянен каталог на засечени политици, магистрати, лекари и общественици с рейтинг за приоритизиране, неограничени тагове и дълбоко разузнаване.'

@@ -23,9 +23,9 @@ yt_dlp_timeout_seconds = 45
 [extraction]
 ffmpeg_timeout_seconds = 120
 whisper_timeout_seconds = 300
-ocr_timeout_seconds = 60
-keyframe_interval_seconds = 3
-max_keyframes = 20
+ocr_timeout_seconds = 300
+keyframe_interval_seconds = 2
+max_keyframes = 45
 ocr_languages = ['bul', 'eng']
 ocr_dedup_similarity = 0.85
 
@@ -99,7 +99,7 @@ local_llm_model = 'BgGPT-Gemma-3-4B-IT-Q4_K_M.gguf'
 gemini_model = 'gemini-2.5-flash'
 transcriber_engine = 'google_ai_first'
 whisper_model = 'large-v3-turbo'
-ocr_engine = 'tesseract'
+ocr_engine = 'combined'
 searxng_url = ''
 
 [verification]
