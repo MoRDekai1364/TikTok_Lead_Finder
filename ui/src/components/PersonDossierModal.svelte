@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Language } from '../lib/i18n';
-  import type { Person, DetailedPersonProfile } from '../lib/types';
-  import { researchPerson } from '../lib/api';
+  import type { Person, DetailedPersonProfile, EntityIntelEvent, SanctionsMatch, EntityPivotRef } from '../lib/types';
+  import { researchPerson, fetchPersonIntelStream, refreshPersonIntelStream, fetchPersonSanctions } from '../lib/api';
 
   let {
     person,
@@ -15,9 +15,57 @@
     onResearchTrigger?: (p: Person) => Promise<void>;
   } = $props();
 
-  let activeTab = $state<'report' | 'categories'>('report');
+  let activeTab = $state<'report' | 'intel_stream' | 'sanctions' | 'categories'>('report');
   let isResearching = $state(false);
   let toastMsg = $state<string | null>(null);
+  let searchFilter = $state('');
+  let intelEvents = $state<EntityIntelEvent[]>([]);
+  let isRefreshingIntel = $state(false);
+  let liveSanctions = $state<SanctionsMatch[]>([]);
+  let sanctionsCheckedAt = $state<string | null>(null);
+  let isCheckingSanctions = $state(false);
+
+  $effect(() => {
+    if (person?.id) {
+      loadIntelStream();
+      loadSanctionsRadar();
+    }
+  });
+
+  async function loadIntelStream() {
+    if (!person) return;
+    try {
+      intelEvents = await fetchPersonIntelStream(person.id);
+    } catch {
+    }
+  }
+
+  async function triggerRefreshIntel() {
+    if (!person || isRefreshingIntel) return;
+    isRefreshingIntel = true;
+    try {
+      const res = await refreshPersonIntelStream(person.id);
+      intelEvents = res.events;
+      showToast(currentLang === 'bg' ? `✓ Открити ${res.newly_added} нови събития!` : `✓ Discovered ${res.newly_added} new events!`);
+    } catch {
+      showToast(currentLang === 'bg' ? 'Грешка при обновяване на потока' : 'Error refreshing stream');
+    } finally {
+      isRefreshingIntel = false;
+    }
+  }
+
+  async function loadSanctionsRadar() {
+    if (!person) return;
+    isCheckingSanctions = true;
+    try {
+      const res = await fetchPersonSanctions(person.id);
+      liveSanctions = res.matches;
+      sanctionsCheckedAt = res.checked_at;
+    } catch {
+    } finally {
+      isCheckingSanctions = false;
+    }
+  }
 
   function getEntityTypeInfo(type?: string) {
     switch (type) {
@@ -47,20 +95,20 @@
     if (!person || !person.detailed_profile_json) return null;
     try {
       const parsed = JSON.parse(person.detailed_profile_json);
-      if (parsed.profile && typeof parsed.profile === 'object') {
-        return {
-          profile: parsed.profile as DetailedPersonProfile,
-          report_markdown: (parsed.report_markdown as string) || '',
-        };
-      }
+      const prof = (parsed.profile && typeof parsed.profile === 'object') ? parsed.profile : parsed;
       return {
-        profile: parsed as DetailedPersonProfile,
+        profile: prof as DetailedPersonProfile,
         report_markdown: (parsed.report_markdown as string) || '',
+        delta_summary: (parsed.delta_summary as string) || prof?.delta_summary || null,
+        sanctions_matches: (parsed.sanctions_matches as SanctionsMatch[]) || prof?.sanctions_matches || [],
+        entity_pivots: (parsed.entity_pivots as EntityPivotRef[]) || prof?.entity_pivots || [],
       };
     } catch {
       return null;
     }
   });
+
+  const displaySanctions = $derived(liveSanctions.length > 0 ? liveSanctions : (parsedData?.sanctions_matches || []));
 
   const fullMarkdown = $derived.by(() => {
     if (parsedData?.report_markdown) {
@@ -93,20 +141,29 @@
     return fullMarkdown.trim().split(/\s+/).filter(Boolean).length;
   });
 
+  const readingTimeMinutes = $derived(Math.max(1, Math.ceil(wordCount / 240)));
+
+  const hasAegisDeepfakeMention = $derived.by(() => {
+    if (!fullMarkdown) return false;
+    const low = fullMarkdown.toLowerCase();
+    return low.includes('deepfake') || low.includes('aegis') || low.includes('клониран') || low.includes('face-swap');
+  });
+
   type Block =
-    | { type: 'h1'; text: string }
-    | { type: 'h2'; text: string }
-    | { type: 'h3'; text: string }
-    | { type: 'p'; text: string }
-    | { type: 'ul'; items: string[] }
-    | { type: 'hr' }
-    | { type: 'quote'; text: string };
+    | { type: 'h1'; text: string; id?: string }
+    | { type: 'h2'; text: string; id?: string }
+    | { type: 'h3'; text: string; id?: string }
+    | { type: 'p'; text: string; id?: string }
+    | { type: 'ul'; items: string[]; id?: string }
+    | { type: 'hr'; id?: string }
+    | { type: 'quote'; text: string; id?: string };
 
   const parsedBlocks = $derived.by(() => {
     if (!fullMarkdown) return [];
     const lines = fullMarkdown.split('\n');
     const blocks: Block[] = [];
     let currentList: string[] = [];
+    let chapterIndex = 0;
 
     function flushList() {
       if (currentList.length > 0) {
@@ -126,10 +183,12 @@
         blocks.push({ type: 'h3', text: line.slice(4).trim() });
       } else if (line.startsWith('## ')) {
         flushList();
-        blocks.push({ type: 'h2', text: line.slice(3).trim() });
+        chapterIndex += 1;
+        blocks.push({ type: 'h2', text: line.slice(3).trim(), id: `chapter-${chapterIndex}` });
       } else if (line.startsWith('# ')) {
         flushList();
-        blocks.push({ type: 'h1', text: line.slice(2).trim() });
+        chapterIndex += 1;
+        blocks.push({ type: 'h1', text: line.slice(2).trim(), id: `chapter-${chapterIndex}` });
       } else if (line === '---' || line === '***') {
         flushList();
         blocks.push({ type: 'hr' });
@@ -147,6 +206,17 @@
     return blocks;
   });
 
+  const chapters = $derived.by(() => {
+    if (!parsedBlocks) return [];
+    return parsedBlocks
+      .filter((b) => (b.type === 'h1' || b.type === 'h2') && b.id)
+      .map((b) => ({
+        id: b.id!,
+        text: (b as any).text,
+        isMain: b.type === 'h1',
+      }));
+  });
+
   function escapeHtml(str: string): string {
     return str
       .replace(/&/g, '&amp;')
@@ -156,7 +226,17 @@
 
   function formatInline(str: string): string {
     const escaped = escapeHtml(str);
-    return escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    let formatted = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    if (searchFilter.trim().length >= 2) {
+      const filterEsc = escapeHtml(searchFilter.trim()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(${filterEsc})`, 'gi');
+      formatted = formatted.replace(re, '<mark class="dossier-search-hit">$1</mark>');
+    }
+    return formatted;
+  }
+
+  function printDossier() {
+    window.print();
   }
 
   function downloadFile() {
@@ -188,7 +268,7 @@
   async function triggerResearch() {
     if (!person || isResearching) return;
     isResearching = true;
-    showToast(currentLang === 'bg' ? '⚡ Извършва се 2000-думи OSINT разузнаване...' : '⚡ Running full 2000-word OSINT investigation...');
+    showToast(currentLang === 'bg' ? '⚡ Извършва се дълбоко OSINT разузнаване (5k-10k думи)...' : '⚡ Running full deep 10k-word OSINT investigation...');
     try {
       if (onResearchTrigger) {
         await onResearchTrigger(person);
@@ -226,6 +306,9 @@
               <span class="dossier-word-badge">
                 📄 {wordCount.toLocaleString()} {currentLang === 'bg' ? 'думи' : 'words'}
               </span>
+              <span class="dossier-time-badge">
+                ⏱️ ~{readingTimeMinutes} {currentLang === 'bg' ? 'мин четене' : 'min read'}
+              </span>
             {/if}
           </div>
           <span class="dossier-sub">{person.role || person.category || 'Публична личност'}</span>
@@ -253,12 +336,20 @@
           </button>
 
           <button
+            class="btn btn-secondary btn-sm"
+            onclick={printDossier}
+            title={currentLang === 'bg' ? 'Принтирай или запази като PDF' : 'Print or save as PDF'}
+          >
+            🖨️ {currentLang === 'bg' ? 'Печат' : 'Print'}
+          </button>
+
+          <button
             class="btn btn-primary btn-sm"
             onclick={triggerResearch}
             disabled={isResearching}
-            title={currentLang === 'bg' ? 'Стартирай пълно дълбоко OSINT разузнаване с AI (~2000 думи)' : 'Run 2000-word deep OSINT research'}
+            title={currentLang === 'bg' ? 'Стартирай пълно дълбоко OSINT разузнаване с AI (5000-10000+ думи)' : 'Run 10,000-word deep OSINT research'}
           >
-            {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Генерирай отново' : 'Re-run OSINT')}
+            {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Генерирай 10k OSINT досие' : 'Re-run 10k OSINT')}
           </button>
 
           <button class="close-btn" onclick={onClose}>✕</button>
@@ -271,7 +362,27 @@
           class:active={activeTab === 'report'}
           onclick={() => (activeTab = 'report')}
         >
-          📄 {currentLang === 'bg' ? 'Пълен разузнавателен доклад (~2000 думи)' : 'Complete Investigative Report'}
+          📄 {currentLang === 'bg' ? 'Пълен разузнавателен доклад (5k - 10k думи)' : 'Exhaustive Dossier Report (5k - 10k words)'}
+        </button>
+        <button
+          class="dossier-tab-btn"
+          class:active={activeTab === 'intel_stream'}
+          onclick={() => (activeTab = 'intel_stream')}
+        >
+          ⚡ {currentLang === 'bg' ? 'Динамичен новинарски поток' : 'Live Intel Stream'}
+          {#if intelEvents.length > 0}
+            <span class="tab-badge">{intelEvents.length}</span>
+          {/if}
+        </button>
+        <button
+          class="dossier-tab-btn"
+          class:active={activeTab === 'sanctions'}
+          onclick={() => (activeTab = 'sanctions')}
+        >
+          🛡️ {currentLang === 'bg' ? 'Санкции & PEP радар' : 'Sanctions & PEP Radar'}
+          {#if displaySanctions.length > 0}
+            <span class="tab-badge tab-badge-alert">{displaySanctions.length}</span>
+          {/if}
         </button>
         <button
           class="dossier-tab-btn"
@@ -287,15 +398,92 @@
           {#if wordCount > 0}
             <div class="report-meta-box">
               <span class="meta-item">📁 <strong>{currentLang === 'bg' ? 'Локален файл:' : 'Local file:'}</strong> <code>data/osint/{person.id}_{person.canonical_name.replace(/[^a-zA-Z0-9\u0400-\u04FF_-]/g, '_')}_dossier.md</code></span>
-              <span class="meta-item">🔍 <strong>{currentLang === 'bg' ? 'Обхват:' : 'Scope:'}</strong> {currentLang === 'bg' ? 'Многоизмерен анализ, биографични факти, фирми, съдебни дела и мрежа' : 'Multi-dimensional background, corporate holdings, court records & network'}</span>
+              <span class="meta-item">🔍 <strong>{currentLang === 'bg' ? 'Обхват:' : 'Scope:'}</strong> {currentLang === 'bg' ? 'Многоизмерен анализ, биографични факти, фирми, съдебни дела, AEGIS deepfake мониторинг и мрежа' : 'Multi-dimensional background, corporate holdings, court records, AEGIS deepfakes & network'}</span>
             </div>
+
+            {#if parsedData?.delta_summary}
+              <div class="dossier-delta-banner">
+                <span class="delta-badge-icon">🔄</span>
+                <div class="delta-body">
+                  <strong>{currentLang === 'bg' ? 'Динамичен делта мониторинг (Какво се промени от предходния скан):' : 'Living Dossier Delta:'}</strong>
+                  <span>{parsedData.delta_summary}</span>
+                </div>
+              </div>
+            {/if}
+
+            {#if displaySanctions.length > 0}
+              <div class="dossier-sanctions-alert">
+                <span class="sanctions-badge-icon">⚠️</span>
+                <div class="sanctions-body">
+                  <strong>{currentLang === 'bg' ? 'ВНИМАНИЕ: Открити международни санкционни съответствия / PEP статус' : 'WARNING: International Sanctions / PEP Matches Detected'}</strong>
+                  <div class="sanctions-badges-row">
+                    {#each displaySanctions as sm}
+                      <span class="sanctions-pill">
+                        <strong>[{sm.dataset}]</strong> {sm.caption} ({(sm.match_score * 100).toFixed(0)}%)
+                      </span>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            {/if}
+
+            {#if parsedData?.entity_pivots && parsedData.entity_pivots.length > 0}
+              <div class="dossier-pivots-box">
+                <span class="pivots-title">🏢 {currentLang === 'bg' ? 'Картографирани бизнес пивоти:' : 'Discovered Corporate Pivots:'}</span>
+                <div class="pivots-row">
+                  {#each parsedData.entity_pivots as pv}
+                    <span class="pivot-badge">
+                      <strong>{pv.entity_name}</strong>
+                      <small>({pv.entity_kind})</small>
+                    </span>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            <div class="dossier-toolbar">
+              <div class="dossier-search-bar">
+                <span class="search-icon">🔍</span>
+                <input
+                  type="text"
+                  bind:value={searchFilter}
+                  placeholder={currentLang === 'bg' ? 'Търси в 10k-досието (фирма, име, дело, дата, deepfake)...' : 'Search in dossier (company, name, case, date, deepfake)...'}
+                />
+                {#if searchFilter}
+                  <button class="clear-search-btn" onclick={() => (searchFilter = '')}>✕</button>
+                {/if}
+              </div>
+            </div>
+
+            {#if chapters.length > 0}
+              <div class="chapters-quick-nav">
+                <span class="chapters-nav-title">📑 {currentLang === 'bg' ? 'Глави на досието:' : 'Chapters:'}</span>
+                <div class="chapters-pill-row">
+                  {#each chapters as ch}
+                    <a href={`#${ch.id}`} class="chapter-nav-pill" class:pill-main={ch.isMain}>
+                      {ch.text.replace(/^#+\s*/, '').slice(0, 34)}
+                    </a>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if hasAegisDeepfakeMention}
+              <div class="dossier-aegis-banner">
+                <span class="aegis-badge-icon">🛡️</span>
+                <div>
+                  <strong>{currentLang === 'bg' ? 'AEGIS Форензичен мониторинг:' : 'AEGIS Forensic Monitoring:'}</strong>
+                  <span>{currentLang === 'bg' ? 'В досието са включени данни за цифрова синтетика, клонирани гласове или deepfake атаки срещу субекта.' : 'Dossier includes synthetic media records, cloned voices or deepfake impersonations targeting this figure.'}</span>
+                </div>
+              </div>
+            {/if}
 
             <div class="dossier-report-prose">
               {#each parsedBlocks as block}
                 {#if block.type === 'h1'}
-                  <h1 class="prose-h1">{@html formatInline(block.text)}</h1>
+                  <h1 class="prose-h1" id={block.id}>{@html formatInline(block.text)}</h1>
                 {:else if block.type === 'h2'}
-                  <h2 class="prose-h2">{@html formatInline(block.text)}</h2>
+                  <h2 class="prose-h2" id={block.id}>{@html formatInline(block.text)}</h2>
                 {:else if block.type === 'h3'}
                   <h3 class="prose-h3">{@html formatInline(block.text)}</h3>
                 {:else if block.type === 'quote'}
@@ -321,10 +509,120 @@
                 onclick={triggerResearch}
                 disabled={isResearching}
               >
-                {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Генерирай пълен 2000-думи доклад сега' : 'Generate Full 2000-Word Report Now')}
+                {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Генерирай пълно 10k OSINT досие сега' : 'Generate Full 10k OSINT Dossier Now')}
               </button>
             </div>
           {/if}
+        {:else if activeTab === 'intel_stream'}
+          <div class="intel-stream-container">
+            <div class="intel-stream-header">
+              <div class="stream-info">
+                <h4>⚡ {currentLang === 'bg' ? 'Постоянен динамичен новинарски поток' : 'Live Intelligence Feed'}</h4>
+                <p>{currentLang === 'bg' ? 'Автоматизирано извличане от Google News RSS, БТА, БНР и независими медийни агенции в реално време.' : 'Real-time multi-source feed from Google News RSS, BTA, BNR & national agencies.'}</p>
+              </div>
+              <button
+                class="btn btn-primary btn-sm"
+                onclick={triggerRefreshIntel}
+                disabled={isRefreshingIntel}
+              >
+                {isRefreshingIntel ? '⏳ ' + (currentLang === 'bg' ? 'Обновяване...' : 'Refreshing...') : '🔄 ' + (currentLang === 'bg' ? 'Обнови новинарски поток' : 'Refresh Intel Stream')}
+              </button>
+            </div>
+
+            {#if intelEvents.length > 0}
+              <div class="intel-events-list">
+                {#each intelEvents as ev}
+                  <div class="intel-event-card">
+                    <div class="event-meta">
+                      <span class="event-source">{ev.source_name}</span>
+                      <span class="event-time">{new Date(ev.discovered_at).toLocaleString(currentLang === 'bg' ? 'bg-BG' : 'en-US')}</span>
+                    </div>
+                    <h5 class="event-title">
+                      <a href={ev.url} target="_blank" rel="noopener noreferrer">
+                        {ev.title} ↗
+                      </a>
+                    </h5>
+                    <p class="event-snippet">{ev.snippet}</p>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="empty-dossier">
+                <p>{currentLang === 'bg' ? 'Все още няма записани новинарски събития за това лице. Натиснете "Обнови новинарски поток", за да извлечете актуални публикации.' : 'No live intel events recorded yet. Click "Refresh Intel Stream" to query live news feeds.'}</p>
+                <button
+                  class="btn btn-primary btn-sm"
+                  onclick={triggerRefreshIntel}
+                  disabled={isRefreshingIntel}
+                >
+                  {isRefreshingIntel ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Сканирай живия новинарски поток' : 'Scan Live News Feeds')}
+                </button>
+              </div>
+            {/if}
+          </div>
+        {:else if activeTab === 'sanctions'}
+          <div class="sanctions-radar-container">
+            <div class="sanctions-radar-header">
+              <div>
+                <h4>🛡️ {currentLang === 'bg' ? 'Глобален санкционен & PEP радар' : 'Global Sanctions & PEP Radar'}</h4>
+                <p>{currentLang === 'bg' ? 'Кръстосана проверка срещу OpenSanctions, ООН, US OFAC SDN (Закон Магнитски), ЕС, Великобритания (OFSI), Швейцария (SECO), НАЗК (Украйна) и Интерпол.' : 'Live cross-reference against OpenSanctions, UN, US OFAC SDN (Magnitsky), EU Consolidated, UK OFSI, Swiss SECO, Ukraine NAZK & Interpol.'}</p>
+                {#if sanctionsCheckedAt}
+                  <span class="sanctions-checked-time">🕒 {currentLang === 'bg' ? 'Последна проверка:' : 'Last checked:'} {new Date(sanctionsCheckedAt).toLocaleString(currentLang === 'bg' ? 'bg-BG' : 'en-US')}</span>
+                {/if}
+              </div>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={loadSanctionsRadar}
+                disabled={isCheckingSanctions}
+              >
+                {isCheckingSanctions ? '...' : '🔄 ' + (currentLang === 'bg' ? 'Провери отново' : 'Re-verify Sanctions')}
+              </button>
+            </div>
+
+            {#if displaySanctions.length > 0}
+              <div class="sanctions-cards-list">
+                {#each displaySanctions as sm}
+                  <div class="sanctions-card">
+                    <div class="sanctions-card-head">
+                      <span class="sanctions-dataset-badge">{sm.dataset}</span>
+                      <span class="sanctions-score-badge">
+                        {currentLang === 'bg' ? 'Съвпадение:' : 'Match:'} {(sm.match_score * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <h5 class="sanctions-caption">{sm.caption}</h5>
+                    {#if sm.program}
+                      <div class="sanctions-row">
+                        <strong>{currentLang === 'bg' ? 'Програма:' : 'Program:'}</strong> {sm.program}
+                      </div>
+                    {/if}
+                    {#if sm.sanctor}
+                      <div class="sanctions-row">
+                        <strong>{currentLang === 'bg' ? 'Орган:' : 'Authority:'}</strong> {sm.sanctor}
+                      </div>
+                    {/if}
+                    {#if sm.countries && sm.countries.length > 0}
+                      <div class="sanctions-row">
+                        <strong>{currentLang === 'bg' ? 'Юрисдикции:' : 'Jurisdictions:'}</strong> {sm.countries.join(', ')}
+                      </div>
+                    {/if}
+                    {#if sm.summary}
+                      <p class="sanctions-summary">{sm.summary}</p>
+                    {/if}
+                    {#if sm.source_url}
+                      <a href={sm.source_url} target="_blank" rel="noopener noreferrer" class="sanctions-link">
+                        🔗 {currentLang === 'bg' ? 'Официален регистър / Източник' : 'Official Registry Record'} ↗
+                      </a>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="clean-sanctions-box">
+                <span class="clean-icon">✓</span>
+                <h5>{currentLang === 'bg' ? 'Няма открити санкции или активни мерки' : 'No Sanctions or Enforcement Measures Found'}</h5>
+                <p>{currentLang === 'bg' ? 'Субектът не фигурира в активните санкционни бази на САЩ (OFAC), ЕС, Обединеното кралство, Швейцария или Интерпол.' : 'Subject does not appear on active US OFAC, EU, UK OFSI, Swiss SECO or Interpol red notice lists.'}</p>
+              </div>
+            {/if}
+          </div>
         {:else}
           {#if person.summary}
             <div class="summary-box">
@@ -490,6 +788,124 @@
     background: rgba(37, 99, 235, 0.15);
     color: var(--primary-accent);
     border: 1px solid rgba(37, 99, 235, 0.3);
+  }
+
+  .dossier-time-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .dossier-toolbar {
+    padding: 0.6rem 1.25rem 0.2rem;
+  }
+
+  .dossier-search-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem;
+    gap: 0.5rem;
+  }
+
+  .dossier-search-bar input {
+    background: transparent;
+    border: none;
+    color: var(--text-heading);
+    font-size: 0.82rem;
+    width: 100%;
+    outline: none;
+  }
+
+  .clear-search-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0 4px;
+  }
+
+  .chapters-quick-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1.25rem;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .chapters-nav-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .chapters-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .chapter-nav-pill {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--card-bg);
+    color: var(--text-body);
+    border: 1px solid var(--border-color);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .chapter-nav-pill:hover {
+    background: var(--primary-accent);
+    color: #fff;
+    border-color: var(--primary-accent);
+  }
+
+  .chapter-nav-pill.pill-main {
+    font-weight: 700;
+    border-color: rgba(99, 102, 241, 0.4);
+    background: rgba(99, 102, 241, 0.1);
+  }
+
+  .dossier-aegis-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0.6rem 1.25rem 0;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+    font-size: 0.78rem;
+  }
+
+  .dossier-aegis-banner strong {
+    color: #fee2e2;
+  }
+
+  .aegis-badge-icon {
+    font-size: 1.2rem;
+  }
+
+  .dossier-search-hit {
+    background: rgba(245, 158, 11, 0.4);
+    color: #fff;
+    border-radius: 2px;
+    padding: 0 2px;
   }
 
   .person-entity-badge {
@@ -809,5 +1225,298 @@
   .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .dossier-delta-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.85rem 1.15rem;
+    margin-bottom: 1rem;
+    background: rgba(13, 110, 253, 0.08);
+    border: 1px solid rgba(13, 110, 253, 0.25);
+    border-radius: 8px;
+    font-size: 0.88rem;
+  }
+
+  .delta-badge-icon {
+    font-size: 1.4rem;
+  }
+
+  .delta-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .dossier-sanctions-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.85rem 1.15rem;
+    margin-bottom: 1rem;
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.35);
+    border-radius: 8px;
+  }
+
+  .sanctions-badge-icon {
+    font-size: 1.4rem;
+  }
+
+  .sanctions-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .sanctions-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .sanctions-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(220, 53, 69, 0.18);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    color: #ff6b6b;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+  }
+
+  .dossier-pivots-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 1rem;
+    margin-bottom: 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+
+  .pivots-title {
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .pivots-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .pivot-badge {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+  }
+
+  .tab-badge {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    margin-left: 0.3rem;
+  }
+
+  .tab-badge-alert {
+    background: #dc3545;
+    color: #fff;
+  }
+
+  .intel-stream-container, .sanctions-radar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .intel-stream-header, .sanctions-radar-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .stream-info h4, .sanctions-radar-header h4 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.1rem;
+  }
+
+  .stream-info p, .sanctions-radar-header p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .sanctions-checked-time {
+    display: inline-block;
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .intel-events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .intel-event-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.85rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .event-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+  }
+
+  .event-source {
+    font-weight: 700;
+    color: var(--primary-accent);
+    background: rgba(13, 110, 253, 0.1);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+  }
+
+  .event-time {
+    color: var(--text-muted);
+  }
+
+  .event-title {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  .event-title a {
+    color: var(--text-body);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .event-title a:hover {
+    color: var(--primary-accent);
+    text-decoration: underline;
+  }
+
+  .event-snippet {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+
+  .sanctions-cards-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1rem;
+  }
+
+  .sanctions-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .sanctions-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sanctions-dataset-badge {
+    background: rgba(220, 53, 69, 0.15);
+    color: #ff6b6b;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  .sanctions-score-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .sanctions-caption {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .sanctions-row {
+    font-size: 0.82rem;
+  }
+
+  .sanctions-summary {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .sanctions-link {
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--primary-accent);
+    text-decoration: none;
+  }
+
+  .sanctions-link:hover {
+    text-decoration: underline;
+  }
+
+  .clean-sanctions-box {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: rgba(40, 167, 69, 0.06);
+    border: 1px solid rgba(40, 167, 69, 0.2);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .clean-icon {
+    font-size: 2.5rem;
+    color: #28a745;
+  }
+
+  .clean-sanctions-box h5 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #28a745;
+  }
+
+  .clean-sanctions-box p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    max-width: 500px;
   }
 </style>

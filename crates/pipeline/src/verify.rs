@@ -3,8 +3,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use leadfinder_core::{
-    AppConfig, Claim, CoreEvent, Evidence, FactCheckArchive, LlmJsonRequest, Search, SearchHit,
-    SearchQuery, Stage, VideoState,
+    AegisDeepfakeResult, AppConfig, Claim, CoreEvent, Evidence, FactCheckArchive, LlmJsonRequest,
+    Search, SearchHit, SearchQuery, Stage, VideoState,
 };
 use leadfinder_providers::{
     global_lexicon, ConfiguredFactCheckArchive, LlmChainRunner, PassageExtractorAndRanker,
@@ -265,6 +265,7 @@ pub fn build_verify_user_prompt(
     claim: &Claim,
     passages: &[RankedPassage],
     date_window: Option<&str>,
+    aegis_context: Option<&str>,
 ) -> String {
     let mut sections = Vec::new();
     sections.push(format!(
@@ -275,6 +276,12 @@ pub fn build_verify_user_prompt(
         claim.speaker.as_deref().unwrap_or("unknown"),
         date_window.unwrap_or("unknown")
     ));
+
+    if let Some(aegis) = aegis_context {
+        if !aegis.is_empty() {
+            sections.push(format!("AEGIS_DEEPFAKE_FORENSIC_INTELLIGENCE:\n{}", aegis));
+        }
+    }
 
     if !claim.attribution.is_empty() {
         let mut att_lines = Vec::new();
@@ -525,10 +532,30 @@ impl PipelineContext {
                     cfg.verification.min_independent_news_outlets,
                 )
             } else {
+                let aegis_info = self.db.get_aegis_result(video_id).await.ok().flatten();
+                let aegis_context = aegis_info.as_ref().map(|df| {
+                    let mut parts = Vec::new();
+                    if df.audio.synthetic {
+                        let target = df.audio.target_person.as_deref().unwrap_or("неустановена личност");
+                        parts.push(format!("Аудио анализ: Засечен клониран AI глас / синтетичен TTS ({:.0}% увереност, имитиран глас: {}).", df.audio.score * 100.0, target));
+                    }
+                    if df.video.synthetic {
+                        let target = df.video.target_person.as_deref().unwrap_or("неустановена личност");
+                        parts.push(format!("Видео анализ: Засечен face-swap / генеративно видео ({:.0}% увереност, имитирано лице: {}).", df.video.score * 100.0, target));
+                    }
+                    if df.multimodal.av_sync_mismatch {
+                        parts.push("AV синхрон: Открито фазово разминаване между устни и артикулиран звук (AI дублаж/lipsync).".to_string());
+                    }
+                    if !parts.is_empty() {
+                        parts.push("ВНИМАНИЕ: Записът съдържа доказана цифрова синтетика от AEGIS. Ако твърдението приписва думи на публична личност чрез синтетичен глас или подменено лице, това представлява цифрова фалшификация!".to_string());
+                    }
+                    parts.join("\n")
+                });
                 let user_prompt = build_verify_user_prompt(
                     &claim,
                     &top_passages,
                     video.posted_at.as_deref(),
+                    aegis_context.as_deref(),
                 );
                 let runner = LlmChainRunner::from_role("fact_verification", &self.paths, &cfg, &self.db).await;
                 let llm_req = LlmJsonRequest {
@@ -622,6 +649,7 @@ impl PipelineContext {
     }
 
     pub async fn run_verify_job(&self, video_id: &str) -> Result<()> {
+        let _ = self.run_aegis_deepfake_detection(video_id).await;
         let claims = self.db.get_claims_for_video(video_id).await?;
         if claims.is_empty() {
             self.db
@@ -654,7 +682,11 @@ impl PipelineContext {
     }
 
     pub async fn run_research_more_job(&self, video_id: &str) -> Result<()> {
-        let claims = self.db.get_claims_for_video(video_id).await?;
+        let mut claims = self.db.get_claims_for_video(video_id).await?;
+        if claims.is_empty() {
+            let _ = self.run_claims_job(video_id).await;
+            claims = self.db.get_claims_for_video(video_id).await.unwrap_or_default();
+        }
         for claim in &claims {
             self.verify_claim_with_retrieval(video_id, claim.id).await?;
         }
@@ -722,6 +754,7 @@ impl PipelineContext {
             }
         }
 
+        let _ = self.run_aegis_deepfake_detection(video_id).await;
         let _ = self.check_and_mark_video_verified(video_id).await;
         let _ = self.rank_all().await;
         if let Some(v) = self.db.get_video(video_id).await? {
@@ -732,6 +765,58 @@ impl PipelineContext {
             });
         }
         Ok(())
+    }
+
+    pub async fn run_aegis_deepfake_detection(&self, video_id: &str) -> Result<AegisDeepfakeResult> {
+        let media_dir = self.media_root().join(video_id);
+        let people = self.db.get_people_for_video(video_id).await.unwrap_or_default();
+        let people_names: Vec<String> = people.into_iter().map(|p| p.canonical_name).collect();
+        let people_json = serde_json::to_string(&people_names).unwrap_or_else(|_| "[]".to_string());
+
+        let py_script = [
+            self.paths.tools_dir.join("aegis_deepfake_detector.py"),
+            self.paths.static_root.join("scripts").join("aegis_deepfake_detector.py"),
+            self.paths.static_root.join("tools").join("aegis_deepfake_detector.py"),
+            std::path::PathBuf::from("tools/aegis_deepfake_detector.py"),
+            std::path::PathBuf::from("scripts/aegis_deepfake_detector.py"),
+        ]
+        .into_iter()
+        .find(|p| p.is_file());
+
+        let mut result = if let Some(script) = py_script {
+            let mut cmd = tokio::process::Command::new("python");
+            cmd.arg(&script)
+                .arg("--media-dir")
+                .arg(&media_dir)
+                .arg("--people-json")
+                .arg(&people_json)
+                .arg("--json");
+            #[cfg(windows)]
+            {
+                cmd.creation_flags(0x08000000);
+            }
+            let output = tokio::time::timeout(std::time::Duration::from_secs(25), cmd.output()).await??;
+            if output.status.success() {
+                serde_json::from_slice::<AegisDeepfakeResult>(&output.stdout)?
+            } else {
+                anyhow::bail!("Aegis detector script error: {}", String::from_utf8_lossy(&output.stderr));
+            }
+        } else {
+            anyhow::bail!("Aegis detector script not found");
+        };
+
+        result.analyzed_at = chrono::Utc::now().to_rfc3339();
+        self.db.save_aegis_result(video_id, &result).await?;
+
+        if let Ok(Some(v)) = self.db.get_video(video_id).await {
+            self.emit(CoreEvent::VideoUpdated {
+                video_id: video_id.to_string(),
+                state: v.state,
+                lane: v.lane,
+            });
+        }
+
+        Ok(result)
     }
 
     async fn check_and_mark_video_verified(&self, video_id: &str) -> Result<()> {

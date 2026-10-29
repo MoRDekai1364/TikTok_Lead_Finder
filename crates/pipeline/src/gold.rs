@@ -177,6 +177,7 @@ pub async fn run_gold_set_eval(
                     &claim,
                     &passages,
                     item.date_window.as_deref(),
+                    None,
                 ),
                 json_schema: Some(verification_output_json_schema()),
                 temperature: 0.0,

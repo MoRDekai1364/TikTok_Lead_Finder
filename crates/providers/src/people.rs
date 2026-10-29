@@ -4,7 +4,7 @@ use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use leadfinder_core::{NormalisationConfig, PersonInput, PolitenessGuard};
+use leadfinder_core::{EntityPivotRef, NormalisationConfig, PersonInput, PolitenessGuard};
 use crate::lexicon::LexiconNormalizer;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1163,4 +1163,85 @@ pub fn transliterate_to_canonical_latin_key(input: &str) -> String {
         }
     }
     clean
+}
+
+pub fn extract_entity_pivots(text: &str, exclude_name: &str) -> Vec<EntityPivotRef> {
+    let mut pivots = Vec::new();
+    let exc_lower = exclude_name.to_lowercase();
+    let exc_tokens: Vec<&str> = exc_lower.split_whitespace().collect();
+
+    let corp_suffixes = [
+        ("ЕООД", "company"),
+        ("ООД", "company"),
+        ("ЕАД", "company"),
+        ("АД", "company"),
+        ("Холдинг", "holding"),
+        ("Консорциум", "consortium"),
+        ("Фондация", "foundation"),
+        ("Сдружение", "ngo"),
+        ("Партия", "political_party"),
+        ("LLC", "foreign_entity"),
+        ("Ltd", "foreign_entity"),
+        ("GmbH", "foreign_entity"),
+        ("Inc", "foreign_entity"),
+    ];
+
+    for line in text.lines() {
+        for &(suffix, kind) in &corp_suffixes {
+            let mut offset = 0;
+            while let Some(pos) = line[offset..].find(suffix) {
+                let abs_pos = offset + pos;
+                let start_window = abs_pos.saturating_sub(40);
+                let window = &line[start_window..abs_pos + suffix.len()];
+
+                let extracted_name = if let Some(q_start) = window.rfind(['"', '„', '«']) {
+                    if let Some(q_end) = window[q_start + 1..].find(['"', '“', '»']) {
+                        let inner = &window[q_start + 1..q_start + 1 + q_end].trim();
+                        format!("{} {}", inner, suffix)
+                    } else {
+                        let clean_pre = window[..window.len() - suffix.len()].trim();
+                        let last_words = clean_pre.split_whitespace().rev().take(3).collect::<Vec<_>>();
+                        let mut words = last_words.into_iter().rev().collect::<Vec<_>>();
+                        words.push(suffix);
+                        words.join(" ")
+                    }
+                } else {
+                    let clean_pre = window[..window.len() - suffix.len()].trim();
+                    let last_words = clean_pre.split_whitespace().rev().take(3).collect::<Vec<_>>();
+                    let mut words = last_words.into_iter().rev().collect::<Vec<_>>();
+                    words.push(suffix);
+                    words.join(" ")
+                };
+
+                let norm_cand = extracted_name.trim().trim_matches(|c: char| c.is_ascii_punctuation() || c == '„' || c == '“' || c == '»');
+                let cand_lower = norm_cand.to_lowercase();
+
+                let is_excluded = exc_tokens.iter().any(|t| cand_lower.contains(t) && t.len() > 3);
+                let is_too_short = norm_cand.len() < 4;
+
+                if !is_excluded && !is_too_short && !pivots.iter().any(|p: &EntityPivotRef| p.entity_name.eq_ignore_ascii_case(norm_cand)) {
+                    pivots.push(EntityPivotRef {
+                        entity_name: norm_cand.to_string(),
+                        entity_kind: kind.to_string(),
+                        relevance: 0.85,
+                        registry_status: Some("Активно / Проучено в регистър".to_string()),
+                    });
+                }
+
+                offset = abs_pos + suffix.len();
+                if pivots.len() >= 8 {
+                    break;
+                }
+            }
+            if pivots.len() >= 8 {
+                break;
+            }
+        }
+        if pivots.len() >= 8 {
+            break;
+        }
+    }
+
+    pivots.truncate(6);
+    pivots
 }

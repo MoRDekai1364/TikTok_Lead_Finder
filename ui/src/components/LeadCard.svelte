@@ -128,6 +128,17 @@
           <span class="badge badge-archive" title={t.alreadyCheckedBadge}>FactCheck</span>
         {/if}
 
+        {#if card.aegis_verdict === 'deepfake' || ((card.aegis_audio_score ?? 0) >= 0.65 || (card.aegis_video_score ?? 0) >= 0.65)}
+          <span class="badge badge-deepfake" title={card.aegis_target_person ? `AI Deepfake: ${card.aegis_target_person}` : 'Засечен AI Deepfake / Синтетика'}>
+            🛡️ {card.aegis_target_person ? card.aegis_target_person : 'Deepfake'}
+            {#if (card.aegis_audio_score ?? 0) >= (card.aegis_video_score ?? 0)}
+              {Math.round((card.aegis_audio_score ?? 0) * 100)}%
+            {:else}
+              {Math.round((card.aegis_video_score ?? 0) * 100)}%
+            {/if}
+          </span>
+        {/if}
+
         {#if card.research_running}
           <span class="badge badge-researching" title={t.researchRunningBadge}>⚡</span>
         {/if}
@@ -194,8 +205,22 @@
         >
           ✕
         </button>
-        <button class="action-btn btn-research" title={t.researchAction} onclick={() => onResearchMore(card.id)} aria-label="Проучи">
-          R
+        <button
+          class="action-btn btn-research"
+          class:is-researching={card.research_running}
+          disabled={card.research_running}
+          title={card.research_running ? (currentLang === 'bg' ? 'В момента тече проучване...' : 'Research running...') : t.researchAction}
+          onclick={(e) => {
+            e.stopPropagation();
+            onResearchMore(card.id);
+          }}
+          aria-label="Проучи"
+        >
+          {#if card.research_running}
+            <span class="card-spin">⚙</span>
+          {:else}
+            R
+          {/if}
         </button>
       </div>
     </div>
@@ -532,10 +557,45 @@
     color: #3b82f6;
   }
 
+  .action-btn.btn-research.is-researching {
+    background: rgba(59, 130, 246, 0.4);
+    color: #93c5fd;
+    cursor: wait;
+  }
+
+  .badge-researching {
+    background: rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    animation: badgePulse 1.5s infinite;
+  }
+
+  .card-spin {
+    display: inline-block;
+    animation: cardSpin 1.2s linear infinite;
+  }
+
+  @keyframes cardSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes badgePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.95); }
+  }
+
   .badge-pasted {
     background: rgba(99, 102, 241, 0.2);
     color: var(--primary-accent);
     border: 1px solid rgba(99, 102, 241, 0.4);
+  }
+
+  .badge-deepfake {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    font-weight: 800;
   }
 
   .card-progress-track {

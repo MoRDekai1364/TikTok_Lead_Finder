@@ -39,6 +39,10 @@ pub async fn assess_creator_risk(
     let mut flagged_videos = 0i64;
     let mut contradicted_claims = 0i64;
     let mut supported_claims = 0i64;
+    let mut aegis_deepfake_count = 0i64;
+    let mut aegis_synthetic_audio_count = 0i64;
+    let mut aegis_synthetic_video_count = 0i64;
+    let mut aegis_impersonated_persons: Vec<String> = Vec::new();
 
     for v in &local_videos {
         let claims = ctx.db.get_claims_for_video(&v.id).await.unwrap_or_default();
@@ -50,6 +54,28 @@ pub async fn assess_creator_risk(
                 vid_flagged = true;
             } else if verd == "SUPPORTED" {
                 supported_claims += 1;
+            }
+        }
+        if let Ok(Some(df)) = ctx.db.get_aegis_result(&v.id).await {
+            if df.overall_verdict == "deepfake" {
+                aegis_deepfake_count += 1;
+                vid_flagged = true;
+            }
+            if df.audio.synthetic {
+                aegis_synthetic_audio_count += 1;
+                if let Some(target) = df.audio.target_person {
+                    if !aegis_impersonated_persons.contains(&target) {
+                        aegis_impersonated_persons.push(target);
+                    }
+                }
+            }
+            if df.video.synthetic {
+                aegis_synthetic_video_count += 1;
+                if let Some(target) = df.video.target_person {
+                    if !aegis_impersonated_persons.contains(&target) {
+                        aegis_impersonated_persons.push(target);
+                    }
+                }
             }
         }
         if vid_flagged {
@@ -222,7 +248,22 @@ pub async fn assess_creator_risk(
         "low".to_string()
     };
 
-    let (risk_level, risk_score, rationale) = if contradicted_claims >= 2 || (contradicted_claims >= 1 && (factcheck_count >= 1 || risk_keyword_count >= 2)) {
+    let (risk_level, risk_score, rationale) = if aegis_deepfake_count > 0 || aegis_synthetic_audio_count >= 2 || aegis_synthetic_video_count >= 2 {
+        let score = (0.85 + (aegis_deepfake_count as f64 * 0.05) + (contradicted_claims as f64 * 0.04)).clamp(0.85, 0.99);
+        let target_note = if !aegis_impersonated_persons.is_empty() {
+            format!(" Засечена имитация на публични личности: {}.", aegis_impersonated_persons.join(", "))
+        } else {
+            String::new()
+        };
+        let rat = format!(
+            "КРИТИЧЕН РИСК: AEGIS детекторът установи {} deepfake видеоклипа и {} синтетични гласови/визуални манипулации сред видеата на автора.{}{}",
+            aegis_deepfake_count,
+            aegis_synthetic_audio_count + aegis_synthetic_video_count,
+            target_note,
+            if contradicted_claims > 0 { format!(" Установени и {} опровергани твърдения.", contradicted_claims) } else { String::new() }
+        );
+        ("high".to_string(), score, rat)
+    } else if contradicted_claims >= 2 || (contradicted_claims >= 1 && (factcheck_count >= 1 || risk_keyword_count >= 2)) {
         let score = (0.75 + (contradicted_claims as f64 * 0.08) + (factcheck_count as f64 * 0.05)).clamp(0.75, 0.98);
         let rat = format!(
             "Открити {} опровергани твърдения в локалната база и {} свързани публикации/фактчек проверки в мрежата. Висока степен на риск от разпространение на подвеждащи данни.",
@@ -230,10 +271,10 @@ pub async fn assess_creator_risk(
             web_sources.len()
         );
         ("high".to_string(), score, rat)
-    } else if contradicted_claims == 1 || flagged_videos > 0 || risk_keyword_count >= 2 {
-        let score = 0.55;
+    } else if contradicted_claims == 1 || flagged_videos > 0 || risk_keyword_count >= 2 || aegis_synthetic_audio_count > 0 || aegis_synthetic_video_count > 0 {
+        let score = 0.65;
         let rat = format!(
-            "Регистрирано 1 спорно/опровергано твърдение или сигнализирано съдържание сред общо {} видеа и {} уеб източника.",
+            "Регистрирано 1 спорно твърдение или синтетично аудио/видео съдържание (AEGIS откри 1 манипулация) сред общо {} видеа и {} уеб източника.",
             total_videos,
             web_sources.len()
         );

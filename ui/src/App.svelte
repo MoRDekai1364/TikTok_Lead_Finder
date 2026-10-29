@@ -67,6 +67,7 @@
   let benchmarkProgress = $state<BenchmarkProgress | null>(null);
   let powerInfo = $state<PowerInfo | null>(null);
   let powerToast = $state<string | null>(null);
+  let actionToast = $state<{ text: string; icon: string } | null>(null);
 
   onMount(() => {
     const savedTheme = localStorage.getItem('leadfinder_theme') as 'light' | 'dark' | null;
@@ -216,6 +217,18 @@
       void loadInitialData();
       return;
     }
+    if (ev?.event === 'job_updated' && ev.data) {
+      const j = ev.data;
+      if (j.stage === 'RESEARCH_MORE' && j.status === 'succeeded' && j.video_id) {
+        actionToast = {
+          icon: '✓',
+          text: currentLang === 'bg'
+            ? 'Проучването завърши успешно! Данните са обновени.'
+            : 'Deep research finished successfully! Data updated.',
+        };
+        setTimeout(() => { actionToast = null; }, 4500);
+      }
+    }
     fetchVideos(activeLane).then((vids) => {
       cards = vids;
     });
@@ -306,8 +319,27 @@
     const c = cards.find((x) => x.id === id);
     if (c) {
       c.research_running = true;
+      c.progress_pct = 75;
+      c.stage_desc = currentLang === 'bg' ? 'Задълбочено проучване...' : 'Deep research...';
       cards = [...cards];
-      await logDecision(id, 'research_more');
+      actionToast = {
+        icon: '⚡',
+        text: currentLang === 'bg'
+          ? 'Стартирано задълбочено проучване на твърденията...'
+          : 'Started deep fact-checking & OSINT research...',
+      };
+      setTimeout(() => { actionToast = null; }, 4000);
+      try {
+        await logDecision(id, 'research_more');
+      } catch {
+        actionToast = {
+          icon: '⚠️',
+          text: currentLang === 'bg'
+            ? 'Грешка при стартиране на проучването'
+            : 'Error starting research job',
+        };
+        setTimeout(() => { actionToast = null; }, 4000);
+      }
     }
   }
 
@@ -566,6 +598,13 @@
       }}
     />
 
+    {#if actionToast}
+      <div class="action-toast-alert">
+        <span class="action-toast-icon">{actionToast.icon}</span>
+        <span>{actionToast.text}</span>
+      </div>
+    {/if}
+
     {#if powerToast}
       <div class="power-toast-alert">
         <span>{powerToast}</span>
@@ -606,6 +645,29 @@
     flex-direction: column;
     overflow: hidden;
     position: relative;
+  }
+
+  .action-toast-alert {
+    position: fixed;
+    bottom: 72px;
+    right: 24px;
+    z-index: 9999;
+    background: rgba(17, 24, 39, 0.95);
+    border: 1px solid rgba(59, 130, 246, 0.6);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    padding: 10px 16px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: #f3f4f6;
+    animation: toastSlide 0.25s ease-out;
+  }
+
+  .action-toast-icon {
+    font-size: 1.1rem;
   }
 
   .power-toast-alert {

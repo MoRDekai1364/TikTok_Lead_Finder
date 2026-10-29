@@ -157,8 +157,12 @@ impl Ocr for TesseractOcr {
             )
         })?;
 
-        let futures = futures::stream::iter(frames.iter().map(|frame| self.ocr_with_prep(bin, frame)));
-        let results: Vec<_> = futures::StreamExt::collect(futures::StreamExt::buffer_unordered(futures, 4)).await;
+        let mut results: Vec<Result<Vec<OcrLine>, ProviderError>> = Vec::new();
+        for chunk in frames.chunks(4) {
+            let futures = chunk.iter().map(|frame| self.ocr_with_prep(bin, frame));
+            results.extend(futures::future::join_all(futures).await);
+        }
+
         let mut raw_lines = Vec::new();
         for res in results {
             if let Ok(lines) = res {
@@ -292,7 +296,10 @@ fn prepare_frame_bands(frame: &FrameSample) -> Vec<FrameSample> {
             crop
         };
         let mut luma = resized.to_luma8();
-        image::imageops::contrast_in_place(&mut luma, 30.0);
+        for p in luma.pixels_mut() {
+            let v = p.0[0] as f32;
+            p.0[0] = ((v - 128.0) * 1.4 + 128.0).clamp(0.0, 255.0) as u8;
+        }
         let path = std::env::temp_dir().join(format!("lf_ocr_{:x}_{}.png", key, idx));
         if luma.save(&path).is_ok() {
             out.push(FrameSample {

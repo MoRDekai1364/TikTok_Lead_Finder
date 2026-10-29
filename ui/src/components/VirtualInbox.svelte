@@ -134,10 +134,6 @@
     }
   }
 
-  const selectedCard = $derived(
-    filteredCards.find((c: LeadCard) => c.id === selectedId) || filteredCards[0] || null
-  );
-
   const filteredCards = $derived.by(() => {
     let list = cards.filter((c: LeadCard) => {
       if (activeLane === 'pasted') {
@@ -159,7 +155,9 @@
         const claim = (c.top_claim_text || '').toLowerCase();
         const creator = (c.creator_handle || '').toLowerCase();
         const reason = (c.reason_flagged || '').toLowerCase();
-        return claim.includes(q) || creator.includes(q) || reason.includes(q);
+        const person = (c.aegis_target_person || '').toLowerCase();
+        const verdict = (c.aegis_verdict || '').toLowerCase();
+        return claim.includes(q) || creator.includes(q) || reason.includes(q) || person.includes(q) || verdict.includes(q);
       });
     }
 
@@ -173,6 +171,10 @@
 
     return list;
   });
+
+  const selectedCard = $derived(
+    filteredCards.find((c: LeadCard) => c.id === selectedId) || filteredCards[0] || null
+  );
 
   const totalHeight = $derived(filteredCards.length * ITEM_HEIGHT);
 
@@ -441,8 +443,20 @@
               <button class="btn btn-danger btn-sm" onclick={() => onDiscard(selectedCard!.id)}>
                 ✕ {currentLang === 'bg' ? 'Отхвърли' : 'Discard'}
               </button>
-              <button class="btn btn-secondary btn-sm" onclick={() => onResearchMore(selectedCard!.id)}>
-                R {currentLang === 'bg' ? 'Проучи' : 'Research'}
+              <button
+                class="btn btn-secondary btn-sm btn-research-action"
+                class:active-researching={selectedCard?.research_running}
+                disabled={Boolean(selectedCard?.research_running)}
+                onclick={() => onResearchMore(selectedCard!.id)}
+                title={selectedCard?.research_running
+                  ? (currentLang === 'bg' ? 'В момента тече задълбочено проучване...' : 'Deep research currently running...')
+                  : t.researchAction}
+              >
+                {#if selectedCard?.research_running}
+                  <span class="spin-icon">⚙</span> {currentLang === 'bg' ? 'Проучва се...' : 'Researching...'}
+                {:else}
+                  ⚡ {currentLang === 'bg' ? 'Проучи' : 'Research'}
+                {/if}
               </button>
             </div>
           </div>
@@ -788,6 +802,23 @@
     padding: 0.45rem;
     font-size: 0.85rem;
     font-weight: 700;
+  }
+
+  .btn-research-action.active-researching {
+    background: rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+    border-color: rgba(59, 130, 246, 0.5);
+    cursor: wait;
+  }
+
+  .spin-icon {
+    display: inline-block;
+    animation: iconSpin 1.2s linear infinite;
+  }
+
+  @keyframes iconSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   .feed-empty {

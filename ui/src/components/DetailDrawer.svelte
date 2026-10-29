@@ -4,6 +4,7 @@
     assessCreatorRisk,
     deleteEvidence,
     deleteVideo,
+    fetchDeepfakeResult,
     fetchEvidencePreview,
     fetchPeople,
     fetchVideoDetail,
@@ -19,13 +20,14 @@
     researchPerson,
     retranscribeVideo,
     setCreatorWatchlist,
+    triggerAegisScan,
     updateTranscript,
   } from '../lib/api';
   import { isJobActive, startAiJob, finishAiJob, getActiveAiJobs } from '../lib/aiTasks.svelte';
   import type { GoogleAiQueryResult } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
-  import type { ClaimWithEvidence, EntityType, LeadCard, Person, VideoDetail } from '../lib/types';
+  import type { AegisDeepfakeResult, ClaimWithEvidence, EntityType, LeadCard, OcrText, Person, VideoDetail } from '../lib/types';
   import { formatVerdictDisplay } from '../lib/types';
   import PersonDossierModal from './PersonDossierModal.svelte';
 
@@ -83,6 +85,8 @@
   let disambiguateTags = $state('');
   let disambiguateTargetPersonId = $state<number | null>(null);
   let disambiguateEntityType = $state<EntityType>('person');
+  let isAegisScanning = $state(false);
+  let aegisScanError = $state<string | null>(null);
 
   function getEntityTypeInfo(type?: string) {
     switch (type) {
@@ -119,6 +123,46 @@
     }));
   });
 
+  let showOcr = $state(true);
+
+  const ocrItems = $derived.by((): OcrText[] => {
+    const rows = detail?.ocr_texts ?? [];
+    return rows
+      .map((o) => ({ ...o, text: (o.text || '').trim() }))
+      .filter((o) => o.text.length > 0)
+      .sort((a, b) => a.frame_ms - b.frame_ms);
+  });
+
+  const ocrBySegment = $derived.by(() => {
+    const map = new Map<number, OcrText[]>();
+    const tail: OcrText[] = [];
+    const segs = transcriptDisplaySegments;
+    for (const o of ocrItems) {
+      let target = -1;
+      for (const seg of segs) {
+        if (seg.end_ms > o.frame_ms) {
+          target = seg.start_ms;
+          break;
+        }
+      }
+      if (target < 0) {
+        tail.push(o);
+      } else {
+        const list = map.get(target) ?? [];
+        list.push(o);
+        map.set(target, list);
+      }
+    }
+    return { map, tail };
+  });
+
+  const timelineDurationMs = $derived.by(() => {
+    const segs = transcriptDisplaySegments;
+    const lastSeg = segs.length > 0 ? segs[segs.length - 1].end_ms : 0;
+    const lastOcr = ocrItems.length > 0 ? ocrItems[ocrItems.length - 1].frame_ms + 2000 : 0;
+    return Math.max((detail?.video.duration_s ?? 0) * 1000, lastSeg, lastOcr, 1);
+  });
+
   let activeLoadId = '';
 
   $effect(() => {
@@ -148,6 +192,13 @@
         } else if (res?.video.creator_handle) {
           loadCreatorVideos(res.video.creator_handle);
         }
+        if (!res?.aegis_deepfake && id) {
+          fetchDeepfakeResult(id).then((df) => {
+            if (df && activeLoadId === id && detail) {
+              detail = { ...detail, aegis_deepfake: df };
+            }
+          }).catch(() => {});
+        }
       }
     } catch {
       if (activeLoadId === id) {
@@ -157,6 +208,27 @@
       if (activeLoadId === id) {
         isLoading = false;
       }
+    }
+  }
+
+  async function handleTriggerAegis() {
+    if (!detail?.video.id || isAegisScanning) return;
+    isAegisScanning = true;
+    aegisScanError = null;
+    try {
+      const res = await triggerAegisScan(detail.video.id);
+      if (res && detail) {
+        detail = {
+          ...detail,
+          aegis_deepfake: res,
+        };
+      }
+      copyToast = currentLang === 'bg' ? '🛡️ AEGIS анализът завърши успешно!' : '🛡️ AEGIS scan completed!';
+      setTimeout(() => (copyToast = null), 2500);
+    } catch (err: any) {
+      aegisScanError = err?.message || 'Error running AEGIS scan';
+    } finally {
+      isAegisScanning = false;
     }
   }
 
@@ -222,6 +294,34 @@
     }, 2500);
   }
 
+  function stemSet(text: string): Set<string> {
+    const out = new Set<string>();
+    for (const w of text.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []) {
+      out.add(w.slice(0, 5));
+    }
+    return out;
+  }
+
+  function claimSource(claimText: string): 'speech' | 'screen' | 'both' {
+    const claimStems = [...stemSet(claimText)];
+    if (claimStems.length === 0 || ocrItems.length === 0) return 'speech';
+    const spoken = stemSet(detail?.transcript?.edited_text || detail?.transcript?.text || '');
+    const shown = stemSet(ocrItems.map((o) => o.text).join(' '));
+    const coverage = (pool: Set<string>) => claimStems.filter((s) => pool.has(s)).length / claimStems.length;
+    const speechCov = coverage(spoken);
+    const screenCov = coverage(shown);
+    if (screenCov >= 0.5 && speechCov >= 0.5) return 'both';
+    if (screenCov >= 0.4 && screenCov > speechCov + 0.15) return 'screen';
+    if (speechCov === 0 && screenCov > 0) return 'screen';
+    return 'speech';
+  }
+
+  function claimSourceLabel(src: 'speech' | 'screen' | 'both'): string {
+    if (src === 'screen') return currentLang === 'bg' ? 'Текст на екрана' : 'On-screen text';
+    if (src === 'both') return currentLang === 'bg' ? 'Реч + екран' : 'Speech + screen';
+    return currentLang === 'bg' ? 'Реч' : 'Speech';
+  }
+
   function getSegmentClaimInfo(seg: { start_ms: number; end_ms: number; text?: string }) {
     if (!detail?.claims || detail.claims.length === 0) return null;
     for (let i = 0; i < detail.claims.length; i++) {
@@ -242,6 +342,7 @@
           index: i + 1,
           verdict: (c.verdict || '').toLowerCase(),
           text: c.text_bg,
+          source: claimSource(c.text_bg),
         };
       }
     }
@@ -649,7 +750,7 @@
     const author = detail.creator?.handle ? `@${detail.creator.handle}` : (detail.video.creator_handle ? `@${detail.video.creator_handle}` : 'неизвестен');
     const startS = Math.round((cwith.claim.start_ms || 0) / 1000);
     const endS = Math.round((cwith.claim.end_ms || 0) / 1000);
-    const citation = `"${cwith.claim.text_bg}" (Видео ID: ${detail.video.id}, Автор: ${author}, Времеви отрязък: ${startS}s-${endS}s, Присъда: ${cwith.claim.label || cwith.claim.verdict || 'Неверифицирано'})`;
+    const citation = `"${cwith.claim.text_bg}" (Видео ID: ${detail.video.id}, Автор: ${author}, Времеви отрязък: ${startS}s-${endS}s, Източник: ${claimSourceLabel(claimSource(cwith.claim.text_bg))}, Присъда: ${cwith.claim.label || cwith.claim.verdict || 'Неверифицирано'})`;
     await navigator.clipboard.writeText(citation);
     copyToast = currentLang === 'bg' ? '✓ Цитатът е копиран!' : '✓ Citation copied!';
     setTimeout(() => (copyToast = null), 2500);
@@ -1051,6 +1152,60 @@
         </div>
 
         {#if detail.transcript}
+          {#snippet ocrChip(o: OcrText)}
+            <div
+              class="ocr-chip"
+              class:active={currentTimeMs >= o.frame_ms && currentTimeMs < o.frame_ms + 2500}
+              onclick={() => seekToMs(o.frame_ms)}
+              onkeydown={(e) => e.key === 'Enter' && seekToMs(o.frame_ms)}
+              role="button"
+              tabindex="0"
+              title={`${currentLang === 'bg' ? 'Текст на екрана' : 'On-screen text'} · ${Math.round((o.confidence ?? 0) * 100)}%`}
+            >
+              <span class="ocr-chip-tag">🖥️ {formatTime(o.frame_ms)}</span>
+              <span class="ocr-chip-text">{o.text}</span>
+            </div>
+          {/snippet}
+
+          {#if ocrItems.length > 0}
+            <div class="ocr-overview">
+              <div class="ocr-overview-head">
+                <button class="ocr-toggle" class:on={showOcr} onclick={() => (showOcr = !showOcr)}>
+                  🖥️ {currentLang === 'bg' ? 'Текст от видеото' : 'On-screen text'} ({ocrItems.length})
+                </button>
+                {#if showOcr}
+                  <span class="ocr-legend">
+                    <i class="lg-speech"></i>{currentLang === 'bg' ? 'Реч' : 'Speech'}
+                    <i class="lg-ocr"></i>{currentLang === 'bg' ? 'Текст на екрана' : 'On-screen text'}
+                  </span>
+                {/if}
+              </div>
+              {#if showOcr}
+                <div class="ocr-track">
+                  {#each transcriptDisplaySegments as seg}
+                    <span
+                      class="ocr-track-speech"
+                      style={`left:${(seg.start_ms / timelineDurationMs) * 100}%;width:${Math.max(0.4, ((seg.end_ms - seg.start_ms) / timelineDurationMs) * 100)}%`}
+                    ></span>
+                  {/each}
+                  {#each ocrItems as o}
+                    <button
+                      class="ocr-track-mark"
+                      style={`left:${(o.frame_ms / timelineDurationMs) * 100}%`}
+                      onclick={() => seekToMs(o.frame_ms)}
+                      title={`${formatTime(o.frame_ms)} · ${o.text}`}
+                      aria-label={o.text}
+                    ></button>
+                  {/each}
+                  <span
+                    class="ocr-track-playhead"
+                    style={`left:${Math.min(100, (currentTimeMs / timelineDurationMs) * 100)}%`}
+                  ></span>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
           <div class="transcript-segments" class:editing-active={isEditingTranscript}>
             {#if isEditingTranscript}
               <div class="editing-banner">
@@ -1061,6 +1216,11 @@
             {/if}
             {#each transcriptDisplaySegments as seg}
               {@const cinfo = getSegmentClaimInfo(seg)}
+              {#if showOcr && !isEditingTranscript}
+                {#each ocrBySegment.map.get(seg.start_ms) ?? [] as o}
+                  {@render ocrChip(o)}
+                {/each}
+              {/if}
               {#if isEditingTranscript}
                 <span
                   class="transcript-segment-editable"
@@ -1109,7 +1269,7 @@
                       onkeydown={(e) => e.key === 'Enter' && jumpToClaim(cinfo.claimId)}
                       title="Отиди на твърдение #{cinfo.index}"
                     >
-                      [Т{cinfo.index}]
+                      [Т{cinfo.index}{cinfo.source === 'screen' ? ' 🖥️' : ''}]
                     </span>
                   {/if}
                   {seg.text}{' '}
@@ -1117,8 +1277,264 @@
               {/if}
             {/each}
           </div>
+          {#if showOcr && !isEditingTranscript && ocrBySegment.tail.length > 0}
+            <div class="ocr-tail">
+              {#each ocrBySegment.tail as o}
+                {@render ocrChip(o)}
+              {/each}
+            </div>
+          {/if}
         {:else}
           <p class="empty-hint">{currentLang === 'bg' ? 'Няма налична стенограма.' : 'No transcript available.'}</p>
+        {/if}
+      </div>
+
+      <div class="section-card aegis-section">
+        <div class="section-header aegis-header">
+          <div>
+            <div class="aegis-title-row">
+              <h3>🛡️ {currentLang === 'bg' ? 'AEGIS Детектор за Deepfake & Синтетично съдържание' : 'AEGIS Deepfake & Synthetic Forensics'}</h3>
+              {#if detail.aegis_deepfake}
+                <span class="aegis-verdict-pill aegis-verdict-{detail.aegis_deepfake.overall_verdict}">
+                  {#if detail.aegis_deepfake.overall_verdict === 'deepfake'}
+                    🚨 {currentLang === 'bg' ? 'DEEPFAKE ОТКРИТ' : 'DEEPFAKE DETECTED'}
+                  {:else if detail.aegis_deepfake.overall_verdict === 'suspicious'}
+                    ⚠️ {currentLang === 'bg' ? 'СЪМНИТЕЛЕН ЗАПИС' : 'SUSPICIOUS MEDIA'}
+                  {:else}
+                    ✅ {currentLang === 'bg' ? 'АВТЕНТИЧЕН ЗАПИС' : 'AUTHENTIC MEDIA'}
+                  {/if}
+                </span>
+              {:else}
+                <span class="aegis-verdict-pill aegis-verdict-unscanned">
+                  ⚪ {currentLang === 'bg' ? 'НЕ Е СКАНИРАНО' : 'NOT SCANNED'}
+                </span>
+              {/if}
+            </div>
+            <span class="section-subhint">
+              {currentLang === 'bg'
+                ? 'Отделен акустичен анализ на гласова синтеза, 2D FFT честотна матрица и лицево приписване на публични личности'
+                : 'Separate acoustic voice synthesis detection, 2D FFT visual artifacts and target public figure attribution'}
+            </span>
+          </div>
+          <button
+            class="aegis-scan-btn"
+            disabled={isAegisScanning}
+            onclick={handleTriggerAegis}
+          >
+            {#if isAegisScanning}
+              <span class="aegis-spinner">⚡</span> {currentLang === 'bg' ? 'Сканиране...' : 'Scanning...'}
+            {:else if detail.aegis_deepfake}
+              🔄 {currentLang === 'bg' ? 'Повторен анализ' : 'Rescan Media'}
+            {:else}
+              ⚡ {currentLang === 'bg' ? 'Сканирай за Deepfake' : 'Run Deepfake Scan'}
+            {/if}
+          </button>
+        </div>
+
+        {#if aegisScanError}
+          <div class="aegis-error-banner">
+            ⚠️ {aegisScanError}
+          </div>
+        {/if}
+
+        {#if detail.aegis_deepfake}
+          <div class="aegis-grid">
+            <div class="aegis-card aegis-audio-card" class:synthetic-detected={detail.aegis_deepfake.audio.synthetic}>
+              <div class="aegis-card-top">
+                <div class="aegis-card-title">
+                  <span class="aegis-icon">🎵</span>
+                  <div>
+                    <h4>{currentLang === 'bg' ? 'Аудио: Гласова синтеза' : 'Audio: Voice Synthesis'}</h4>
+                    <span class="aegis-class-label">
+                      {#if detail.aegis_deepfake.audio.classification === 'cloned_voice'}
+                        🎭 {currentLang === 'bg' ? 'Клониран AI глас' : 'Cloned AI Voice'}
+                      {:else if detail.aegis_deepfake.audio.classification === 'robotic_tts'}
+                        🤖 {currentLang === 'bg' ? 'Роботизиран глас (TTS)' : 'Robotic Voice (TTS)'}
+                      {:else}
+                        🎙️ {currentLang === 'bg' ? 'Автентичен човешки глас' : 'Authentic Human Voice'}
+                      {/if}
+                    </span>
+                  </div>
+                </div>
+                <div class="aegis-score-box" class:score-high={detail.aegis_deepfake.audio.score >= 0.7} class:score-med={detail.aegis_deepfake.audio.score >= 0.4 && detail.aegis_deepfake.audio.score < 0.7}>
+                  <span class="aegis-score-num">{Math.round(detail.aegis_deepfake.audio.score * 100)}%</span>
+                  <span class="aegis-score-label">{currentLang === 'bg' ? 'Синтетика' : 'Synthetic'}</span>
+                </div>
+              </div>
+
+              <div class="aegis-meter-track">
+                <div class="aegis-meter-fill" style="width: {Math.min(100, Math.round(detail.aegis_deepfake.audio.score * 100))}%" class:fill-alert={detail.aegis_deepfake.audio.score >= 0.7}></div>
+              </div>
+
+              <div class="aegis-attribution-box">
+                {#if detail.aegis_deepfake.audio.target_person && (detail.aegis_deepfake.audio.target_confidence ?? 0) >= 0.8}
+                  <div class="aegis-target-alert">
+                    <span class="target-badge-icon">🎯</span>
+                    <div class="target-badge-info">
+                      <strong>{currentLang === 'bg' ? 'Приписан глас на:' : 'Attributed Voice:'}</strong>
+                      <span class="target-name">{detail.aegis_deepfake.audio.target_person}</span>
+                      <span class="target-conf">({Math.round((detail.aegis_deepfake.audio.target_confidence ?? 0) * 100)}% {currentLang === 'bg' ? 'увереност' : 'confidence'})</span>
+                    </div>
+                  </div>
+                {:else if detail.aegis_deepfake.audio.synthetic}
+                  <div class="aegis-target-unattributed">
+                    👤 {currentLang === 'bg' ? 'Синтетичен глас без достатъчна увереност за приписване на конкретна личност (< 80%)' : 'Synthetic voice detected without high attribution confidence (< 80%)'}
+                  </div>
+                {:else}
+                  <div class="aegis-target-clean">
+                    ✓ {currentLang === 'bg' ? 'Не се отчита гласова кражба на публична личност' : 'No public figure voice cloning detected'}
+                  </div>
+                {/if}
+              </div>
+
+              {#if detail.aegis_deepfake.audio.anomalies.length > 0}
+                <div class="aegis-anomalies-list">
+                  <span class="anomalies-head">{currentLang === 'bg' ? 'Аномалии:' : 'Anomalies:'}</span>
+                  {#each detail.aegis_deepfake.audio.anomalies as anomaly}
+                    <span class="aegis-anomaly-chip">⚡ {anomaly}</span>
+                  {/each}
+                </div>
+              {/if}
+
+              <div class="aegis-metrics-grid">
+                {#if detail.aegis_deepfake.audio.metrics?.f0_mean_hz !== undefined}
+                  <div class="metric-item">
+                    <span class="m-label">F0 Pitch:</span>
+                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.f0_mean_hz} Hz</span>
+                  </div>
+                {/if}
+                {#if detail.aegis_deepfake.audio.metrics?.f0_std !== undefined}
+                  <div class="metric-item">
+                    <span class="m-label">F0 Std:</span>
+                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.f0_std} Hz</span>
+                  </div>
+                {/if}
+                {#if detail.aegis_deepfake.audio.metrics?.vocoder_cutoff_ratio !== undefined}
+                  <div class="metric-item">
+                    <span class="m-label">12kHz Cutoff:</span>
+                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.vocoder_cutoff_ratio}</span>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+            <div class="aegis-card aegis-video-card" class:synthetic-detected={detail.aegis_deepfake.video.synthetic}>
+              <div class="aegis-card-top">
+                <div class="aegis-card-title">
+                  <span class="aegis-icon">🎬</span>
+                  <div>
+                    <h4>{currentLang === 'bg' ? 'Видео: Лицева и визуална синтеза' : 'Video: Face & Visual Synthesis'}</h4>
+                    <span class="aegis-class-label">
+                      {#if detail.aegis_deepfake.video.classification === 'face_swap'}
+                        🎭 {currentLang === 'bg' ? 'Face-Swap (Разменено лице)' : 'Face-Swap Deepfake'}
+                      {:else if detail.aegis_deepfake.video.classification === 'generative_video'}
+                        🤖 {currentLang === 'bg' ? 'Генеративно видео (AI Video)' : 'Generative Video'}
+                      {:else}
+                        📹 {currentLang === 'bg' ? 'Автентична камера' : 'Authentic Camera Capture'}
+                      {/if}
+                    </span>
+                  </div>
+                </div>
+                <div class="aegis-score-box" class:score-high={detail.aegis_deepfake.video.score >= 0.7} class:score-med={detail.aegis_deepfake.video.score >= 0.4 && detail.aegis_deepfake.video.score < 0.7}>
+                  <span class="aegis-score-num">{Math.round(detail.aegis_deepfake.video.score * 100)}%</span>
+                  <span class="aegis-score-label">{currentLang === 'bg' ? 'Синтетика' : 'Synthetic'}</span>
+                </div>
+              </div>
+
+              <div class="aegis-meter-track">
+                <div class="aegis-meter-fill" style="width: {Math.min(100, Math.round(detail.aegis_deepfake.video.score * 100))}%" class:fill-alert={detail.aegis_deepfake.video.score >= 0.7}></div>
+              </div>
+
+              <div class="aegis-attribution-box">
+                {#if detail.aegis_deepfake.video.target_person && (detail.aegis_deepfake.video.target_confidence ?? 0) >= 0.8}
+                  <div class="aegis-target-alert">
+                    <span class="target-badge-icon">🎯</span>
+                    <div class="target-badge-info">
+                      <strong>{currentLang === 'bg' ? 'Приписано лице на:' : 'Attributed Face:'}</strong>
+                      <span class="target-name">{detail.aegis_deepfake.video.target_person}</span>
+                      <span class="target-conf">({Math.round((detail.aegis_deepfake.video.target_confidence ?? 0) * 100)}% {currentLang === 'bg' ? 'увереност' : 'confidence'})</span>
+                    </div>
+                  </div>
+                {:else if detail.aegis_deepfake.video.synthetic}
+                  <div class="aegis-target-unattributed">
+                    👤 {currentLang === 'bg' ? 'Модифицирано/синтетично лице без достатъчна увереност за приписване на личност (< 80%)' : 'Synthetic face detected without high attribution confidence (< 80%)'}
+                  </div>
+                {:else}
+                  <div class="aegis-target-clean">
+                    ✓ {currentLang === 'bg' ? 'Не се отчита подменено лице на публична личност' : 'No public figure face swapping detected'}
+                  </div>
+                {/if}
+              </div>
+
+              {#if detail.aegis_deepfake.video.anomalies.length > 0}
+                <div class="aegis-anomalies-list">
+                  <span class="anomalies-head">{currentLang === 'bg' ? 'Аномалии:' : 'Anomalies:'}</span>
+                  {#each detail.aegis_deepfake.video.anomalies as anomaly}
+                    <span class="aegis-anomaly-chip">⚡ {anomaly}</span>
+                  {/each}
+                </div>
+              {/if}
+
+              <div class="aegis-metrics-grid">
+                {#if detail.aegis_deepfake.video.metrics?.seam_gradient_ratio !== undefined}
+                  <div class="metric-item">
+                    <span class="m-label">Seam Gradient:</span>
+                    <span class="m-val">{detail.aegis_deepfake.video.metrics.seam_gradient_ratio}x</span>
+                  </div>
+                {/if}
+                {#if detail.aegis_deepfake.video.metrics?.fft_ratio !== undefined}
+                  <div class="metric-item">
+                    <span class="m-label">FFT Checkerboard:</span>
+                    <span class="m-val">{detail.aegis_deepfake.video.metrics.fft_ratio}</span>
+                  </div>
+                {/if}
+                {#if detail.aegis_deepfake.video.metrics?.laplacian_var !== undefined}
+                  <div class="metric-item">
+                    <span class="m-label">Texture Var:</span>
+                    <span class="m-val">{detail.aegis_deepfake.video.metrics.laplacian_var}</span>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          </div>
+
+          {#if detail.aegis_deepfake.multimodal}
+            <div class="aegis-multimodal-bar" class:av-mismatch={detail.aegis_deepfake.multimodal.av_sync_mismatch}>
+              <div class="av-sync-info">
+                <span class="av-icon">🔄</span>
+                <div>
+                  <strong>{currentLang === 'bg' ? 'Мултимодален AV Синхрон (Говор-Артикулация)' : 'Multimodal AV-Sync (Lip-Sync Congruence)'}</strong>
+                  <span class="av-desc">
+                    {#if detail.aegis_deepfake.multimodal.av_sync_mismatch}
+                      {currentLang === 'bg' ? '⚠️ Открито разминаване между фонемния акустичен контур и движението на устните (типично за синтетичен дублаж / lipsync AI)' : '⚠️ Phoneme-viseme desynchronization detected (typical for AI dubbing / lipsync)'}
+                    {:else}
+                      {currentLang === 'bg' ? '✓ Нормален синхрон между артикулация и аудио спектър' : '✓ Normal phoneme-viseme temporal coherence'}
+                    {/if}
+                  </span>
+                </div>
+              </div>
+              {#if detail.aegis_deepfake.multimodal.av_sync_score !== null && detail.aegis_deepfake.multimodal.av_sync_score !== undefined}
+                <div class="av-score-pill">
+                  {Math.round(detail.aegis_deepfake.multimodal.av_sync_score * 100)}% {currentLang === 'bg' ? 'съгласуваност' : 'match'}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          {#if detail.aegis_deepfake.summary_bg}
+            <div class="aegis-summary-box">
+              <span class="summary-title">📝 {currentLang === 'bg' ? 'Форензичен доклад за журналисти:' : 'Forensic Report for Fact-Checkers:'}</span>
+              <p>{detail.aegis_deepfake.summary_bg}</p>
+            </div>
+          {/if}
+        {:else}
+          <div class="aegis-empty-state">
+            <p>
+              {currentLang === 'bg'
+                ? 'Видеото все още не е преминало през форензичния модул AEGIS. Натиснете бутона по-горе за моментален мултимодален анализ на гласа и лицето.'
+                : 'This media has not been scanned by AEGIS yet. Click the button above to run acoustic and visual deepfake detection.'}
+            </p>
+          </div>
         {/if}
       </div>
 
@@ -1139,6 +1555,7 @@
         {:else}
           {#each detail.claims as cwith, cIdx}
             {@const claim = cwith.claim}
+            {@const src = claimSource(claim.text_bg)}
             <div
               id={`claim-${claim.id}`}
               class="claim-block"
@@ -1147,6 +1564,14 @@
               <div class="claim-header">
                 <span class="claim-index-pill">Т{cIdx + 1}</span>
                 <span class="claim-type-tag">{claim.claim_type}</span>
+                <span
+                  class="claim-source-tag {src}"
+                  title={currentLang === 'bg'
+                    ? 'Откъде идва твърдението: от речта, от текста на екрана или от двете'
+                    : 'Where the claim comes from: speech, on-screen text, or both'}
+                >
+                  {src === 'screen' ? '🖥️' : src === 'both' ? '🎙️+🖥️' : '🎙️'} {claimSourceLabel(src)}
+                </span>
                 <span class="verdict-tag {claim.verdict?.toLowerCase()}">
                   {formatVerdictDisplay(claim.verdict, claim.label, currentLang)}
                 </span>
@@ -2265,6 +2690,370 @@
     gap: 0.5rem;
   }
 
+  .aegis-section {
+    border-color: rgba(99, 102, 241, 0.35);
+    background: linear-gradient(180deg, rgba(30, 27, 75, 0.15) 0%, var(--card-bg) 100%);
+  }
+
+  .aegis-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .aegis-verdict-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .aegis-verdict-deepfake {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    animation: badgePulse 1.8s infinite;
+  }
+
+  .aegis-verdict-suspicious {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+  }
+
+  .aegis-verdict-authentic {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.5);
+  }
+
+  .aegis-verdict-unscanned {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+
+  .aegis-scan-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 6px;
+    background: #4f46e5;
+    color: #fff;
+    border: 1px solid #6366f1;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+
+  .aegis-scan-btn:hover:not(:disabled) {
+    background: #4338ca;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  }
+
+  .aegis-scan-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .aegis-spinner {
+    display: inline-block;
+    animation: cardSpin 1s linear infinite;
+  }
+
+  .aegis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  @media (max-width: 768px) {
+    .aegis-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .aegis-card {
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .aegis-card.synthetic-detected {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.05);
+  }
+
+  .aegis-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .aegis-card-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .aegis-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+  }
+
+  .aegis-card-title h4 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .aegis-class-label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+  }
+
+  .aegis-score-box {
+    text-align: right;
+  }
+
+  .aegis-score-num {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text-heading);
+  }
+
+  .score-high .aegis-score-num {
+    color: #ef4444;
+  }
+
+  .score-med .aegis-score-num {
+    color: #f59e0b;
+  }
+
+  .aegis-score-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .aegis-meter-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .aegis-meter-fill {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  .aegis-meter-fill.fill-alert {
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
+  }
+
+  .aegis-attribution-box {
+    margin-top: 0.2rem;
+  }
+
+  .aegis-target-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(239, 68, 68, 0.16);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    padding: 0.45rem 0.6rem;
+    border-radius: 5px;
+    color: #fca5a5;
+  }
+
+  .target-badge-icon {
+    font-size: 1.1rem;
+  }
+
+  .target-badge-info {
+    font-size: 0.75rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .target-name {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #fee2e2;
+  }
+
+  .target-conf {
+    font-size: 0.68rem;
+    color: #fca5a5;
+  }
+
+  .aegis-target-unattributed {
+    font-size: 0.72rem;
+    color: #d1d5db;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  .aegis-target-clean {
+    font-size: 0.72rem;
+    color: #10b981;
+    padding: 0.25rem 0.4rem;
+  }
+
+  .aegis-anomalies-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+  }
+
+  .anomalies-head {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .aegis-anomaly-chip {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .aegis-metrics-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
+  .metric-item {
+    font-size: 0.68rem;
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .m-label {
+    color: var(--text-muted);
+  }
+
+  .m-val {
+    font-weight: 700;
+    color: var(--text-body);
+  }
+
+  .aegis-multimodal-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    margin-top: 0.75rem;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    gap: 0.75rem;
+  }
+
+  .aegis-multimodal-bar.av-mismatch {
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  .av-sync-info {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    font-size: 0.78rem;
+  }
+
+  .av-icon {
+    font-size: 1.2rem;
+  }
+
+  .av-desc {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+  }
+
+  .av-score-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-body);
+    white-space: nowrap;
+  }
+
+  .aegis-summary-box {
+    margin-top: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    background: rgba(0, 0, 0, 0.25);
+    border-left: 3px solid #6366f1;
+    border-radius: 4px;
+  }
+
+  .summary-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #a5b4fc;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .aegis-summary-box p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-body);
+  }
+
+  .aegis-empty-state {
+    padding: 1.2rem 0.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+
+  .aegis-error-banner {
+    margin: 0.5rem 0;
+    padding: 0.4rem 0.6rem;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid #ef4444;
+    color: #fca5a5;
+    font-size: 0.75rem;
+    border-radius: 4px;
+  }
+
   .transcript-btn-group {
     display: flex;
     align-items: center;
@@ -2338,6 +3127,164 @@
     background: rgba(217, 119, 6, 0.15);
     border-bottom: 2px solid var(--verdict-unverifiable);
     color: var(--text-heading);
+  }
+
+  .ocr-overview {
+    margin-bottom: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+  }
+
+  .ocr-overview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .ocr-toggle {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--pill-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .ocr-toggle:hover {
+    background: var(--hover-bg);
+  }
+
+  .ocr-toggle.on {
+    background: var(--primary-accent-alpha);
+    color: var(--primary-accent);
+    border-color: var(--primary-accent);
+  }
+
+  .ocr-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .ocr-legend i {
+    display: inline-block;
+    border-radius: 3px;
+  }
+
+  .ocr-legend .lg-speech {
+    width: 16px;
+    height: 6px;
+    background: var(--text-muted);
+    opacity: 0.4;
+  }
+
+  .ocr-legend .lg-ocr {
+    width: 4px;
+    height: 12px;
+    margin-left: 0.5rem;
+    background: var(--primary-accent);
+  }
+
+  .ocr-track {
+    position: relative;
+    height: 22px;
+    margin-top: 0.55rem;
+    background: var(--input-bg);
+    border-radius: 4px;
+  }
+
+  .ocr-track-speech {
+    position: absolute;
+    top: 8px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--text-muted);
+    opacity: 0.4;
+  }
+
+  .ocr-track-mark {
+    position: absolute;
+    top: 2px;
+    width: 4px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    background: var(--primary-accent);
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+
+  .ocr-track-mark:hover {
+    transform: translateX(-50%) scaleX(1.8);
+  }
+
+  .ocr-track-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--text-heading);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .ocr-chip {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0.35rem 0;
+    padding: 0.3rem 0.6rem;
+    border-left: 3px solid var(--primary-accent);
+    border-radius: 4px;
+    background: var(--primary-accent-alpha);
+    color: var(--text-body);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .ocr-chip:hover {
+    background: var(--hover-bg);
+  }
+
+  .ocr-chip.active {
+    box-shadow: 0 0 0 1px var(--primary-accent);
+    color: var(--text-heading);
+  }
+
+  .ocr-chip-tag {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--primary-accent);
+    white-space: nowrap;
+  }
+
+  .ocr-chip-text {
+    font-style: italic;
+    word-break: break-word;
+  }
+
+  .ocr-tail {
+    margin-top: -1px;
+    padding: 0.4rem 0.75rem;
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-top: 1px dashed var(--border-color);
+    border-radius: 0 0 6px 6px;
   }
 
   .claim-badge-inline {
@@ -2414,6 +3361,22 @@
     padding: 2px 6px;
     border-radius: 4px;
     border: 1px solid var(--border-color);
+  }
+
+  .claim-source-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: var(--pill-bg);
+    color: var(--text-muted);
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .claim-source-tag.screen,
+  .claim-source-tag.both {
+    background: var(--primary-accent-alpha);
+    color: var(--primary-accent);
   }
 
   .claim-type-tag {

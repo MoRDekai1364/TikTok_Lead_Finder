@@ -1,4 +1,5 @@
 import type {
+  AegisDeepfakeResult,
   BenchmarkProgress,
   BenchmarkStatusResponse,
   Creator,
@@ -6,6 +7,7 @@ import type {
   CuratedModelCatalogItem,
   CustomScanConfig,
   CustomScanResult,
+  EntityIntelEvent,
   ExternalAiServerStatus,
   GeminiStatus,
   HardwareProfile,
@@ -18,6 +20,7 @@ import type {
   Person,
   PowerInfo,
   QueueCounts,
+  SanctionsMatch,
   ScaleStatus,
   Seed,
   VideoDetail,
@@ -110,6 +113,10 @@ function mapSummaryToCard(raw: any): LeadCard {
     progress_pct: typeof raw?.progress_pct === 'number' ? raw.progress_pct : null,
     etr_seconds: typeof raw?.etr_seconds === 'number' ? raw.etr_seconds : null,
     stage_desc: raw?.stage_desc ?? null,
+    aegis_verdict: raw?.aegis_verdict ?? null,
+    aegis_audio_score: typeof raw?.aegis_audio_score === 'number' ? raw.aegis_audio_score : null,
+    aegis_video_score: typeof raw?.aegis_video_score === 'number' ? raw.aegis_video_score : null,
+    aegis_target_person: raw?.aegis_target_person ?? null,
   };
 }
 
@@ -147,6 +154,22 @@ export async function fetchVideos(lane: string = 'leads', limit: number = 2000):
 
 export async function fetchVideoDetail(id: string): Promise<VideoDetail> {
   return fetchJson<VideoDetail>(`/api/videos/${encodeURIComponent(id)}`);
+}
+
+export async function fetchDeepfakeResult(id: string): Promise<AegisDeepfakeResult | null> {
+  try {
+    const res = await fetchJson<{ ok: boolean; aegis: AegisDeepfakeResult }>(`/api/videos/${encodeURIComponent(id)}/deepfake`);
+    return res?.aegis || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function triggerAegisScan(id: string): Promise<AegisDeepfakeResult> {
+  const res = await fetchJson<{ ok: boolean; aegis: AegisDeepfakeResult }>(`/api/videos/${encodeURIComponent(id)}/deepfake`, {
+    method: 'POST',
+  });
+  return res.aegis;
 }
 
 export async function aiCheckTranscript(id: string): Promise<{ ok: boolean; video_id: string; corrected_text: string }> {
@@ -420,6 +443,21 @@ export async function fetchPersonDossierMarkdown(personId: number): Promise<stri
   const res = await fetch(`${base}/api/people/${personId}/dossier`);
   if (!res.ok) throw new Error('Failed to fetch dossier');
   return res.text();
+}
+
+export async function fetchPersonIntelStream(personId: number): Promise<EntityIntelEvent[]> {
+  const res = await fetchJson<{ events: EntityIntelEvent[] }>(`/api/people/${personId}/intel-stream`);
+  return res.events || [];
+}
+
+export async function refreshPersonIntelStream(personId: number): Promise<{ events: EntityIntelEvent[]; newly_added: number; monitored_at: string }> {
+  return fetchJson<{ events: EntityIntelEvent[]; newly_added: number; monitored_at: string }>(`/api/people/${personId}/intel-stream/refresh`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchPersonSanctions(personId: number): Promise<{ matches: SanctionsMatch[]; checked_at: string; cached: boolean }> {
+  return fetchJson<{ matches: SanctionsMatch[]; checked_at: string; cached: boolean }>(`/api/people/${personId}/sanctions`);
 }
 
 export async function fetchVideosByCreator(creatorId: string, limit: number = 10): Promise<LeadCard[]> {

@@ -534,6 +534,86 @@ pub struct LeadCardSummary {
     pub etr_seconds: Option<i64>,
     #[serde(default)]
     pub stage_desc: Option<String>,
+    #[serde(default)]
+    pub aegis_verdict: Option<String>,
+    #[serde(default)]
+    pub aegis_audio_score: Option<f64>,
+    #[serde(default)]
+    pub aegis_video_score: Option<f64>,
+    #[serde(default)]
+    pub aegis_target_person: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AegisAudioDetails {
+    pub score: f64,
+    pub synthetic: bool,
+    pub classification: String,
+    pub target_person: Option<String>,
+    pub target_confidence: Option<f64>,
+    pub anomalies: Vec<String>,
+    pub metrics: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AegisVideoDetails {
+    pub score: f64,
+    pub synthetic: bool,
+    pub classification: String,
+    pub target_person: Option<String>,
+    pub target_confidence: Option<f64>,
+    pub anomalies: Vec<String>,
+    pub metrics: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AegisMultimodalDetails {
+    pub av_sync_score: Option<f64>,
+    pub av_sync_mismatch: bool,
+    pub anomalies: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AegisDeepfakeResult {
+    pub audio: AegisAudioDetails,
+    pub video: AegisVideoDetails,
+    pub multimodal: AegisMultimodalDetails,
+    pub overall_verdict: String,
+    pub summary_bg: String,
+    pub analyzed_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SanctionsMatch {
+    pub dataset: String,
+    pub caption: String,
+    pub schema: String,
+    pub match_score: f64,
+    pub birth_date: Option<String>,
+    pub countries: Vec<String>,
+    pub sanctor: Option<String>,
+    pub program: Option<String>,
+    pub source_url: Option<String>,
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityIntelEvent {
+    pub id: i64,
+    pub person_id: i64,
+    pub source_name: String,
+    pub title: String,
+    pub url: String,
+    pub discovered_at: String,
+    pub snippet: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityPivotRef {
+    pub entity_name: String,
+    pub entity_kind: String,
+    pub relevance: f64,
+    pub registry_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -545,6 +625,8 @@ pub struct VideoDetail {
     pub claims: Vec<ClaimWithEvidence>,
     pub people: Vec<Person>,
     pub decisions: Vec<Decision>,
+    #[serde(default)]
+    pub aegis_deepfake: Option<AegisDeepfakeResult>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

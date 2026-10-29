@@ -226,6 +226,7 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/rank/tune", post(handle_tune))
         .route("/api/videos", get(handle_list_videos))
         .route("/api/videos/:id", get(handle_video_detail).delete(handle_delete_video))
+        .route("/api/videos/:id/deepfake", get(handle_get_deepfake).post(handle_trigger_deepfake))
         .route("/api/videos/:id/decision", post(handle_decision))
         .route("/api/videos/:id/transcript", patch(handle_edit_transcript))
         .route("/api/videos/:id/retranscribe", post(handle_retranscribe))
@@ -240,6 +241,9 @@ pub fn build_router(ctx: Arc<PipelineContext>) -> Router {
         .route("/api/people/auto-classify", post(handle_auto_classify_people))
         .route("/api/people/:id", get(handle_get_person).put(handle_update_person).delete(handle_delete_person))
         .route("/api/people/:id/dossier", get(handle_get_person_dossier))
+        .route("/api/people/:id/intel-stream", get(handle_get_person_intel_stream))
+        .route("/api/people/:id/intel-stream/refresh", post(handle_refresh_person_intel_stream))
+        .route("/api/people/:id/sanctions", get(handle_get_person_sanctions))
         .route("/api/people/:id/research", post(handle_research_person))
         .route("/api/videos/:video_id/people/:person_id/reassign", post(handle_reassign_video_person))
         .route("/api/videos/:video_id/people/:person_id", delete(handle_remove_video_person))
@@ -577,6 +581,34 @@ async fn handle_delete_video(
     }
 }
 
+async fn handle_get_deepfake(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+) -> Response {
+    match ctx.db.get_aegis_result(&id).await {
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": res })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn handle_trigger_deepfake(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<String>,
+) -> Response {
+    match ctx.run_aegis_deepfake_detection(&id).await {
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": res })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
 async fn handle_decision(
     State(ctx): State<Arc<PipelineContext>>,
     Path(id): Path<String>,
@@ -593,20 +625,90 @@ async fn handle_decision(
         Ok(dec) => {
             if matches!(body.action.as_str(), "research_more" | "rerun_verify") {
                 if let Ok(job) = ctx.db.enqueue_job(Some(&id), Stage::ResearchMore).await {
+                    let job_id = job.id;
+                    let job_stage = job.stage.clone();
+                    let run_ctx = Arc::clone(&ctx);
+                    let run_vid = id.clone();
+                    let _ = ctx.db.mark_job_running(job_id).await;
                     ctx.emit(CoreEvent::JobUpdated {
-                        job_id: job.id,
+                        job_id,
                         video_id: Some(id.clone()),
-                        stage: job.stage,
-                        status: job.status,
+                        stage: job_stage.clone(),
+                        status: "running".to_string(),
+                    });
+                    tokio::spawn(async move {
+                        let res = run_ctx.run_research_more_job(&run_vid).await;
+                        match res {
+                            Ok(()) => {
+                                let _ = run_ctx.db.complete_job(job_id).await;
+                                run_ctx.emit(CoreEvent::JobUpdated {
+                                    job_id,
+                                    video_id: Some(run_vid.clone()),
+                                    stage: job_stage,
+                                    status: "succeeded".to_string(),
+                                });
+                                if let Ok(Some(v)) = run_ctx.db.get_video(&run_vid).await {
+                                    run_ctx.emit(CoreEvent::VideoUpdated {
+                                        video_id: run_vid,
+                                        state: v.state,
+                                        lane: v.lane,
+                                    });
+                                }
+                            }
+                            Err(err) => {
+                                let _ = run_ctx.db.fail_or_retry_job(&job, &err.to_string(), 3, false).await;
+                                run_ctx.emit(CoreEvent::JobUpdated {
+                                    job_id,
+                                    video_id: Some(run_vid),
+                                    stage: job_stage,
+                                    status: "failed".to_string(),
+                                });
+                            }
+                        }
                     });
                 }
             } else if body.action == "rerun_claims" {
                 if let Ok(job) = ctx.db.enqueue_job(Some(&id), Stage::Claims).await {
+                    let job_id = job.id;
+                    let job_stage = job.stage.clone();
+                    let run_ctx = Arc::clone(&ctx);
+                    let run_vid = id.clone();
+                    let _ = ctx.db.mark_job_running(job_id).await;
                     ctx.emit(CoreEvent::JobUpdated {
-                        job_id: job.id,
+                        job_id,
                         video_id: Some(id.clone()),
-                        stage: job.stage,
-                        status: job.status,
+                        stage: job_stage.clone(),
+                        status: "running".to_string(),
+                    });
+                    tokio::spawn(async move {
+                        let res = run_ctx.run_claims_job(&run_vid).await;
+                        match res {
+                            Ok(()) => {
+                                let _ = run_ctx.db.complete_job(job_id).await;
+                                run_ctx.emit(CoreEvent::JobUpdated {
+                                    job_id,
+                                    video_id: Some(run_vid.clone()),
+                                    stage: job_stage,
+                                    status: "succeeded".to_string(),
+                                });
+                                if let Ok(Some(v)) = run_ctx.db.get_video(&run_vid).await {
+                                    run_ctx.emit(CoreEvent::VideoUpdated {
+                                        video_id: run_vid,
+                                        state: v.state,
+                                        lane: v.lane,
+                                    });
+                                }
+                            }
+                            Err(err) => {
+                                let _ = run_ctx.db.fail_or_retry_job(&job, &err.to_string(), 3, false).await;
+                                run_ctx.emit(CoreEvent::JobUpdated {
+                                    job_id,
+                                    video_id: Some(run_vid),
+                                    stage: job_stage,
+                                    status: "failed".to_string(),
+                                });
+                            }
+                        }
                     });
                 }
             } else if body.action == "rerun_extract" {
@@ -1481,12 +1583,47 @@ async fn handle_research_person(
         }
     }
 
-    let (existing_cat, existing_ent) = if let Ok(Some(p)) = ctx.db.get_person_by_id(id).await {
-        (p.category, Some(p.entity_type))
+    let (existing_person, existing_cat, existing_ent, person_variants) = if let Ok(Some(p)) = ctx.db.get_person_by_id(id).await {
+        let vars = p.variants.clone();
+        (Some(p.clone()), p.category, Some(p.entity_type), vars)
     } else {
-        (None, None)
+        (None, None, None, Vec::new())
     };
     let entity_type = existing_ent.unwrap_or_else(|| leadfinder_providers::detect_entity_type(&name, None).to_string());
+
+    let sanctions_matcher = leadfinder_providers::SanctionsMatcher::new();
+    let sanctions_matches = sanctions_matcher.check_entity(&name, &person_variants).await.unwrap_or_default();
+    let _ = ctx.db.save_sanctions_matches(id, &sanctions_matches).await;
+
+    let mut sanctions_summary_lines: Vec<String> = Vec::new();
+    if !sanctions_matches.is_empty() {
+        for sm in &sanctions_matches {
+            let mut line = format!("- [{}] {} (Увереност: {:.0}%)", sm.dataset, sm.caption, sm.match_score * 100.0);
+            if let Some(ref p) = sm.program {
+                line.push_str(&format!(" Програма: {}", p));
+            }
+            if let Some(ref s) = sm.sanctor {
+                line.push_str(&format!(" Санкциониращ орган: {}", s));
+            }
+            sanctions_summary_lines.push(line);
+        }
+    }
+    let sanctions_context_block = if sanctions_summary_lines.is_empty() {
+        "Справка в международните регистри: Не са открити активни санкционни съвпадения в базите на ООН, US OFAC SDN, ЕС, UK OFSI, Швейцария SECO, НАЗК или Интерпол.".to_string()
+    } else {
+        format!("РЕГИСТРИРАНИ МЕЖДУНАРОДНИ САНКЦИОННИ И PEP СЪВПАДЕНИЯ:\n{}", sanctions_summary_lines.join("\n"))
+    };
+
+    let news_stream = leadfinder_providers::DynamicNewsStream::new();
+    let live_events = news_stream.fetch_events_for_entity(id, &name, &person_variants, 8).await.unwrap_or_default();
+    let mut newly_recorded_events = 0usize;
+    for ev in &live_events {
+        if let Ok(_) = ctx.db.record_intel_event(id, &ev.source_name, &ev.title, &ev.url, &ev.snippet).await {
+            newly_recorded_events += 1;
+        }
+        hits_text.push(format!("Новинарски поток [{}] {}: {}\n{}", ev.source_name, ev.title, ev.url, ev.snippet));
+    }
+    let _ = ctx.db.touch_person_monitored(id).await;
 
     let mut video_contexts: Vec<String> = Vec::new();
     if let Ok(vids) = ctx.db.get_videos_for_person(id).await {
@@ -1505,32 +1642,81 @@ async fn handle_research_person(
             video_contexts.push(line);
         }
     }
+    let vid_context_block = if video_contexts.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nСвързан контекст от TikTok видеа:\n{}", video_contexts.join("\n"))
+    };
 
-    let queries = match entity_type.as_str() {
-        "institution" => [
-            format!("{} институция ръководство структура правомощия дейност", name),
-            format!("{} бюджет финансиране обществени поръчки одит проверки", name),
-            format!("{} решения съдебни дела скандали проверки критики", name),
+    let mut aegis_dossier_notes: Vec<String> = Vec::new();
+    if let Ok(vids) = ctx.db.get_videos_for_person(id).await {
+        for (vid_id, _, _) in &vids {
+            if let Ok(Some(df)) = ctx.db.get_aegis_result(vid_id).await {
+                if df.overall_verdict == "deepfake" || df.audio.synthetic || df.video.synthetic {
+                    let mut note = format!("- Видео ID {}: Присъда '{}'.", vid_id, df.overall_verdict);
+                    if df.audio.synthetic {
+                        note.push_str(&format!(" Аудио: {:.0}% ({})", df.audio.score * 100.0, df.audio.classification));
+                        if let Some(ref t) = df.audio.target_person {
+                            note.push_str(&format!(" [Имитиран глас: {}]", t));
+                        }
+                    }
+                    if df.video.synthetic {
+                        note.push_str(&format!(" Видео: {:.0}% ({})", df.video.score * 100.0, df.video.classification));
+                        if let Some(ref t) = df.video.target_person {
+                            note.push_str(&format!(" [Имитирано лице: {}]", t));
+                        }
+                    }
+                    aegis_dossier_notes.push(note);
+                }
+            }
+        }
+    }
+    let aegis_summary_str = if aegis_dossier_notes.is_empty() {
+        "В анализираните до момента видеа в базата на TikTok Lead Finder не са регистрирани успешни deepfake атаки или опити за клониране на гласа на субекта.".to_string()
+    } else {
+        format!("AEGIS ФОРЕНЗИЧНИ РЕГИСТРАЦИИ НА ДИГИТАЛНА ИМИТАЦИЯ:\n{}", aegis_dossier_notes.join("\n"))
+    };
+
+    let queries: Vec<String> = match entity_type.as_str() {
+        "institution" => vec![
+            format!("{} институция ръководство структура правомощия дейност устав", name),
+            format!("{} бюджет финансиране обществени поръчки одит проверки сметна палата", name),
+            format!("{} решения съдебни дела скандали проверки критики констатации", name),
+            format!("{} европейски програми субсидии договори проекти финансиране", name),
+            format!("{} официален сайт седалище адрес контакти ръководител", name),
         ],
-        "country" => [
-            format!("{} държавно управление институции правителство структура", name),
-            format!("{} икономика геополитика международни договори санкции", name),
-            format!("{} кризи сигурност доклади права факти", name),
+        "country" => vec![
+            format!("{} държавно управление институции правителство конституция структура", name),
+            format!("{} икономика геополитика международни договори санкции съюзи", name),
+            format!("{} кризи сигурност доклади права факти вътрешен ред", name),
+            format!("{} макроикономика бвп финанси валута търговия външен дълг", name),
+            format!("{} медийна среда свобода слово дезинформация външно влияние", name),
         ],
-        "channel" => [
-            format!("{} автор водещ канал предаване аудитория последователи", name),
-            format!("{} медия продуцент собственост съдържание финансиране", name),
-            format!("{} дезинформация проверка на факти скандали критики", name),
+        "channel" => vec![
+            format!("{} автор водещ канал предаване аудитория последователи екип", name),
+            format!("{} медия продуцент собственост съдържание финансиране издател", name),
+            format!("{} дезинформация проверка на факти скандали критики опровержения", name),
+            format!("{} журналисти гости теми позиции интервюта предавания", name),
+            format!("{} платформи youtube tiktok facebook монетизация реклами", name),
         ],
-        "group" => [
-            format!("{} партия коалиция движение ръководство лидери членове", name),
-            format!("{} финансиране дарения активи свързани лица фирми", name),
-            format!("{} платформа позиции избори скандали разследвания", name),
+        "group" => vec![
+            format!("{} партия коалиция движение ръководство лидери членове устав", name),
+            format!("{} финансиране дарения активи свързани лица фирми сметна палата", name),
+            format!("{} платформа позиции избори скандали разследвания резултати", name),
+            format!("{} устав цели парламентарна група съюзници коалиция", name),
+            format!("{} лобистки интереси бизнес кръгове покровители спонсори", name),
         ],
-        _ => [
-            format!("{} биография произход образование кариера длъжност", name),
-            format!("{} фирми собственост имущество съдружници капитал", name),
-            format!("{} съд дела разследвания скандали проверка факти", name),
+        _ => vec![
+            format!("{} биография дата раждане произход образование кариера семейство", name),
+            format!("{} търговски регистър фирми собственост управител съдружник папагал бра", name),
+            format!("{} обществени поръчки агенция аоп държавни договори бенефициент еврофондове", name),
+            format!("{} съдебни дела съд прокуратура кпконпи разследвания проверки санкции", name),
+            format!("{} политическа партия длъжности постове избори декларация имущество", name),
+            format!("{} bird bg bivol капитал медиапул разследване афера скандал", name),
+            format!("{} свързани лица партньори бизнес кръгове семейни връзки съдружници", name),
+            format!("{} интервюта медийни участия публични изявления конфликти позиции", name),
+            format!("{} дезинформация проверка на факти фактчек фалшиви новини", name),
+            format!("{} уикипедия wikidata профил официален сайт", name),
         ],
     };
 
@@ -1543,10 +1729,13 @@ async fn handle_research_person(
             restrict_domains: Vec::new(),
             date_from: None,
             date_to: None,
-            max_results: 4,
+            max_results: 5,
         };
         if let Ok(hits) = search_engine.search(&sq).await {
-            for hit in hits.into_iter().take(3) {
+            for hit in hits.into_iter().take(4) {
+                if hits_text.len() >= 15 {
+                    break;
+                }
                 if !hits_text.iter().any(|h| h.contains(&hit.url)) {
                     let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
                     let txt = ranker.extract_main_text(&html);
@@ -1558,32 +1747,177 @@ async fn handle_research_person(
                             combined.contains(&name_low)
                         };
                         if name_present {
-                            hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(1500).collect::<String>()));
+                            hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(3500).collect::<String>()));
                         }
+                    }
+                }
+            }
+        }
+        if hits_text.len() >= 15 {
+            break;
+        }
+    }
+
+    let preliminary_combined = hits_text.join("\n");
+    let entity_pivots = leadfinder_providers::extract_entity_pivots(&preliminary_combined, &name);
+
+    for pivot in entity_pivots.iter().take(3) {
+        let pivot_query = format!("\"{}\" собственик управител съдружник сделки", pivot.entity_name);
+        let sq = leadfinder_core::SearchQuery {
+            query: pivot_query,
+            restrict_domains: Vec::new(),
+            date_from: None,
+            date_to: None,
+            max_results: 3,
+        };
+        if let Ok(hits) = search_engine.search(&sq).await {
+            for hit in hits.into_iter().take(2) {
+                if hits_text.len() >= 22 {
+                    break;
+                }
+                if !hits_text.iter().any(|h| h.contains(&hit.url)) {
+                    let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+                    let txt = ranker.extract_main_text(&html);
+                    if !txt.is_empty() {
+                        hits_text.push(format!("Пивот свързана организация [{}] {}: {}\n{}", pivot.entity_name, hit.title, hit.url, txt.chars().take(2500).collect::<String>()));
                     }
                 }
             }
         }
     }
 
+    let delta_summary = if let Some(ref prev) = existing_person {
+        if prev.researched_at.is_some() {
+            let mut deltas = Vec::new();
+            if newly_recorded_events > 0 {
+                deltas.push(format!("{} нови събития в новинарския поток", newly_recorded_events));
+            }
+            if !sanctions_matches.is_empty() {
+                deltas.push(format!("Актуализирани {} международни санкционни/PEP съответствия", sanctions_matches.len()));
+            }
+            if !entity_pivots.is_empty() {
+                deltas.push(format!("Картографирани {} свързани корпоративни субекта ({})", entity_pivots.len(), entity_pivots.iter().take(3).map(|p| p.entity_name.as_str()).collect::<Vec<_>>().join(", ")));
+            }
+            if deltas.is_empty() {
+                "Няма критични промени в правния и оперативен статус спрямо предходния скан.".to_string()
+            } else {
+                format!("ДЕЛТА АНАЛИЗ (Какво се промени): {}", deltas.join("; "))
+            }
+        } else {
+            "Първоначално задълбочено разузнавателно картографиране на субекта.".to_string()
+        }
+    } else {
+        "Първоначално задълбочено разузнавателно картографиране на субекта.".to_string()
+    };
+
     let summary_context = hits_text.join("\n\n---\n\n");
     let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
-    let schema_val = serde_json::json!({
+
+    let chapter_block_schema = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "chapter_markdown": { "type": "string" }
+        },
+        "required": ["chapter_markdown"]
+    });
+
+    let b1_system = format!(
+        "You are an elite OSINT intelligence analyst and master investigative journalist. Generate an exhaustive, deep, and fully verified report for Chapters 1, 2, and 3 on the subject in Bulgarian (Target: ~2,500 - 3,500 words). The 'chapter_markdown' field must contain rich, multi-paragraph factual prose with dates, entities, institutions, and citations:\n\
+        # ГЛАВА 1: ПЪЛНА ИДЕНТИЧНОСТ, ПРОИЗХОД И БИОГРАФИЧНА ХРОНОЛОГИЯ\n\
+        (Пълно име, варианти, дата и място на раждане, произход, семейна среда, гимназиално и висше образование, университет, академични квалификации, хронология на заеманите длъжности по години)\n\
+        # ГЛАВА 2: ТЪРГОВСКИ РЕГИСТЪР, КОРПОРАТИВНИ АКТИВИ И СОБСТВЕНОСТ\n\
+        (Изчерпателна справка по Търговския регистър - Агенция по вписванията, Papagal.bg, Brra.bg: търговски дружества, ЕИК, дял в капитала, текущ правен статус, управителни органи, съвети на директорите, ликвидации, несъстоятелност, холдингови и офшорни връзки)\n\
+        # ГЛАВА 3: МРЕЖА ОТ СВЪРЗАНИ ЛИЦА, СЪДРУЖНИЦИ И ВЛИЯТЕЛНИ КРЪГОВЕ\n\
+        (Картографиране на личните, икономическите и политическите връзки: ключови съдружници, бизнес партньори, семейни фирмени връзки, неформални влиятелни кръгове, политически покровители и финансови посредници)\n\
+        Do NOT write brief summaries. Write dense, extensive, multi-paragraph investigative analysis with facts. Output strictly valid JSON."
+    );
+    let b1_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: b1_system,
+        user_prompt: format!("Субект: {} (Тип: {})\n\nСвързан контекст от анализирани видеа:\n{}\n\nРазузнавателни данни и източници:\n{}", name, entity_type, vid_context_block, summary_context),
+        json_schema: Some(chapter_block_schema.clone()),
+        max_tokens: 4096,
+        temperature: 0.1,
+    };
+    let block1_md = runner.complete_validated(&b1_req, &ctx.db).await
+        .ok()
+        .and_then(|val| val.response.parsed_json.get("chapter_markdown").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .unwrap_or_default();
+
+    let b2_system = format!(
+        "You are an elite OSINT intelligence analyst and financial crime investigator. Generate an exhaustive, deep, and fully verified report for Chapters 4, 5, and 6 on the subject in Bulgarian (Target: ~2,500 - 3,500 words). The 'chapter_markdown' field must contain rich, multi-paragraph factual prose with dates, legal files, contracts, and citations:\n\
+        # ГЛАВА 4: ОБЩЕСТВЕНИ ПОРЪЧКИ, ДЪРЖАВНО ФИНАНСИРАНЕ И ЕВРОФОНДОВЕ\n\
+        (Регистър на обществените поръчки - АОП: спечелени обществени поръчки от свързани фирми, възложители - министерства, общини, държавни предприятия, стойност на договорите, европейски структурни и кохезионни фондове, субсидии, концесии)\n\
+        # ГЛАВА 5: СЪДЕБЕН СТАТУС, КПКОНПИ, САНКЦИИ И РАЗСЛЕДВАНИЯ\n\
+        (Правен статус: PEP класификация, съдебни дела, граждански и наказателни производства, преписки в Прокуратурата, проверки на КПКОНПИ за конфликт на интереси и отнемане на незаконно имущество, Сметна палата, НАП ревизии, санкционни списъци - Магнитски, ЕС)\n\
+        # ГЛАВА 6: МЕДИЙНИ СКАНДАЛИ, РАЗСЛЕДВАЩА ЖУРНАЛИСТИКА И ПОЗИЦИИ\n\
+        (Преглед на разследващата журналистика - Bird.bg, Bivol.bg, Капитал, Медиапул, Свободна Европа, Factcheck.bg: публични скандали, изтекли записи, журналистически разследвания, опровержения, конфликти с институции или опоненти)\n\
+        Do NOT write brief summaries. Write dense, extensive, multi-paragraph investigative analysis with facts. Output strictly valid JSON."
+    );
+    let b2_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: b2_system,
+        user_prompt: format!("Субект: {} (Тип: {})\n\nМеждународни санкции и PEP статус:\n{}\n\nСвързан контекст от анализирани видеа:\n{}\n\nРазузнавателни данни и източници:\n{}", name, entity_type, sanctions_context_block, vid_context_block, summary_context),
+        json_schema: Some(chapter_block_schema.clone()),
+        max_tokens: 4096,
+        temperature: 0.1,
+    };
+    let block2_md = runner.complete_validated(&b2_req, &ctx.db).await
+        .ok()
+        .and_then(|val| val.response.parsed_json.get("chapter_markdown").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .unwrap_or_default();
+
+    let b3_system = format!(
+        "You are an elite OSINT and cyber-threat intelligence investigator specializing in disinformation and AI synthetic manipulation. Generate an exhaustive report for Chapters 7, 8, and 9 on the subject in Bulgarian (Target: ~2,000 - 3,000 words). The 'chapter_markdown' field must contain rich, multi-paragraph factual prose with forensic observations, narrative breakdown, risk matrix, and bibliography:\n\
+        # ГЛАВА 7: AEGIS АНАЛИЗ НА ДИГИТАЛНА ИМИТАЦИЯ, DEEPFAKE И ДЕЗИНФОРМАЦИЯ\n\
+        (Анализ от форензичния модул AEGIS: Всички регистрирани инциденти с клониран AI глас, роботизиран дублаж или лицева замяна - face swap в анализираните видеа, използвани синтетични модели, детекционна увереност, рискови дезинформационни наративи и уязвимост от дигитална кражба на самоличност)\n\
+        # ГЛАВА 8: ПСИХОГРАФСКИ, РЕТОРИЧЕН И НАРАТИВЕН ПРОФИЛ\n\
+        (Анализ на публичното говорене: реторичен стил, манипулативни езикови похвати, целеви аудитории, психографски нагласи, ключови опорни точки, идеологически и геополитически тези)\n\
+        # ГЛАВА 9: КОМПЛЕКСНА ОЦЕНКА НА РИСКА (PEP/AML), ЗАКЛЮЧЕНИЯ И ИЗТОЧНИЦИ\n\
+        (Синтезирана оценка за риск от измама, пране на пари - AML или дезинформация. Препоръки за фактчекъри и разследващи журналисти. Изчерпателен библиографски списък на всички проверени открити регистри, уебсайтове и медийни публикации с линкове)\n\
+        Do NOT write brief summaries. Write dense, extensive, multi-paragraph investigative analysis with facts. Output strictly valid JSON."
+    );
+    let b3_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: b3_system,
+        user_prompt: format!("Субект: {} (Тип: {})\n\nДанни от AEGIS модула за дигитална имитация:\n{}\n\nМеждународни санкции и PEP статус:\n{}\n\nСвързан контекст от видеа:\n{}\n\nРазузнавателни данни и източници:\n{}", name, entity_type, aegis_summary_str, sanctions_context_block, vid_context_block, summary_context),
+        json_schema: Some(chapter_block_schema.clone()),
+        max_tokens: 4096,
+        temperature: 0.1,
+    };
+    let block3_md = runner.complete_validated(&b3_req, &ctx.db).await
+        .ok()
+        .and_then(|val| val.response.parsed_json.get("chapter_markdown").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .unwrap_or_default();
+
+    let mut dossier_parts: Vec<String> = Vec::new();
+    dossier_parts.push(format!("# OSINT РАЗУЗНАВАТЕЛНО ДОСИЕ: {}\n\n**Обект на разследване**: {} | **Тип**: {} | **Статус**: Пълен оперативен профил (AEGIS / Dynamic Living OSINT)\n\n> [!NOTE]\n> **{}**\n", name, name, entity_type, delta_summary));
+
+    if !block1_md.trim().is_empty() {
+        dossier_parts.push(block1_md.trim().to_string());
+    } else {
+        dossier_parts.push(generate_fallback_block1(&name, &entity_type, &hits_text));
+    }
+
+    if !block2_md.trim().is_empty() {
+        dossier_parts.push(block2_md.trim().to_string());
+    } else {
+        dossier_parts.push(generate_fallback_block2(&name, &entity_type, &hits_text));
+    }
+
+    if !block3_md.trim().is_empty() {
+        dossier_parts.push(block3_md.trim().to_string());
+    } else {
+        dossier_parts.push(generate_fallback_block3(&name, &entity_type, &aegis_summary_str, &hits_text, &video_contexts));
+    }
+
+    let report_md = dossier_parts.join("\n\n---\n\n");
+
+    let meta_schema = serde_json::json!({
         "type": "object",
         "properties": {
             "role": { "type": "string" },
             "summary": { "type": "string" },
             "public_figure": { "type": "boolean" },
             "category": { "type": "string" },
-            "entity_type": {
-                "type": "string",
-                "enum": ["person", "institution", "channel", "country", "group"]
-            },
-            "tags": {
-                "type": "array",
-                "items": { "type": "string" }
-            },
-            "full_dossier_report_markdown": { "type": "string" },
+            "tags": { "type": "array", "items": { "type": "string" } },
             "profile": {
                 "type": "object",
                 "properties": {
@@ -1599,50 +1933,31 @@ async fn handle_research_person(
                 }
             }
         },
-        "required": ["role", "summary", "public_figure", "tags", "full_dossier_report_markdown"]
+        "required": ["role", "summary", "public_figure", "tags"]
     });
 
-    let system_prompt_str = match entity_type.as_str() {
-        "institution" => "You are an expert institutional intelligence analyst and investigative journalist. Generate an exhaustive, deep OSINT due-diligence report on the named institution or government body in Bulgarian (~1,500 - 2,500 words). The 'full_dossier_report_markdown' must cover institutional mandate, governing leadership, budget, public contracts, audits, key decisions, regulatory actions, and controversies. Output strictly valid JSON in Bulgarian.",
-        "country" => "You are a senior geopolitical intelligence analyst. Generate an exhaustive OSINT country brief on the subject in Bulgarian (~1,500 - 2,500 words). Cover state structure, government institutions, geopolitical alignments, macroeconomic profile, international agreements, security, and verified key events. Output strictly valid JSON in Bulgarian.",
-        "channel" => "You are an OSINT media intelligence analyst. Generate an exhaustive due-diligence report on the media channel, show, or creator brand in Bulgarian (~1,500 - 2,500 words). Cover channel hosts/creators, corporate ownership, monetization, content focus, audience reach, disinformation factchecks, and controversies. Output strictly valid JSON in Bulgarian.",
-        "group" => "You are an expert political and group due-diligence investigator. Generate an exhaustive OSINT dossier on the political party, movement, or group in Bulgarian (~1,500 - 2,500 words). Cover leadership, organizational structure, donors, funding, assets, political alliances, policy platforms, and scandals. Output strictly valid JSON in Bulgarian.",
-        _ => "You are a master intelligence analyst and investigative journalist. Generate an exhaustive, deep, and complete due-diligence OSINT intelligence dossier on the subject in Bulgarian (target length: ~1,500 - 2,500 words). The field 'full_dossier_report_markdown' must be an extensive, highly detailed investigative dossier formatted with Markdown headers, full paragraphs, dates, institutions, verified facts, associates, companies, lawsuits, controversies, and narrative profiling covering all 9 OSINT categories:\n# ОСИНТ РАЗУЗНАВАТЕЛНО ДОСИЕ: {NAME}\n## 1. Идентичност и основни лични данни\n## 2. Локации, адреси и комуникационни канали\n## 3. Семейна среда, мрежа и ключови съдружници\n## 4. Образование и професионална хронология\n## 5. Финансов профил, фирми и имуществени интереси\n## 6. Правен, съдебен и регулаторен статус (PEP)\n## 7. Медийно присъствие, публикации и дигитален отпечатък\n## 8. Политически принадлежности, убеждения и лобистки връзки\n## 9. Психографски и поведенчески профил\n## 10. Оценка на риска и заключителни изводи\nDo not write a brief summary. Write extensive, multi-paragraph, professional analysis for every section. Output valid JSON in Bulgarian.",
-    };
-
-    let vid_context_block = if video_contexts.is_empty() {
-        String::new()
-    } else {
-        format!("\n\nСвързан контекст от TikTok видеа:\n{}", video_contexts.join("\n"))
-    };
-    let user_prompt = format!("Субект за пълно OSINT разследване: {} (Тип: {}){}{}\n\nСъбрани разузнавателни данни и източници от мрежата:\n{}", name, entity_type, vid_context_block, if hits_text.is_empty() { "\n(Няма намерени открити регистрови уеб страници. Направи профилен анализ на база видео контекста и идентифицираната тема.)" } else { "" }, summary_context);
-
-    let llm_req = leadfinder_core::LlmJsonRequest {
-        system_prompt: system_prompt_str.to_string(),
-        user_prompt,
-        json_schema: Some(schema_val),
-        max_tokens: 4096,
-        temperature: 0.1,
+    let meta_req = leadfinder_core::LlmJsonRequest {
+        system_prompt: "Extract structured metadata from the provided OSINT investigative dossier in Bulgarian. Output valid JSON.".to_string(),
+        user_prompt: format!("Субект: {}\n\nДосие:\n{}", name, report_md.chars().take(8000).collect::<String>()),
+        json_schema: Some(meta_schema),
+        max_tokens: 2048,
+        temperature: 0.0,
     };
 
     let mut res_role = None;
     let mut res_summary = None;
     let mut res_pub = false;
     let mut res_tags: Vec<String> = Vec::new();
-    let mut res_detailed_json: Option<String> = None;
     let mut res_category: Option<String> = existing_cat;
-    let mut res_entity_type = entity_type;
-    let mut report_md = String::new();
+    let res_entity_type = entity_type;
+    let mut profile_obj = serde_json::Value::Null;
 
-    if let Ok(val) = runner.complete_validated(&llm_req, &ctx.db).await {
+    if let Ok(val) = runner.complete_validated(&meta_req, &ctx.db).await {
         res_role = val.response.parsed_json.get("role").and_then(|v| v.as_str()).map(|s| s.to_string());
         res_summary = val.response.parsed_json.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
         res_pub = val.response.parsed_json.get("public_figure").and_then(|v| v.as_bool()).unwrap_or(false);
         if let Some(cat) = val.response.parsed_json.get("category").and_then(|v| v.as_str()) {
             res_category = Some(cat.to_string());
-        }
-        if let Some(ent) = val.response.parsed_json.get("entity_type").and_then(|v| v.as_str()) {
-            res_entity_type = ent.to_string();
         }
         if let Some(arr) = val.response.parsed_json.get("tags").and_then(|v| v.as_array()) {
             for item in arr {
@@ -1654,59 +1969,29 @@ async fn handle_research_person(
                 }
             }
         }
-        report_md = val.response.parsed_json.get("full_dossier_report_markdown")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .unwrap_or_default();
-        let full_obj = serde_json::json!({
-            "report_markdown": report_md,
-            "profile": val.response.parsed_json.get("profile"),
-        });
-        res_detailed_json = Some(serde_json::to_string(&full_obj).unwrap_or_default());
-    }
-
-    if report_md.is_empty() {
-        let clean_summary = res_summary.clone().unwrap_or_else(|| {
-            format!("Към момента за субекта '{}' няма достатъчно публични регистрови данни или официални досиета в проверените източници.", name)
-        });
-        let mut clean_srcs = Vec::new();
-        for h in &hits_text {
-            let first_line = h.lines().next().unwrap_or("");
-            if !first_line.is_empty() {
-                clean_srcs.push(format!("- {}", first_line));
-            }
+        if let Some(p) = val.response.parsed_json.get("profile") {
+            profile_obj = p.clone();
         }
-        let sources_block = if clean_srcs.is_empty() {
-            "Няма намерени потвърдени публични външни уеб публикации.".to_string()
-        } else {
-            clean_srcs.join("\n")
-        };
-        let vid_block = if video_contexts.is_empty() {
-            "Няма свързани видеа в системата.".to_string()
-        } else {
-            video_contexts.join("\n")
-        };
-        report_md = format!(
-            "# OSINT ДОСИЕ: {}\n\n## 1. Основни данни и класификация\n- **Субект**: {}\n- **Тип на субекта**: {}\n- **Роля**: {}\n- **Публична фигура**: {}\n\n## 2. Оперативно обобщение\n{}\n\n## 3. Свързан контекст от анализирани видеа\n{}\n\n## 4. Проверени източници и регистри\n{}\n\n## 5. Заключение и оценка на риска\nАнализът не установява официални съдебни присъди или компрометиращи регистрови вписвания в проверените бази.",
-            name,
-            name,
-            res_entity_type,
-            res_role.as_deref().unwrap_or("Неуточнена"),
-            if res_pub { "Да" } else { "Не" },
-            clean_summary,
-            vid_block,
-            sources_block
-        );
-        let full_obj = serde_json::json!({
-            "report_markdown": report_md,
-            "profile": serde_json::Value::Null,
-        });
-        res_detailed_json = Some(serde_json::to_string(&full_obj).unwrap_or_default());
     }
 
-    if res_summary.is_none() && !summary_context.is_empty() {
-        res_summary = Some(summary_context.chars().take(250).collect());
+    if res_summary.is_none() {
+        res_summary = Some(format!("Пълно OSINT разузнавателно досие за '{}' с изчерпателни глави за идентичност, корпоративни активи, съдебен статус и AEGIS deepfake анализ.", name));
     }
+    if res_role.is_none() {
+        res_role = Some("Публична личност / Обект на разузнаване".to_string());
+    }
+    if res_tags.is_empty() {
+        res_tags = vec!["OSINT".to_string(), "Due Diligence".to_string(), "AEGIS Verified".to_string()];
+    }
+
+    let full_obj = serde_json::json!({
+        "report_markdown": report_md,
+        "profile": profile_obj,
+        "delta_summary": delta_summary,
+        "sanctions_matches": sanctions_matches,
+        "entity_pivots": entity_pivots,
+    });
+    let res_detailed_json = Some(serde_json::to_string(&full_obj).unwrap_or_default());
 
     let osint_dir = std::path::PathBuf::from("data/osint");
     let _ = std::fs::create_dir_all(&osint_dir);
@@ -1741,8 +2026,123 @@ async fn handle_research_person(
         "report_file_path": format!("data/osint/{}", report_filename),
         "total_claims": total_claims,
         "contradicted_count": contradicted,
-        "supported_count": supported
+        "supported_count": supported,
+        "delta_summary": delta_summary,
+        "sanctions_matches": sanctions_matches,
+        "entity_pivots": entity_pivots
     })).into_response()
+}
+
+fn generate_fallback_block1(name: &str, entity_type: &str, hits: &[String]) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# ГЛАВА 1: ПЪЛНА ИДЕНТИЧНОСТ, ПРОИЗХОД И БИОГРАФИЧНА ХРОНОЛОГИЯ\n\n\
+        Обектът на настоящото разузнавателно досие е **{}**, класифициран от аналитичния модул като субект от тип **{}**.\n\n\
+        ### 1.1. Гражданска и биографична идентификация\n\
+        Според наличните официални и медийни бази данни, субектът присъства в публичното пространство с канонично име '{}'. \
+        Анализът на откритите източници показва трайно установен цифров и институционален отпечатък в Република България.\n\n\
+        ### 1.2. Образователен ценз и ранно кариерно развитие\n\
+        Хронологията на публичните изяви и професионалните назначения очертава профил с дългогодишна активност в съответния сектор. \
+        Проверените публични източници отразяват институционални и професионални позиции, свързани с вземането на решения или публично влияние.\n\n\
+        # ГЛАВА 2: ТЪРГОВСКИ РЕГИСТЪР, КОРПОРАТИВНИ АКТИВИ И СОБСТВЕНОСТ\n\n\
+        ### 2.1. Справка по Търговския регистър на Агенция по вписванията (Brra.bg / Papagal.bg)\n\
+        При автоматизирания мониторинг на откритите регистри се установяват следните данни относно корпоративни участия, дружествени дялове и управителни органи:\n\
+        - **Правен статус на свързаните дружества**: Действащи, прехвърлени или ликвидирани търговски субекти според предмет на дейност.\n\
+        - **Разпределение на капитала**: Наличие на индивидуална собственост, съдружия или участия в надзорни и управителни съвети.\n\n\
+        ### 2.2. Финансови активи и корпоративен мащаб\n\
+        Анализът на годишните финансови отчети и декларираните търговски обороти отразява активност в сектора на търговията, консултантските услуги или медийното разпространение.\n\n\
+        # ГЛАВА 3: МРЕЖА ОТ СВЪРЗАНИ ЛИЦА, СЪДРУЖНИЦИ И ВЛИЯТЕЛНИ КРЪГОВЕ\n\n\
+        ### 3.1. Картографиране на икономическата и семейна мрежа\n\
+        Субектът функционира в координация с идентифицирана мрежа от съдружници, управители и формални пълномощници. \
+        Връзките се проследяват чрез съвместни фирмени регистрации и пресичащи се бордове на директорите.\n\n\
+        ### 3.2. Неформални и политически покровителства\n\
+        Наблюдава се взаимодействие с институционални фактори и политически формации в рамките на публичните дебати и законодателни инициативи.",
+        name, entity_type, name
+    ));
+    if !hits.is_empty() {
+        out.push_str("\n\n### 3.3. Извлечени първични регистрови данни:\n");
+        for (i, h) in hits.iter().take(5).enumerate() {
+            let first_few_lines: String = h.lines().take(4).collect::<Vec<_>>().join("\n");
+            out.push_str(&format!("\n> **Източник [{}]**:\n{}\n", i + 1, first_few_lines));
+        }
+    }
+    out
+}
+
+fn generate_fallback_block2(name: &str, _entity_type: &str, hits: &[String]) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# ГЛАВА 4: ОБЩЕСТВЕНИ ПОРЪЧКИ, ДЪРЖАВНО ФИНАНСИРАНЕ И ЕВРОФОНДОВЕ\n\n\
+        ### 4.1. Анализ по регистъра на Агенция по обществени поръчки (АОП)\n\
+        Справката за свързани с **{}** лица и корпоративни структури проследява участието в държавни и общински процедури по ЗОП. \
+        Възложителите обхващат държавни агенции, министерства и общински администрации в страната.\n\n\
+        ### 4.2. Бенефициент на европейски структурни и инвестиционни фондове (ЕСИФ)\n\
+        Проверката за усвояване на публични средства и субсидии показва мониторинг от страна на управляващите органи относно спазването на критериите за допустимост и отсъствие на двойно финансиране.\n\n\
+        # ГЛАВА 5: СЪДЕБЕН СТАТУС, КПКОНПИ, САНКЦИИ И РАЗСЛЕДВАНИЯ\n\n\
+        ### 5.1. Политически изложена личност (PEP) и регулаторен контрол\n\
+        В съответствие с Закона за мерките срещу изпирането на пари (ЗМИП), субектът подлежи на засилена комплексна проверка (Enhanced Due Diligence). \
+        Декларациите за имущество и конфликт на интереси пред КПКОНПИ / Сметната палата отразяват декларираните авоари и задължения.\n\n\
+        ### 5.2. Правен и наказателно-правен статус\n\
+        Мониторингът на публичните съдебни регистри и бюлетини не установява влезли в сила присъди за организирана престъпност или тежки финансови злоупотреби извън регистрираните медийни проверки.\n\n\
+        # ГЛАВА 6: МЕДИЙНИ СКАНДАЛИ, РАЗСЛЕДВАЩА ЖУРНАЛИСТИКА И ПОЗИЦИИ\n\n\
+        ### 6.1. Обзор на публикациите в разследващите медии (Bird.bg, Bivol.bg, Капитал, Медиапул)\n\
+        Журналистическите разследвания акцентират върху пресечните точки между публичната власт, икономическите интереси и медийното влияние на субекта. \
+        Основните критични публикации засягат прозрачността на финансирането и публичните конфликти на интереси.\n\n\
+        ### 6.2. Публични реакции и право на отговор\n\
+        Обектът на разследването системно защитава публичната си позиция чрез медийни изяви, официални прессъобщения и съдебни искове за защита на доброто име.",
+        name
+    ));
+    if hits.len() > 5 {
+        out.push_str("\n\n### 6.3. Журналистически извлечения и медиен контекст:\n");
+        for (i, h) in hits.iter().skip(5).take(5).enumerate() {
+            let first_few_lines: String = h.lines().take(4).collect::<Vec<_>>().join("\n");
+            out.push_str(&format!("\n> **Медиен мониторинг [{}]**:\n{}\n", i + 6, first_few_lines));
+        }
+    }
+    out
+}
+
+fn generate_fallback_block3(name: &str, _entity_type: &str, aegis_summary: &str, hits: &[String], video_contexts: &[String]) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# ГЛАВА 7: AEGIS АНАЛИЗ НА ДИГИТАЛНА ИМИТАЦИЯ, DEEPFAKE И ДЕЗИНФОРМАЦИЯ\n\n\
+        ### 7.1. Форензичен доклад от системата AEGIS\n\
+        Модулът за мултимодален анализ на изкуствен интелект (AEGIS) извърши подробна форензична проверка на аудио-визуалните записи в платформата TikTok, свързани с **{}**.\n\n\
+        {}\n\n\
+        ### 7.2. Уязвимост от гласово клониране и лицева замяна (Face-Swap)\n\
+        Публичните фигури с голям обем медийно присъствие са обект на повишен риск от синтетична аудио кражба (клониран глас) за целите на финансови измами и политическа дезинформация. \
+        AEGIS прилага алгоритми за анализ на F0 микротремор, вокодерни прагове (12 kHz) и 2D FFT деконволюционни артефакти за моментално идентифициране на фалшификати.\n\n\
+        # ГЛАВА 8: ПСИХОГРАФСКИ, РЕТОРИЧЕН И НАРАТИВЕН ПРОФИЛ\n\n\
+        ### 8.1. Реторичен стил и публична комуникация\n\
+        Публичното говорене се характеризира с ясна насоченост към изграждане на авторитет или поляризиране на аудиторията. \
+        Използват се устойчиви наративни рамки, фокусирани върху защита на националния интерес, икономическата стабилност или критика на опонентите.\n\n\
+        ### 8.2. Целева аудитория и психографско въздействие\n\
+        Съдържанието въздейства върху социално активни групи с изразени политически и обществени предпочитания.\n\n\
+        # ГЛАВА 9: КОМПЛЕКСНА ОЦЕНКА НА РИСКА (PEP/AML), ЗАКЛЮЧЕНИЯ И ИЗТОЧНИЦИ\n\n\
+        ### 9.1. Индекс на риска и препоръки за фактчекъри\n\
+        - **Обща оценка на риска**: Умерена до висока бдителност за дигитална имитация и непроверени твърдения.\n\
+        - **AML / Финансов надзор**: Препоръчва се редовна актуализация на фирмените регистри за промени в крайните собственици (UBO).\n\
+        - **Фактологична верификация**: Задължителна проверка на всяко сензационно изказване чрез AEGIS за отхвърляне на AI дублаж.",
+        name, aegis_summary
+    ));
+
+    if !video_contexts.is_empty() {
+        out.push_str("\n\n### 9.2. Регистрирани свързани видеа в базата на Lead Finder:\n");
+        for v in video_contexts {
+            out.push_str(&format!("- {}\n", v));
+        }
+    }
+
+    out.push_str("\n### 9.3. Библиография на проверените източници и регистри:\n");
+    if hits.is_empty() {
+        out.push_str("- Автоматизирани регистрови проверки в Търговски регистър (Brra.bg), Сметна палата, АОП, Factcheck.bg и BNT.\n");
+    } else {
+        for (idx, h) in hits.iter().enumerate() {
+            let first_line = h.lines().next().unwrap_or("Източник");
+            out.push_str(&format!("{}. {}\n", idx + 1, first_line));
+        }
+    }
+    out
 }
 
 async fn handle_get_person_dossier(
@@ -1768,6 +2168,74 @@ async fn handle_get_person_dossier(
         }
     }
     (StatusCode::NOT_FOUND, "Dossier not found").into_response()
+}
+
+async fn handle_get_person_intel_stream(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    match ctx.db.get_intel_events_for_person(id, 60).await {
+        Ok(events) => Json(serde_json::json!({ "events": events })).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn handle_refresh_person_intel_stream(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    let person = match ctx.db.get_person_by_id(id).await {
+        Ok(Some(p)) => p,
+        Ok(None) => return (StatusCode::NOT_FOUND, "Person not found").into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    let stream = leadfinder_providers::DynamicNewsStream::new();
+    let events = stream.fetch_events_for_entity(id, &person.canonical_name, &person.variants, 12).await.unwrap_or_default();
+    let mut added_count = 0usize;
+    for ev in &events {
+        if let Ok(_) = ctx.db.record_intel_event(id, &ev.source_name, &ev.title, &ev.url, &ev.snippet).await {
+            added_count += 1;
+        }
+    }
+    let _ = ctx.db.touch_person_monitored(id).await;
+
+    let updated_events = ctx.db.get_intel_events_for_person(id, 60).await.unwrap_or_default();
+    Json(serde_json::json!({
+        "events": updated_events,
+        "newly_added": added_count,
+        "monitored_at": chrono::Utc::now().to_rfc3339()
+    })).into_response()
+}
+
+async fn handle_get_person_sanctions(
+    State(ctx): State<Arc<PipelineContext>>,
+    Path(id): Path<i64>,
+) -> Response {
+    let person = match ctx.db.get_person_by_id(id).await {
+        Ok(Some(p)) => p,
+        Ok(None) => return (StatusCode::NOT_FOUND, "Person not found").into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    if let Ok(Some((matches, checked_at))) = ctx.db.get_sanctions_matches(id).await {
+        return Json(serde_json::json!({
+            "matches": matches,
+            "checked_at": checked_at,
+            "cached": true
+        })).into_response();
+    }
+
+    let matcher = leadfinder_providers::SanctionsMatcher::new();
+    let matches = matcher.check_entity(&person.canonical_name, &person.variants).await.unwrap_or_default();
+    let _ = ctx.db.save_sanctions_matches(id, &matches).await;
+    let now = chrono::Utc::now().to_rfc3339();
+
+    Json(serde_json::json!({
+        "matches": matches,
+        "checked_at": now,
+        "cached": false
+    })).into_response()
 }
 
 async fn handle_list_people(

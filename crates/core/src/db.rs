@@ -7,9 +7,10 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 use sqlx::{Row, SqlitePool};
 use crate::config::SeedEntry;
 use crate::models::{
-    AttributionAct, Claim, ClaimWithEvidence, Creator, Decision, Evidence, HardwareProfile, Job,
-    LeadCardSummary, OcrText, Person, ProviderUsageSummary, Seed, Stage, Transcript,
-    TranscriptSegment, Video, VideoDetail, VideoRef, VideoState,
+    AegisDeepfakeResult, AttributionAct, Claim, ClaimWithEvidence, Creator, Decision,
+    EntityIntelEvent, Evidence, HardwareProfile, Job, LeadCardSummary, OcrText, Person,
+    ProviderUsageSummary, SanctionsMatch, Seed, Stage, Transcript, TranscriptSegment, Video,
+    VideoDetail, VideoRef, VideoState,
 };
 use crate::politeness::compute_backoff_delay;
 
@@ -62,6 +63,10 @@ impl Database {
             "ALTER TABLE people ADD COLUMN detailed_profile_json TEXT",
             "ALTER TABLE people ADD COLUMN entity_type TEXT DEFAULT 'person'",
             "ALTER TABLE creators ADD COLUMN risk_assessment_json TEXT",
+            "CREATE TABLE IF NOT EXISTS aegis_deepfakes (video_id TEXT PRIMARY KEY REFERENCES videos(id) ON DELETE CASCADE, payload_json TEXT NOT NULL, overall_verdict TEXT NOT NULL, audio_score REAL NOT NULL, video_score REAL NOT NULL, target_person TEXT, analyzed_at TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS entity_intel_events (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE, source_name TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, discovered_at TEXT NOT NULL, snippet TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS entity_sanctions_cache (person_id INTEGER PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE, payload_json TEXT NOT NULL, checked_at TEXT NOT NULL)",
+            "ALTER TABLE people ADD COLUMN last_monitored_at TEXT",
         ];
         for mig in migrations {
             let _ = sqlx::raw_sql(mig).execute(&pool).await;
@@ -527,33 +532,53 @@ impl Database {
             .fetch_optional(&self.pool)
             .await?;
 
-            let (progress_pct, etr_seconds, stage_desc) = match video.state.as_str() {
-                "VERIFIED" | "READY" | "KEPT" => (Some(100), Some(0), Some("100% Завършено".to_string())),
-                "FAILED" => (Some(100), Some(0), Some("Грешка при обработка".to_string())),
-                "SCREENED_OUT" => (Some(100), Some(0), Some("Филтрирано".to_string())),
-                "DISCARDED" => (Some(100), Some(0), Some("Отхвърлено".to_string())),
-                _ => match latest_job.as_ref().and_then(|r| r.try_get::<String, _>("stage").ok()).as_deref() {
-                    Some("DISCOVER") => (Some(15), Some(25), Some("Откриване...".to_string())),
-                    Some("SCREEN_CHEAP") => (Some(30), Some(20), Some("Предварителен преглед...".to_string())),
-                    Some("ACQUIRE") => (Some(50), Some(15), Some("Сваляне на съдържание...".to_string())),
-                    Some("EXTRACT") => (Some(70), Some(10), Some("Whisper ASR + OCR...".to_string())),
-                    Some("CLAIMS") | Some("CHECKWORTHY") => (Some(85), Some(5), Some("BgGPT анализ на твърдения...".to_string())),
-                    Some("VERIFY") => (Some(95), Some(2), Some("Финален факт-чек...".to_string())),
-                    Some("RANK") => (Some(98), Some(1), Some("Класиране...".to_string())),
-                    _ => {
-                        if video.state == "ACQUIRED" {
-                            (Some(50), Some(15), Some("Свалено съдържание...".to_string()))
-                        } else if video.state == "EXTRACTED" {
-                            (Some(70), Some(10), Some("Извлечен говор...".to_string()))
-                        } else if video.state == "CLAIMS_DONE" {
-                            (Some(85), Some(5), Some("Извлечени твърдения...".to_string()))
-                        } else if research_running {
-                            (Some(50), Some(15), Some("В обработка...".to_string()))
-                        } else {
-                            (Some(20), Some(20), Some("В опашка...".to_string()))
+            let (progress_pct, etr_seconds, stage_desc) = if research_running_row.get::<i64, _>("cnt") > 0 && is_completed {
+                (Some(75), Some(5), Some("Задълбочено проучване...".to_string()))
+            } else {
+                match video.state.as_str() {
+                    "VERIFIED" | "READY" | "KEPT" => (Some(100), Some(0), Some("100% Завършено".to_string())),
+                    "FAILED" => (Some(100), Some(0), Some("Грешка при обработка".to_string())),
+                    "SCREENED_OUT" => (Some(100), Some(0), Some("Филтрирано".to_string())),
+                    "DISCARDED" => (Some(100), Some(0), Some("Отхвърлено".to_string())),
+                    _ => match latest_job.as_ref().and_then(|r| r.try_get::<String, _>("stage").ok()).as_deref() {
+                        Some("DISCOVER") => (Some(15), Some(25), Some("Откриване...".to_string())),
+                        Some("SCREEN_CHEAP") => (Some(30), Some(20), Some("Предварителен преглед...".to_string())),
+                        Some("ACQUIRE") => (Some(50), Some(15), Some("Сваляне на съдържание...".to_string())),
+                        Some("EXTRACT") => (Some(70), Some(10), Some("Whisper ASR + OCR...".to_string())),
+                        Some("CLAIMS") | Some("CHECKWORTHY") => (Some(85), Some(5), Some("BgGPT анализ на твърдения...".to_string())),
+                        Some("VERIFY") => (Some(95), Some(2), Some("Финален факт-чек...".to_string())),
+                        Some("RANK") => (Some(98), Some(1), Some("Класиране...".to_string())),
+                        _ => {
+                            if video.state == "ACQUIRED" {
+                                (Some(50), Some(15), Some("Свалено съдържание...".to_string()))
+                            } else if video.state == "EXTRACTED" {
+                                (Some(70), Some(10), Some("Извлечен говор...".to_string()))
+                            } else if video.state == "CLAIMS_DONE" {
+                                (Some(85), Some(5), Some("Извлечени твърдения...".to_string()))
+                            } else if research_running {
+                                (Some(50), Some(15), Some("В обработка...".to_string()))
+                            } else {
+                                (Some(20), Some(20), Some("В опашка...".to_string()))
+                            }
                         }
                     }
-                },
+                }
+            };
+
+            let aegis_row = sqlx::query(
+                "SELECT overall_verdict, audio_score, video_score, target_person FROM aegis_deepfakes WHERE video_id = ?1",
+            )
+            .bind(&video.id)
+            .fetch_optional(&self.pool)
+            .await?;
+            let (aegis_verdict, aegis_audio_score, aegis_video_score, aegis_target_person) = match aegis_row {
+                Some(arow) => (
+                    arow.try_get::<String, _>("overall_verdict").ok(),
+                    arow.try_get::<f64, _>("audio_score").ok(),
+                    arow.try_get::<f64, _>("video_score").ok(),
+                    arow.try_get::<String, _>("target_person").ok(),
+                ),
+                None => (None, None, None, None),
             };
 
             cards.push(LeadCardSummary {
@@ -572,6 +597,10 @@ impl Database {
                 progress_pct,
                 etr_seconds,
                 stage_desc,
+                aegis_verdict,
+                aegis_audio_score,
+                aegis_video_score,
+                aegis_target_person,
             });
         }
 
@@ -599,6 +628,7 @@ impl Database {
         }
         let people = self.get_people_for_video(video_id).await?;
         let decisions = self.get_decisions_for_video(video_id).await?;
+        let aegis_deepfake = self.get_aegis_result(video_id).await.unwrap_or(None);
 
         Ok(Some(VideoDetail {
             video,
@@ -608,7 +638,49 @@ impl Database {
             claims,
             people,
             decisions,
+            aegis_deepfake,
         }))
+    }
+
+    pub async fn save_aegis_result(&self, video_id: &str, result: &AegisDeepfakeResult) -> Result<()> {
+        let payload = serde_json::to_string(result)?;
+        let now = Utc::now().to_rfc3339();
+        let target_person = result.audio.target_person.as_deref().or(result.video.target_person.as_deref());
+        sqlx::query(
+            "INSERT INTO aegis_deepfakes (video_id, payload_json, overall_verdict, audio_score, video_score, target_person, analyzed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(video_id) DO UPDATE SET
+                payload_json = excluded.payload_json,
+                overall_verdict = excluded.overall_verdict,
+                audio_score = excluded.audio_score,
+                video_score = excluded.video_score,
+                target_person = excluded.target_person,
+                analyzed_at = excluded.analyzed_at",
+        )
+        .bind(video_id)
+        .bind(&payload)
+        .bind(&result.overall_verdict)
+        .bind(result.audio.score)
+        .bind(result.video.score)
+        .bind(target_person)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_aegis_result(&self, video_id: &str) -> Result<Option<AegisDeepfakeResult>> {
+        let row = sqlx::query("SELECT payload_json FROM aegis_deepfakes WHERE video_id = ?1")
+            .bind(video_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        if let Some(r) = row {
+            let json_str: String = r.get("payload_json");
+            let res = serde_json::from_str::<AegisDeepfakeResult>(&json_str)?;
+            Ok(Some(res))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn get_creator(&self, creator_id: &str) -> Result<Option<Creator>> {
@@ -1601,6 +1673,166 @@ impl Database {
         Ok(())
     }
 
+    pub async fn record_intel_event(
+        &self,
+        person_id: i64,
+        source_name: &str,
+        title: &str,
+        url: &str,
+        snippet: &str,
+    ) -> Result<i64> {
+        let existing = sqlx::query("SELECT id FROM entity_intel_events WHERE person_id = ?1 AND url = ?2 LIMIT 1")
+            .bind(person_id)
+            .bind(url)
+            .fetch_optional(&self.pool)
+            .await?;
+        if let Some(r) = existing {
+            return Ok(r.get::<i64, _>("id"));
+        }
+        let now = Utc::now().to_rfc3339();
+        let res = sqlx::query(
+            "INSERT INTO entity_intel_events (person_id, source_name, title, url, discovered_at, snippet)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        )
+        .bind(person_id)
+        .bind(source_name)
+        .bind(title)
+        .bind(url)
+        .bind(&now)
+        .bind(snippet)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.last_insert_rowid())
+    }
+
+    pub async fn get_intel_events_for_person(
+        &self,
+        person_id: i64,
+        limit: i64,
+    ) -> Result<Vec<EntityIntelEvent>> {
+        let rows = sqlx::query(
+            "SELECT id, person_id, source_name, title, url, discovered_at, snippet
+             FROM entity_intel_events
+             WHERE person_id = ?1
+             ORDER BY discovered_at DESC, id DESC
+             LIMIT ?2",
+        )
+        .bind(person_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(EntityIntelEvent {
+                id: r.get("id"),
+                person_id: r.get("person_id"),
+                source_name: r.get("source_name"),
+                title: r.get("title"),
+                url: r.get("url"),
+                discovered_at: r.get("discovered_at"),
+                snippet: r.get("snippet"),
+            });
+        }
+        Ok(list)
+    }
+
+    pub async fn save_sanctions_matches(
+        &self,
+        person_id: i64,
+        matches: &[SanctionsMatch],
+    ) -> Result<()> {
+        let raw = serde_json::to_string(matches)?;
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "INSERT INTO entity_sanctions_cache (person_id, payload_json, checked_at)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(person_id) DO UPDATE SET
+               payload_json = excluded.payload_json,
+               checked_at = excluded.checked_at",
+        )
+        .bind(person_id)
+        .bind(&raw)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_sanctions_matches(
+        &self,
+        person_id: i64,
+    ) -> Result<Option<(Vec<SanctionsMatch>, String)>> {
+        let row_opt = sqlx::query("SELECT payload_json, checked_at FROM entity_sanctions_cache WHERE person_id = ?1")
+            .bind(person_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        if let Some(r) = row_opt {
+            let json_str: String = r.get("payload_json");
+            let checked_at: String = r.get("checked_at");
+            let list: Vec<SanctionsMatch> = serde_json::from_str(&json_str).unwrap_or_default();
+            Ok(Some((list, checked_at)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn touch_person_monitored(&self, person_id: i64) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query("UPDATE people SET last_monitored_at = ?2 WHERE id = ?1")
+            .bind(person_id)
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_people_due_for_monitoring(&self, limit: i64) -> Result<Vec<Person>> {
+        let rows = sqlx::query(
+            "SELECT * FROM people
+             WHERE public_figure = 1 OR researched_at IS NOT NULL
+             ORDER BY last_monitored_at ASC NULLS FIRST
+             LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let vars: Vec<String> = r
+                    .try_get::<Option<String>, _>("variants_json")
+                    .ok()
+                    .flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default();
+                let tags: Vec<String> = r
+                    .try_get::<Option<String>, _>("tags_json")
+                    .ok()
+                    .flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default();
+                Person {
+                    id: r.get("id"),
+                    canonical_name: r.get("canonical_name"),
+                    variants: vars,
+                    role: r.try_get("role").ok().flatten(),
+                    public_figure: r.get::<i64, _>("public_figure") != 0,
+                    wikidata_id: r.try_get("wikidata_id").ok().flatten(),
+                    summary: r.try_get("summary").ok().flatten(),
+                    researched_at: r.try_get("researched_at").ok().flatten(),
+                    mentions: None,
+                    found_in: None,
+                    tags,
+                    rating: r.try_get::<i64, _>("rating").unwrap_or(50),
+                    category: r.try_get("category").ok().flatten(),
+                    notes: r.try_get("notes").ok().flatten(),
+                    detailed_profile_json: r.try_get("detailed_profile_json").ok().flatten(),
+                    entity_type: r.try_get::<Option<String>, _>("entity_type").ok().flatten().unwrap_or_else(|| "person".to_string()),
+                }
+            })
+            .collect())
+    }
+
     pub async fn get_decisions_for_video(&self, video_id: &str) -> Result<Vec<Decision>> {
         let rows = sqlx::query("SELECT * FROM decisions WHERE video_id = ?1 ORDER BY id DESC")
             .bind(video_id)
@@ -1814,6 +2046,18 @@ impl Database {
         let now = Utc::now().to_rfc3339();
         sqlx::query(
             "UPDATE jobs SET status = 'succeeded', last_error = NULL, run_after = NULL, updated_at = ?2 WHERE id = ?1",
+        )
+        .bind(job_id)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn mark_job_running(&self, job_id: i64) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE jobs SET status = 'running', updated_at = ?2 WHERE id = ?1",
         )
         .bind(job_id)
         .bind(&now)

@@ -162,6 +162,10 @@ enum Commands {
         #[arg(required = true)]
         video_id: String,
     },
+    Aegis {
+        #[arg(required = true)]
+        video_id: String,
+    },
     Export {
         #[arg(long, default_value = "markdown")]
         format: String,
@@ -549,6 +553,11 @@ async fn main() -> Result<()> {
                     detail.people.len()
                 );
             }
+        }
+        Commands::Aegis { video_id } => {
+            println!("leadfinder: running AEGIS deepfake detection on {video_id}...");
+            let res = ctx.run_aegis_deepfake_detection(&video_id).await?;
+            println!("{}", serde_json::to_string_pretty(&res)?);
         }
         Commands::Export { format, lane, out } => {
             let fmt = leadfinder_pipeline::ExportFormat::parse_str(&format)?;

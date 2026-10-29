@@ -26,6 +26,10 @@ export interface LeadCard {
   progress_pct?: number | null;
   etr_seconds?: number | null;
   stage_desc?: string | null;
+  aegis_verdict?: string | null;
+  aegis_audio_score?: number | null;
+  aegis_video_score?: number | null;
+  aegis_target_person?: string | null;
 }
 
 export interface AttributionItem {
@@ -61,11 +65,48 @@ export interface Evidence {
   source_kind: string;
   source_name: string;
   url: string;
+  source_url?: string;
+  passage?: string;
   title: string | null;
   published_at: string | null;
   snippet: string;
   stance: string;
   similarity: number | null;
+}
+
+export interface ClaimWithEvidence {
+  claim: Claim;
+  evidence: Evidence[];
+}
+
+export interface SanctionsMatch {
+  dataset: string;
+  caption: string;
+  schema: string;
+  match_score: number;
+  birth_date?: string | null;
+  countries: string[];
+  sanctor?: string | null;
+  program?: string | null;
+  source_url?: string | null;
+  summary?: string | null;
+}
+
+export interface EntityIntelEvent {
+  id: number;
+  person_id: number;
+  source_name: string;
+  title: string;
+  url: string;
+  discovered_at: string;
+  snippet: string;
+}
+
+export interface EntityPivotRef {
+  entity_name: string;
+  entity_kind: string;
+  relevance: number;
+  registry_status?: string | null;
 }
 
 export interface DetailedPersonProfile {
@@ -79,6 +120,9 @@ export interface DetailedPersonProfile {
   digital_media_presence?: string;
   affiliations_beliefs?: string;
   psychographic_behavioral?: string;
+  delta_summary?: string;
+  sanctions_matches?: SanctionsMatch[];
+  entity_pivots?: EntityPivotRef[];
 }
 
 export type EntityType = 'person' | 'institution' | 'channel' | 'country' | 'group' | 'event';
@@ -163,6 +207,13 @@ export interface Transcript {
   edited_text: string | null;
 }
 
+export interface OcrText {
+  video_id: string;
+  frame_ms: number;
+  text: string;
+  confidence: number | null;
+}
+
 export interface VideoDetail {
   video: {
     id: string;
@@ -184,12 +235,50 @@ export interface VideoDetail {
     media_path: string | null;
     lead_score: number | null;
     lane: string | null;
+    thumbnail_url?: string | null;
   };
   creator: Creator | null;
   transcript: Transcript | null;
+  ocr_texts?: OcrText[];
   claims: { claim: Claim; evidence: Evidence[] }[];
   people: Person[];
   decisions: { id: number; action: string; decided_at: string; note: string | null }[];
+  aegis_deepfake?: AegisDeepfakeResult | null;
+}
+
+export interface AegisAudioDetails {
+  score: number;
+  synthetic: boolean;
+  classification: string;
+  target_person?: string | null;
+  target_confidence?: number | null;
+  anomalies: string[];
+  metrics: Record<string, any>;
+}
+
+export interface AegisVideoDetails {
+  score: number;
+  synthetic: boolean;
+  classification: string;
+  target_person?: string | null;
+  target_confidence?: number | null;
+  anomalies: string[];
+  metrics: Record<string, any>;
+}
+
+export interface AegisMultimodalDetails {
+  av_sync_score?: number | null;
+  av_sync_mismatch: boolean;
+  anomalies: string[];
+}
+
+export interface AegisDeepfakeResult {
+  audio: AegisAudioDetails;
+  video: AegisVideoDetails;
+  multimodal: AegisMultimodalDetails;
+  overall_verdict: string;
+  summary_bg: string;
+  analyzed_at: string;
 }
 
 export interface Seed {

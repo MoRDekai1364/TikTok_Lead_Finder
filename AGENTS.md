@@ -11,12 +11,13 @@
 
 ## Key Directories & Files
 - `crates/providers/src/transcriber.rs`: Hybrid speech transcriber with Whisper sentence segmentation, language detection routing, and Google AI speech integration.
-- `crates/pipeline/src/creator_risk.rs`: Web-based author risk calculation engine using Factcheck.bg, BNT, Google search, and local statistical confidence.
-- `crates/providers/src/passages.rs`: Passage extraction and HTML sanitizer regex.
-- `crates/pipeline/src/engine.rs`: Pipeline worker loop, stage transitions, event emissions, panic-supervised job tasks.
-- `scripts/google_audio_transcribe.py` & `tools/google_audio_transcribe.py`: Hybrid speech transcription script, sequence word alignment, Gemini multimodal audio segmentation, Google Web Speech API.
-- `tools/whisper-cli.exe`: Vulkan-accelerated local whisper engine on Intel GPU.
-- `models/whisper/`: GGML models (`ggml-tiny.bin`, `ggml-large-v3-turbo-q5_0.bin`).
+- `crates/providers/src/sanctions.rs`: OpenSanctions live search & multi-jurisdiction sanctions/PEP cross-referencing engine (UN, US OFAC SDN, EU, UK OFSI, SECO, NAZK, Interpol).
+- `crates/providers/src/news_stream.rs`: Dynamic real-time news stream engine aggregating Google News RSS, BTA, and BNR with deduplication.
+- `crates/pipeline/src/creator_risk.rs`: Web-based author risk calculation engine using Factcheck.bg, BNT, Google search, and AEGIS forensic penalties.
+- `crates/pipeline/src/verify.rs`: Verification pipeline with AEGIS deepfake and voice clone detection integrated into claim auditing.
+- `crates/pipeline/src/server.rs`: REST API server with chunked 10k-word OSINT dossier synthesis, dynamic query formulation, entity pivoting, and live news streams.
+- `crates/pipeline/src/engine.rs`: Pipeline worker loop, stage transitions, event emissions, and background continuous news stream monitoring.
+- `tools/aegis_deepfake_detector.py` & `scripts/aegis_deepfake_detector.py`: Forensic audio/video synthetic detection engine (F0, vocoder cutoffs, 2D FFT, Laplacian variance, AV-sync).
 - `release_stage/leadfinder.exe`: Staged release binary.
 
 ## Commands

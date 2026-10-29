@@ -510,7 +510,7 @@ pub fn build_claims_user_prompt(
 
     if !ocr_lines.is_empty() {
         let mut olines = Vec::with_capacity(ocr_lines.len());
-        for (ms, txt) in ocr_lines.iter().take(25) {
+        for (ms, txt) in ocr_lines.iter().take(60) {
             olines.push(format!("[OCR {ms} ms] {txt}"));
         }
         sections.push(format!("OCR_LINES:\n{}", olines.join("\n")));

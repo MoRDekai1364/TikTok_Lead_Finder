@@ -57,8 +57,8 @@
   let isScanningServers = $state(false);
   let downloadTimer: ReturnType<typeof setInterval> | null = null;
 
-  onMount(async () => {
-    await reloadAll();
+  onMount(() => {
+    void reloadAll();
     startDownloadPolling();
     return () => {
       if (downloadTimer) clearInterval(downloadTimer);

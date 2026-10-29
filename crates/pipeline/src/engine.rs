@@ -855,6 +855,24 @@ impl PipelineContext {
             }
         });
 
+        let monitoring_ctx = Arc::clone(&self);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(45)).await;
+            loop {
+                if let Ok(due_people) = monitoring_ctx.db.get_people_due_for_monitoring(3).await {
+                    let stream = leadfinder_providers::DynamicNewsStream::new();
+                    for person in due_people {
+                        let events = stream.fetch_events_for_entity(person.id, &person.canonical_name, &person.variants, 6).await.unwrap_or_default();
+                        for ev in &events {
+                            let _ = monitoring_ctx.db.record_intel_event(person.id, &ev.source_name, &ev.title, &ev.url, &ev.snippet).await;
+                        }
+                        let _ = monitoring_ctx.db.touch_person_monitored(person.id).await;
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(1500)).await;
+            }
+        });
+
         tokio::spawn(async move {
             let mut idle_ticks: usize = 0;
             loop {
