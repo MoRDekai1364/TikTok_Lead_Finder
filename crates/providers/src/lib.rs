@@ -1,6 +1,7 @@
 pub mod archive;
 pub mod bootstrap;
 pub mod discovery;
+pub mod entity_cleaner;
 pub mod lexicon;
 pub mod llm;
 pub mod media;
@@ -11,11 +12,13 @@ pub mod people;
 pub mod sanctions;
 pub mod search;
 pub mod transcriber;
+pub mod web_archive;
 pub mod ytdlp;
 
 pub use archive::*;
 pub use bootstrap::*;
 pub use discovery::*;
+pub use entity_cleaner::*;
 pub use lexicon::*;
 pub use llm::*;
 pub use media::*;
@@ -26,6 +29,7 @@ pub use people::*;
 pub use sanctions::*;
 pub use search::*;
 pub use transcriber::*;
+pub use web_archive::*;
 pub use ytdlp::*;
 
 pub fn crate_ready() -> &'static str {

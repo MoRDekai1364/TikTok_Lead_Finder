@@ -724,6 +724,8 @@ impl PipelineContext {
             .count();
         let public_fig_count = resolved_people.iter().filter(|p| p.public_figure).count();
 
+        let _ = self.run_aegis_deepfake_detection(&video.id).await;
+
         self.db
             .set_video_state(&video.id, VideoState::ClaimsDone, None)
             .await?;

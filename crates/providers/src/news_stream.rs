@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::Utc;
-use leadfinder_core::EntityIntelEvent;
+use leadfinder_core::{EntityIntelEvent, SearchHit};
 use reqwest::Client;
 use std::time::Duration;
 
@@ -22,6 +22,36 @@ impl DynamicNewsStream {
             .build()
             .unwrap_or_else(|_| Client::new());
         Self { client }
+    }
+
+    pub async fn search_news_hits(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
+        let clean = query.trim();
+        if clean.is_empty() {
+            return Ok(Vec::new());
+        }
+        let google_rss_url = format!(
+            "https://news.google.com/rss/search?q={}&hl=bg&gl=BG&ceid=BG:bg",
+            urlencoding::encode(clean)
+        );
+        let resp = self.client.get(&google_rss_url).send().await?;
+        if !resp.status().is_success() {
+            return Ok(Vec::new());
+        }
+        let xml_text = resp.text().await?;
+        let events = Self::parse_rss_items(&xml_text, "Google News BG", 0, "");
+        let hits = events
+            .into_iter()
+            .take(limit)
+            .map(|e| SearchHit {
+                url: e.url,
+                title: e.title,
+                snippet: e.snippet,
+                source_name: Some(e.source_name),
+                source_kind: "news".to_string(),
+                published_at: Some(e.discovered_at),
+            })
+            .collect();
+        Ok(hits)
     }
 
     pub async fn fetch_events_for_entity(

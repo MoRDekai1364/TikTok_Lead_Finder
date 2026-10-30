@@ -447,57 +447,60 @@ impl PeopleResolver {
         let mut group_order: Vec<String> = Vec::new();
 
         for item in combined_inputs {
-            let (canon, role) = self.normalize_name_and_role(&item.name, item.role_hint.as_deref());
-            if canon.chars().count() < 3 || !canon.chars().any(|c| c.is_alphabetic()) {
-                continue;
-            }
-            if is_generic_non_person(&canon, &self.norm_cfg) {
-                continue;
-            }
-            let key = self.person_phonetic_key(&canon);
-            if key.len() < 3 {
-                continue;
-            }
-
-            let item_ent_type = item.entity_type.clone().or_else(|| {
-                let d = detect_entity_type(&canon, role.as_deref());
-                if d != "person" {
-                    Some(d.to_string())
-                } else {
-                    None
+            let decomposed = crate::entity_cleaner::decompose_and_clean_entity(&item.name);
+            for dec in decomposed {
+                let (canon, role) = self.normalize_name_and_role(&dec.name, dec.role.as_deref().or(item.role_hint.as_deref()));
+                if canon.chars().count() < 3 || !canon.chars().any(|c| c.is_alphabetic()) {
+                    continue;
                 }
-            });
-
-            let entry = groups.entry(key.clone()).or_insert_with(|| {
-                group_order.push(key.clone());
-                CandidateGroup {
-                    canonical_name: canon.clone(),
-                    variants: Vec::new(),
-                    role: None,
-                    entity_type: item_ent_type.clone(),
+                if is_generic_non_person(&canon, &self.norm_cfg) {
+                    continue;
                 }
-            });
-
-            if has_cyrillic(&canon) && !has_cyrillic(&entry.canonical_name) {
-                entry.canonical_name = canon.clone();
-            } else if canon.split_whitespace().count() > entry.canonical_name.split_whitespace().count()
-                && has_cyrillic(&canon) == has_cyrillic(&entry.canonical_name)
-            {
-                entry.canonical_name = canon.clone();
-            }
-
-            push_unique_ci(&mut entry.variants, &canon);
-            push_unique_ci(&mut entry.variants, item.name.trim());
-            for v in &item.variants {
-                if !v.trim().is_empty() {
-                    push_unique_ci(&mut entry.variants, v.trim());
+                let key = self.person_phonetic_key(&canon);
+                if key.len() < 3 {
+                    continue;
                 }
-            }
-            if entry.role.is_none() && role.is_some() {
-                entry.role = role;
-            }
-            if entry.entity_type.is_none() && item_ent_type.is_some() {
-                entry.entity_type = item_ent_type;
+
+                let item_ent_type = item.entity_type.clone().or_else(|| {
+                    let d = detect_entity_type(&canon, role.as_deref());
+                    if d != "person" {
+                        Some(d.to_string())
+                    } else {
+                        None
+                    }
+                });
+
+                let entry = groups.entry(key.clone()).or_insert_with(|| {
+                    group_order.push(key.clone());
+                    CandidateGroup {
+                        canonical_name: canon.clone(),
+                        variants: Vec::new(),
+                        role: None,
+                        entity_type: item_ent_type.clone(),
+                    }
+                });
+
+                if has_cyrillic(&canon) && !has_cyrillic(&entry.canonical_name) {
+                    entry.canonical_name = canon.clone();
+                } else if canon.split_whitespace().count() > entry.canonical_name.split_whitespace().count()
+                    && has_cyrillic(&canon) == has_cyrillic(&entry.canonical_name)
+                {
+                    entry.canonical_name = canon.clone();
+                }
+
+                push_unique_ci(&mut entry.variants, &canon);
+                push_unique_ci(&mut entry.variants, item.name.trim());
+                for v in &item.variants {
+                    if !v.trim().is_empty() {
+                        push_unique_ci(&mut entry.variants, v.trim());
+                    }
+                }
+                if entry.role.is_none() && role.is_some() {
+                    entry.role = role;
+                }
+                if entry.entity_type.is_none() && item_ent_type.is_some() {
+                    entry.entity_type = item_ent_type;
+                }
             }
         }
 
@@ -607,9 +610,12 @@ impl PeopleResolver {
 
     fn scan_capitalized_name_pairs(&self, sources: &VideoTextSources) -> Vec<PersonInput> {
         let mut out = Vec::new();
+        let sanitized_transcript = crate::entity_cleaner::sanitize_text_for_name_scanning(&sources.transcript);
+        let sanitized_caption = crate::entity_cleaner::sanitize_text_for_name_scanning(&sources.caption);
+        let sanitized_ocr = crate::entity_cleaner::sanitize_text_for_name_scanning(&sources.ocr);
         let combined = format!(
             "{}\n{}\n{}",
-            sources.transcript, sources.caption, sources.ocr
+            sanitized_transcript, sanitized_caption, sanitized_ocr
         );
         for sentence in combined.split(|c: char| matches!(c, '.' | '!' | '?' | '\n' | ';' | ':')) {
             let words: Vec<&str> = sentence.split_whitespace().collect();
@@ -622,8 +628,33 @@ impl PeopleResolver {
                 if w1.chars().count() < 3 || w2.chars().count() < 3 {
                     continue;
                 }
+                if crate::entity_cleaner::is_stopword_or_pronoun(w1) || crate::entity_cleaner::is_stopword_or_pronoun(w2) {
+                    continue;
+                }
+                if crate::entity_cleaner::is_topic_word(w1) || crate::entity_cleaner::is_topic_word(w2) {
+                    continue;
+                }
                 if !is_title_cased_word(w1) || !is_title_cased_word(w2) {
                     continue;
+                }
+                let r1 = crate::entity_cleaner::resolve_single_surname_or_alias(w1);
+                let r2 = crate::entity_cleaner::resolve_single_surname_or_alias(w2);
+                if let (Some(p1), Some(p2)) = (r1, r2) {
+                    if p1 != p2 {
+                        out.push(PersonInput {
+                            name: p1.to_string(),
+                            variants: vec![p1.to_string(), w1.to_string()],
+                            role_hint: None,
+                            entity_type: Some("person".to_string()),
+                        });
+                        out.push(PersonInput {
+                            name: p2.to_string(),
+                            variants: vec![p2.to_string(), w2.to_string()],
+                            role_hint: None,
+                            entity_type: Some("person".to_string()),
+                        });
+                        continue;
+                    }
                 }
                 let full = format!("{w1} {w2}");
                 if is_extracted_noise(&full) {
@@ -641,7 +672,6 @@ impl PeopleResolver {
                 if !has_surname_ending && idx == 0 {
                     continue;
                 }
-                let full = format!("{w1} {w2}");
                 let detected = detect_entity_type(&full, None);
                 out.push(PersonInput {
                     name: full.clone(),
@@ -649,6 +679,21 @@ impl PeopleResolver {
                     role_hint: None,
                     entity_type: Some(detected.to_string()),
                 });
+            }
+        }
+        for tag in &sources.hashtags {
+            let t_clean = tag.trim_start_matches('#').trim();
+            if t_clean.chars().count() >= 3 && !crate::entity_cleaner::is_topic_word(t_clean) {
+                let decs = crate::entity_cleaner::decompose_and_clean_entity(t_clean);
+                for dec in decs {
+                    let d = detect_entity_type(&dec.name, dec.role.as_deref());
+                    out.push(PersonInput {
+                        name: dec.name.clone(),
+                        variants: vec![dec.name.clone(), t_clean.to_string()],
+                        role_hint: dec.role,
+                        entity_type: Some(d.to_string()),
+                    });
+                }
             }
         }
         out
@@ -1189,25 +1234,32 @@ pub fn extract_entity_pivots(text: &str, exclude_name: &str) -> Vec<EntityPivotR
     for line in text.lines() {
         for &(suffix, kind) in &corp_suffixes {
             let mut offset = 0;
-            while let Some(pos) = line[offset..].find(suffix) {
+            while offset < line.len() {
+                let Some(pos) = line[offset..].find(suffix) else {
+                    break;
+                };
                 let abs_pos = offset + pos;
-                let start_window = abs_pos.saturating_sub(40);
-                let window = &line[start_window..abs_pos + suffix.len()];
+                let prefix = &line[..abs_pos];
+                let chars: Vec<char> = prefix.chars().collect();
+                let take_count = chars.len().min(40);
+                let window_chars: String = chars[chars.len() - take_count..].iter().collect();
 
-                let extracted_name = if let Some(q_start) = window.rfind(['"', '„', '«']) {
-                    if let Some(q_end) = window[q_start + 1..].find(['"', '“', '»']) {
-                        let inner = &window[q_start + 1..q_start + 1 + q_end].trim();
+                let extracted_name = if let Some(q_start) = window_chars.rfind(|c| c == '"' || c == '„' || c == '«') {
+                    let after_q = &window_chars[q_start..];
+                    let mut q_chars = after_q.chars();
+                    q_chars.next();
+                    let rest: String = q_chars.collect();
+                    if let Some(end_idx) = rest.find(|c| c == '"' || c == '“' || c == '»') {
+                        let inner = rest[..end_idx].trim();
                         format!("{} {}", inner, suffix)
                     } else {
-                        let clean_pre = window[..window.len() - suffix.len()].trim();
-                        let last_words = clean_pre.split_whitespace().rev().take(3).collect::<Vec<_>>();
+                        let last_words = window_chars.split_whitespace().rev().take(3).collect::<Vec<_>>();
                         let mut words = last_words.into_iter().rev().collect::<Vec<_>>();
                         words.push(suffix);
                         words.join(" ")
                     }
                 } else {
-                    let clean_pre = window[..window.len() - suffix.len()].trim();
-                    let last_words = clean_pre.split_whitespace().rev().take(3).collect::<Vec<_>>();
+                    let last_words = window_chars.split_whitespace().rev().take(3).collect::<Vec<_>>();
                     let mut words = last_words.into_iter().rev().collect::<Vec<_>>();
                     words.push(suffix);
                     words.join(" ")
@@ -1244,4 +1296,17 @@ pub fn extract_entity_pivots(text: &str, exclude_name: &str) -> Vec<EntityPivotR
 
     pivots.truncate(6);
     pivots
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_entity_pivots_cyrillic_boundary_safe() {
+        let text = "Според последните данни от търговския регистър, дружеството „Булгартабак Холдинг“ АД и компанията „Интръст“ ЕАД са свързани лица.";
+        let pivots = extract_entity_pivots(text, "Румен Радев");
+        assert!(!pivots.is_empty());
+        assert!(pivots.iter().any(|p| p.entity_name.contains("Холдинг") || p.entity_name.contains("АД") || p.entity_name.contains("ЕАД")));
+    }
 }

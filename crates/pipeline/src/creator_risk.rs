@@ -57,7 +57,15 @@ pub async fn assess_creator_risk(
             }
         }
         if let Ok(Some(df)) = ctx.db.get_aegis_result(&v.id).await {
-            if df.overall_verdict == "deepfake" {
+            let v_up = df.overall_verdict.to_uppercase();
+            if v_up == "DEEPFAKE"
+                || v_up == "CONFIRMED_DEEPFAKE"
+                || v_up == "AI_GENERATED_VIDEO"
+                || v_up == "AI_VOICE_CLONE"
+                || v_up == "ROBOTIC_TTS"
+                || df.audio.synthetic
+                || df.video.synthetic
+            {
                 aegis_deepfake_count += 1;
                 vid_flagged = true;
             }

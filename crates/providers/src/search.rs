@@ -91,7 +91,7 @@ impl WebAndPrimarySearch {
         for d in EXPANDED_NEWS {
             if domain_matches(clean_host, d) {
                 if *d == "wikipedia.org" || *d == "bg.wikipedia.org" {
-                    return ("primary".to_string(), Some("Уикипедия".to_string()));
+                    return ("reference".to_string(), Some("Уикипедия".to_string()));
                 }
                 return ("news".to_string(), Some(d.to_string()));
             }
@@ -165,6 +165,23 @@ impl WebAndPrimarySearch {
                 let hits = parse_searxng_json(&body);
                 if !hits.is_empty() {
                     return hits;
+                }
+            }
+        }
+
+        if let Ok(resp) = self
+            .client
+            .post("https://lite.duckduckgo.com/lite/")
+            .form(&[("q", q)])
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
+                if let Ok(html) = resp.text().await {
+                    let hits = parse_ddg_html(&html);
+                    if !hits.is_empty() {
+                        return hits;
+                    }
                 }
             }
         }
@@ -294,12 +311,14 @@ pub fn is_untrustworthy_or_junk_url(url: &str) -> bool {
         return true;
     }
 
-    if host.ends_with(".google")
-        || host.contains("google.")
-        || host.ends_with("google.com")
-        || host.ends_with("google.bg")
-        || host.contains("familylink")
-        || host.contains("families.google")
+    let is_google_news_article = host == "news.google.com" && path.starts_with("/rss/articles");
+    if !is_google_news_article
+        && (host.ends_with(".google")
+            || host.contains("google.")
+            || host.ends_with("google.com")
+            || host.ends_with("google.bg")
+            || host.contains("familylink")
+            || host.contains("families.google"))
     {
         return true;
     }
@@ -468,6 +487,43 @@ fn parse_ddg_html(html: &str) -> Vec<(String, String, String, Option<String>)> {
             .unwrap_or_default();
         out.push((resolved_url, title, snippet, None));
     }
+
+    if out.is_empty() {
+        if let Ok(link_sel) = Selector::parse("a.result-link") {
+            let snip_sel_lite = Selector::parse("td.result-snippet").ok();
+            let links: Vec<_> = doc.select(&link_sel).collect();
+            let snippets: Vec<_> = snip_sel_lite
+                .map(|s| doc.select(&s).collect())
+                .unwrap_or_default();
+            for (i, a_el) in links.into_iter().enumerate() {
+                if let Some(raw_href) = a_el.value().attr("href") {
+                    let resolved_url = unwrap_ddg_redirect(raw_href);
+                    if resolved_url.starts_with("http") {
+                        let title = a_el
+                            .text()
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                            .split_whitespace()
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let snippet = snippets
+                            .get(i)
+                            .map(|s| {
+                                s.text()
+                                    .collect::<Vec<_>>()
+                                    .join(" ")
+                                    .split_whitespace()
+                                    .collect::<Vec<_>>()
+                                    .join(" ")
+                            })
+                            .unwrap_or_default();
+                        out.push((resolved_url, title, snippet, None));
+                    }
+                }
+            }
+        }
+    }
+
     out
 }
 
@@ -476,8 +532,15 @@ fn unwrap_ddg_redirect(href: &str) -> String {
         let rest = &href[idx + 5..];
         let encoded = rest.split('&').next().unwrap_or(rest);
         if let Ok(decoded) = urlencoding::decode(encoded) {
-            return decoded.into_owned();
+            let s = decoded.into_owned();
+            if s.starts_with("//") {
+                return format!("https:{s}");
+            }
+            return s;
         }
+    }
+    if href.starts_with("//") {
+        return format!("https:{href}");
     }
     href.to_string()
 }
@@ -530,5 +593,26 @@ mod tests {
         assert!(is_untrustworthy_or_junk_url("https://passport.abv.bg/app/login"));
         assert!(!is_untrustworthy_or_junk_url("https://www.bta.bg/bg/news/123"));
         assert!(!is_untrustworthy_or_junk_url("https://www.mvr.bg/press/news"));
+    }
+
+    #[test]
+    fn wikipedia_is_classified_as_reference_not_primary() {
+        let guard = PolitenessGuard::new(
+            leadfinder_core::PolitenessPolicy {
+                requests_per_minute: 10,
+                breaker_failures: 5,
+                breaker_cooldown: std::time::Duration::from_secs(60),
+                cache_ttl: std::time::Duration::from_secs(60),
+            },
+            std::path::PathBuf::from("target/test_search_cache"),
+        );
+        let search = WebAndPrimarySearch::new("http://127.0.0.1:8080", vec![], vec![], vec![], guard);
+        let (kind_bg, name_bg) = search.classify_url("https://bg.wikipedia.org/wiki/%D0%9F%D0%B0%D1%80%D0%B8%D0%B6");
+        assert_eq!(kind_bg, "reference");
+        assert_eq!(name_bg.as_deref(), Some("Уикипедия"));
+
+        let (kind_en, name_en) = search.classify_url("https://en.wikipedia.org/wiki/Paris");
+        assert_eq!(kind_en, "reference");
+        assert_eq!(name_en.as_deref(), Some("Уикипедия"));
     }
 }

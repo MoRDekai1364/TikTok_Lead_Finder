@@ -475,6 +475,35 @@ pub struct Person {
     pub entity_type: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DedupActionType {
+    Merge,
+    SplitCompound,
+    CleanupTag,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DedupProposal {
+    pub id: String,
+    pub action_type: DedupActionType,
+    pub confidence: f64,
+    pub title: String,
+    pub description: String,
+    pub source_id: i64,
+    pub source_name: String,
+    pub target_names: Vec<String>,
+    pub target_ids: Vec<i64>,
+    pub tag: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DedupSummary {
+    pub merged_count: usize,
+    pub split_count: usize,
+    pub cleaned_tags_count: usize,
+    pub details: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Decision {
     pub id: i64,

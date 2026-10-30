@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Language } from '../lib/i18n';
-  import type { Person, DetailedPersonProfile, EntityIntelEvent, SanctionsMatch, EntityPivotRef } from '../lib/types';
-  import { researchPerson, fetchPersonIntelStream, refreshPersonIntelStream, fetchPersonSanctions } from '../lib/api';
+  import type { Person, DetailedPersonProfile, EntityIntelEvent, SanctionsMatch, EntityPivotRef, AegisTemporalAudit } from '../lib/types';
+  import { researchPerson, fetchPersonIntelStream, refreshPersonIntelStream, fetchPersonSanctions, fetchPersonWayback, refreshPersonWayback } from '../lib/api';
 
   let {
     person,
@@ -15,7 +15,7 @@
     onResearchTrigger?: (p: Person) => Promise<void>;
   } = $props();
 
-  let activeTab = $state<'report' | 'intel_stream' | 'sanctions' | 'categories'>('report');
+  let activeTab = $state<'report' | 'wayback_archive' | 'intel_stream' | 'sanctions' | 'categories'>('report');
   let isResearching = $state(false);
   let toastMsg = $state<string | null>(null);
   let searchFilter = $state('');
@@ -24,11 +24,14 @@
   let liveSanctions = $state<SanctionsMatch[]>([]);
   let sanctionsCheckedAt = $state<string | null>(null);
   let isCheckingSanctions = $state(false);
+  let temporalAudit = $state<AegisTemporalAudit | null>(null);
+  let isRefreshingWayback = $state(false);
 
   $effect(() => {
     if (person?.id) {
       loadIntelStream();
       loadSanctionsRadar();
+      loadWaybackAudit();
     }
   });
 
@@ -67,6 +70,37 @@
     }
   }
 
+  async function loadWaybackAudit() {
+    if (!person) return;
+    if (parsedData?.temporal_audit) {
+      temporalAudit = parsedData.temporal_audit;
+      return;
+    }
+    try {
+      const res = await fetchPersonWayback(person.id);
+      if (res.ok && res.temporal_audit) {
+        temporalAudit = res.temporal_audit;
+      }
+    } catch {
+    }
+  }
+
+  async function triggerRefreshWayback() {
+    if (!person || isRefreshingWayback) return;
+    isRefreshingWayback = true;
+    try {
+      const res = await refreshPersonWayback(person.id);
+      if (res.ok && res.temporal_audit) {
+        temporalAudit = res.temporal_audit;
+        showToast(currentLang === 'bg' ? '✓ Времевите архиви са обновени!' : '✓ Temporal archives refreshed!');
+      }
+    } catch {
+      showToast(currentLang === 'bg' ? 'Грешка при обновяване на архивите' : 'Error refreshing archives');
+    } finally {
+      isRefreshingWayback = false;
+    }
+  }
+
   function getEntityTypeInfo(type?: string) {
     switch (type) {
       case 'institution':
@@ -102,6 +136,7 @@
         delta_summary: (parsed.delta_summary as string) || prof?.delta_summary || null,
         sanctions_matches: (parsed.sanctions_matches as SanctionsMatch[]) || prof?.sanctions_matches || [],
         entity_pivots: (parsed.entity_pivots as EntityPivotRef[]) || prof?.entity_pivots || [],
+        temporal_audit: (parsed.temporal_audit as AegisTemporalAudit) || prof?.temporal_audit || null,
       };
     } catch {
       return null;
@@ -272,9 +307,14 @@
     try {
       if (onResearchTrigger) {
         await onResearchTrigger(person);
-      } else {
-        const updated = await researchPerson(person.id, person.canonical_name);
-        Object.assign(person, updated);
+      }
+      const updated = await researchPerson(person.id, person.canonical_name);
+      Object.assign(person, updated);
+      if (updated.detailed_profile_json) {
+        try {
+          const parsed = JSON.parse(updated.detailed_profile_json);
+          if (parsed.temporal_audit) temporalAudit = parsed.temporal_audit;
+        } catch {}
       }
       activeTab = 'report';
       showToast(currentLang === 'bg' ? '✓ Досието е успешно генерирано!' : '✓ Full dossier successfully generated!');
@@ -363,6 +403,16 @@
           onclick={() => (activeTab = 'report')}
         >
           📄 {currentLang === 'bg' ? 'Пълен разузнавателен доклад (5k - 10k думи)' : 'Exhaustive Dossier Report (5k - 10k words)'}
+        </button>
+        <button
+          class="dossier-tab-btn"
+          class:active={activeTab === 'wayback_archive'}
+          onclick={() => (activeTab = 'wayback_archive')}
+        >
+          🏛️ {currentLang === 'bg' ? 'Wayback & Дигитална Памет' : 'Wayback & Archives'}
+          {#if (temporalAudit?.historical_snapshots?.length || 0) + (temporalAudit?.internet_archive_docs?.length || 0) > 0}
+            <span class="tab-badge">{(temporalAudit?.historical_snapshots?.length || 0) + (temporalAudit?.internet_archive_docs?.length || 0)}</span>
+          {/if}
         </button>
         <button
           class="dossier-tab-btn"
@@ -513,6 +563,114 @@
               </button>
             </div>
           {/if}
+        {:else if activeTab === 'wayback_archive'}
+          <div class="wayback-archive-container">
+            <div class="wayback-header">
+              <div class="wayback-info">
+                <h4>🏛️ {currentLang === 'bg' ? 'AEGIS Времеви Архив & Wayback Машина' : 'AEGIS Temporal Archive & Wayback Machine'}</h4>
+                <p>{currentLang === 'bg' ? 'Исторически крос-референс чрез Wayback Machine (archive.org), дигитални документи, ревизионна история на Уикипедия и детекция на заличаване на дигиталната памет.' : 'Historical cross-referencing via Wayback Machine (archive.org), Internet Archive documents, Wikipedia edit revisions, and scrubbed provenance tracking.'}</p>
+                {#if temporalAudit}
+                  <span class="wayback-stats-summary">
+                    🕒 {currentLang === 'bg' ? 'Проверени архивни снимки:' : 'Snapshots checked:'} <strong>{temporalAudit.snapshots_checked}</strong>
+                    {#if temporalAudit.oldest_capture}
+                      | {currentLang === 'bg' ? 'Най-ранна снимка:' : 'Earliest capture:'} <strong>{temporalAudit.oldest_capture}</strong>
+                    {/if}
+                    {#if temporalAudit.newest_capture}
+                      | {currentLang === 'bg' ? 'Най-нова снимка:' : 'Newest capture:'} <strong>{temporalAudit.newest_capture}</strong>
+                    {/if}
+                  </span>
+                {/if}
+              </div>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick={triggerRefreshWayback}
+                disabled={isRefreshingWayback}
+              >
+                {isRefreshingWayback ? '...' : '🔄 ' + (currentLang === 'bg' ? 'Обнови архивите' : 'Refresh Archives')}
+              </button>
+            </div>
+
+            {#if temporalAudit}
+              <div class="wayback-provenance-banner">
+                <span class="provenance-icon">🛡️</span>
+                <div class="provenance-body">
+                  <strong>{currentLang === 'bg' ? 'Оценка на риска от заличаване (Scrubbing / Retraction):' : 'Scrubbing & Alteration Risk Verdict:'}</strong>
+                  <span class="risk-pill">{temporalAudit.scrubbed_or_altered_risk}</span>
+                  {#if temporalAudit.provenance_notes && temporalAudit.provenance_notes.length > 0}
+                    <ul class="provenance-notes-list">
+                      {#each temporalAudit.provenance_notes as note}
+                        <li>{note}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
+              </div>
+
+              {#if temporalAudit.historical_snapshots && temporalAudit.historical_snapshots.length > 0}
+                <div class="wayback-section">
+                  <h5>📸 {currentLang === 'bg' ? 'Исторически заснети копия в Wayback Machine:' : 'Wayback Machine Captured Snapshots:'}</h5>
+                  <div class="wayback-grid">
+                    {#each temporalAudit.historical_snapshots as snap}
+                      <div class="wayback-card">
+                        <div class="wayback-card-top">
+                          <span class="wayback-service-badge">{snap.service}</span>
+                          <span class="wayback-ts-badge">{snap.timestamp}</span>
+                          <span class="wayback-status-badge">HTTP {snap.status}</span>
+                        </div>
+                        <div class="wayback-orig-url"><code>{snap.original_url}</code></div>
+                        <a href={snap.url} target="_blank" rel="noopener noreferrer" class="wayback-link">
+                          🔗 {currentLang === 'bg' ? 'Отвори архивната снимка в Wayback' : 'View Snapshot on Wayback Machine'} ↗
+                        </a>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#if temporalAudit.internet_archive_docs && temporalAudit.internet_archive_docs.length > 0}
+                <div class="wayback-section">
+                  <h5>📚 {currentLang === 'bg' ? 'Архивирани книги, аудиозаписи и документи (Internet Archive):' : 'Archived Media & Books (Internet Archive):'}</h5>
+                  <div class="archive-docs-list">
+                    {#each temporalAudit.internet_archive_docs as doc}
+                      <div class="archive-doc-card">
+                        <div class="doc-header">
+                          <span class="doc-mediatype-badge">{doc.mediatype || 'документ'}</span>
+                          {#if doc.date}
+                            <span class="doc-date-badge">{doc.date}</span>
+                          {/if}
+                        </div>
+                        <h5 class="doc-title">{doc.title}</h5>
+                        <a href={doc.detail_url} target="_blank" rel="noopener noreferrer" class="archive-doc-link">
+                          📥 {currentLang === 'bg' ? 'Преглед в archive.org' : 'Inspect on archive.org'} ↗
+                        </a>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#if temporalAudit.wiki_bio?.revisions && temporalAudit.wiki_bio.revisions.length > 0}
+                <div class="wayback-section">
+                  <h5>📝 {currentLang === 'bg' ? 'Хронология на редакциите в Уикипедия (Редакционни спорове и корекции):' : 'Wikipedia Revision Log (Edit Wars & Historical Modifiers):'}</h5>
+                  <div class="wiki-revisions-list">
+                    {#each temporalAudit.wiki_bio.revisions as rev}
+                      <div class="wiki-revision-item">
+                        <span class="rev-time">🕒 {rev.timestamp}</span>
+                        <span class="rev-user">👤 <code>{rev.user}</code></span>
+                        <span class="rev-comment">{rev.comment ? `„${rev.comment}“` : (currentLang === 'bg' ? '(без коментар)' : '(no comment)')}</span>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            {:else}
+              <div class="empty-wayback-box">
+                <span class="empty-icon">🏛️</span>
+                <h5>{currentLang === 'bg' ? 'Няма заредени архивни данни' : 'No Temporal Archive Data Loaded'}</h5>
+                <p>{currentLang === 'bg' ? 'Натиснете бутона по-горе за проверка на историческите снимки в Wayback Machine и Internet Archive.' : 'Click the button above to query Wayback Machine and Internet Archive records.'}</p>
+              </div>
+            {/if}
+          </div>
         {:else if activeTab === 'intel_stream'}
           <div class="intel-stream-container">
             <div class="intel-stream-header">
@@ -1518,5 +1676,285 @@
     font-size: 0.88rem;
     color: var(--text-muted);
     max-width: 500px;
+  }
+
+  .wayback-archive-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2rem;
+  }
+
+  .wayback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .wayback-info h4 {
+    margin: 0 0 0.4rem 0;
+    font-size: 1.25rem;
+  }
+
+  .wayback-info p {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+
+  .wayback-stats-summary {
+    display: inline-block;
+    font-size: 0.82rem;
+    color: var(--primary-accent);
+    background: rgba(13, 110, 253, 0.08);
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid rgba(13, 110, 253, 0.2);
+  }
+
+  .wayback-provenance-banner {
+    display: flex;
+    gap: 1rem;
+    background: rgba(255, 193, 7, 0.08);
+    border: 1px solid rgba(255, 193, 7, 0.35);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    align-items: flex-start;
+  }
+
+  .provenance-icon {
+    font-size: 1.75rem;
+  }
+
+  .provenance-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+  }
+
+  .risk-pill {
+    display: inline-block;
+    align-self: flex-start;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: rgba(255, 193, 7, 0.25);
+    color: #ffd166;
+    border: 1px solid rgba(255, 193, 7, 0.4);
+  }
+
+  .provenance-notes-list {
+    margin: 0.35rem 0 0 1.2rem;
+    padding: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .provenance-notes-list li {
+    margin-bottom: 0.25rem;
+  }
+
+  .wayback-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .wayback-section h5 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .wayback-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+
+  .wayback-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .wayback-card-top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .wayback-service-badge {
+    background: rgba(13, 110, 253, 0.15);
+    color: #4da3ff;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .wayback-ts-badge {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+
+  .wayback-status-badge {
+    margin-left: auto;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(40, 167, 69, 0.15);
+    color: #28a745;
+    font-weight: 600;
+  }
+
+  .wayback-orig-url {
+    font-size: 0.82rem;
+    word-break: break-all;
+    color: var(--text-muted);
+  }
+
+  .wayback-link {
+    font-size: 0.82rem;
+    color: var(--primary-accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .wayback-link:hover {
+    text-decoration: underline;
+  }
+
+  .archive-docs-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+
+  .archive-doc-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .doc-mediatype-badge {
+    font-size: 0.72rem;
+    background: rgba(108, 117, 125, 0.2);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .doc-date-badge {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .doc-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .archive-doc-link {
+    margin-top: auto;
+    font-size: 0.82rem;
+    color: var(--primary-accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .archive-doc-link:hover {
+    text-decoration: underline;
+  }
+
+  .wiki-revisions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .wiki-revision-item {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.6rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .rev-time {
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-size: 0.78rem;
+  }
+
+  .rev-user {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .rev-comment {
+    color: var(--text-muted);
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .empty-wayback-box {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .empty-wayback-box .empty-icon {
+    font-size: 2.5rem;
+    opacity: 0.6;
+  }
+
+  .empty-wayback-box h5 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  .empty-wayback-box p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    max-width: 480px;
   }
 </style>

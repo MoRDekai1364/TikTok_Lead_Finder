@@ -7,8 +7,8 @@ use leadfinder_core::{
     Search, SearchHit, SearchQuery, Stage, VideoState,
 };
 use leadfinder_providers::{
-    global_lexicon, ConfiguredFactCheckArchive, LlmChainRunner, PassageExtractorAndRanker,
-    RankedPassage, WebAndPrimarySearch,
+    global_lexicon, ConfiguredFactCheckArchive, DynamicNewsStream, LlmChainRunner,
+    PassageExtractorAndRanker, RankedPassage, WebAndPrimarySearch,
 };
 use crate::engine::PipelineContext;
 
@@ -132,9 +132,12 @@ pub fn distill_claim_keywords(claim_text: &str, actor: Option<&str>, context_wor
         }
     }
 
-    for word in claim_text.split(|c: char| !c.is_alphanumeric()) {
+    let re_spaced_digits = regex::Regex::new(r"(\d)\s+(\d{3})\b").unwrap();
+    let cleaned_claim = re_spaced_digits.replace_all(claim_text, "$1$2");
+
+    for word in cleaned_claim.split(|c: char| !c.is_alphanumeric()) {
         let w = word.trim();
-        if w.chars().count() < 3 && !w.chars().any(|c| c.is_ascii_digit()) {
+        if (w.chars().count() < 3 && !w.chars().any(|c| c.is_ascii_digit())) || w.chars().all(|c| c == '0') {
             continue;
         }
         let low = w.to_lowercase();
@@ -241,13 +244,64 @@ pub fn enforce_verification_rules(
             .filter_map(|e| url::Url::parse(&e.source_url).ok()?.host_str().map(|h| h.to_lowercase()))
             .collect();
 
-        let sufficient = has_primary_or_fc || news_domains.len() >= min_independent_news_outlets;
-        if !sufficient {
+        let has_valid_url = stored_evidence.iter().any(|e| e.source_url.starts_with("http"));
+        if !has_valid_url {
             verdict = "UNVERIFIABLE".to_string();
             label = "unverifiable".to_string();
-            strength = (strength * 0.4).min(0.35);
-            forced_reason = Some("insufficient_authoritative_sources_forced_unverifiable".to_string());
-            reasoning = format!("{reasoning} (Липсва минимално необходимият брой независими потвърждения съгласно правилата.)");
+            strength = 0.0;
+            forced_reason = Some("missing_external_source_url".to_string());
+            reasoning = format!("{reasoning} (Липсва проверен външен източник с пълен валиден уеб адрес.)");
+        } else {
+            let sufficient = has_primary_or_fc || news_domains.len() >= min_independent_news_outlets;
+            if !sufficient {
+                verdict = "UNVERIFIABLE".to_string();
+                label = "unverifiable".to_string();
+                strength = (strength * 0.4).min(0.35);
+                forced_reason = Some("insufficient_authoritative_sources_forced_unverifiable".to_string());
+                reasoning = format!("{reasoning} (Липсва минимално необходимият брой независими потвърждения съгласно правилата.)");
+            } else {
+                let claim_low = claim.text_bg.to_lowercase();
+                let is_event = claim_low.contains("протест")
+                    || claim_low.contains("стачк")
+                    || claim_low.contains("демонстрац")
+                    || claim_low.contains("сблъс")
+                    || claim_low.contains("арест")
+                    || claim_low.contains("безредиц")
+                    || claim_low.contains("погром")
+                    || claim_low.contains("бунт")
+                    || claim_low.contains("митинг")
+                    || claim_low.contains("ранен")
+                    || claim_low.contains("убит");
+
+                let r_low = reasoning.to_lowercase();
+                let has_demographic_reasoning = r_low.contains("население")
+                    || r_low.contains("жители")
+                    || r_low.contains("преброяване")
+                    || r_low.contains("демографи");
+
+                if is_event && has_demographic_reasoning {
+                    verdict = "UNVERIFIABLE".to_string();
+                    label = "unverifiable".to_string();
+                    strength = (strength * 0.3).min(0.25);
+                    forced_reason = Some("demographic_fallacy_detected".to_string());
+                    reasoning = format!("{reasoning} (Демографските данни за население не представляват доказателство за броя на участниците в протест или инцидент.)");
+                } else if verdict == "CONTRADICTED" && !has_primary_or_fc {
+                    let is_denial_dispute = r_low.contains("отрича")
+                        || r_low.contains("отрече")
+                        || r_low.contains("не е казвал")
+                        || r_low.contains("лъже")
+                        || r_low.contains("събеседник")
+                        || r_low.contains("спор")
+                        || r_low.contains("във видеото");
+                    if is_denial_dispute {
+                        verdict = "UNVERIFIABLE".to_string();
+                        label = "unverifiable".to_string();
+                        strength = (strength * 0.4).min(0.35);
+                        forced_reason = Some("intra_video_dispute_unverifiable".to_string());
+                        reasoning = format!("{reasoning} (Спорът или взаимното отричане между събеседници не представлява документално доказателство за опровержение. Изисква се първичен документ или верифициран фактчек.)");
+                    }
+                }
+            }
         }
     }
 
@@ -302,11 +356,12 @@ pub fn build_verify_user_prompt(
     let mut pass_lines = Vec::new();
     for p in passages {
         pass_lines.push(format!(
-            "[{}] ({}) {} [pub: {}]:\n{}",
+            "[{}] ({}) {} [pub: {}]\nИзточник URL: {}\n{}",
             p.passage_id,
             p.source_kind,
-            p.source_name.as_deref().unwrap_or(&p.source_url),
-            p.published_at.as_deref().unwrap_or("unknown"),
+            p.source_name.as_deref().unwrap_or("Медия / Документ"),
+            p.published_at.as_deref().unwrap_or("неизвестна дата"),
+            p.source_url,
             p.text
         ));
     }
@@ -482,6 +537,29 @@ impl PipelineContext {
             }
         }
 
+        let news_stream = DynamicNewsStream::new();
+        if let Ok(n_hits) = news_stream.search_news_hits(&distilled_q, 6).await {
+            for hit in n_hits {
+                if !candidate_hits.iter().any(|(h, _)| h.url == hit.url) {
+                    let body = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+                    let main_txt = ranker.extract_main_text(&body);
+                    candidate_hits.push((hit, main_txt));
+                }
+            }
+        }
+        if let Some(act) = actor {
+            let actor_q = format!("{act} {distilled_q}");
+            if let Ok(n_hits) = news_stream.search_news_hits(&actor_q, 4).await {
+                for hit in n_hits {
+                    if !candidate_hits.iter().any(|(h, _)| h.url == hit.url) {
+                        let body = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
+                        let main_txt = ranker.extract_main_text(&body);
+                        candidate_hits.push((hit, main_txt));
+                    }
+                }
+            }
+        }
+
         if candidate_hits.len() < 3 {
             let relaxed_q = distilled_q.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
             if !relaxed_q.is_empty() {
@@ -532,24 +610,31 @@ impl PipelineContext {
                     cfg.verification.min_independent_news_outlets,
                 )
             } else {
-                let aegis_info = self.db.get_aegis_result(video_id).await.ok().flatten();
-                let aegis_context = aegis_info.as_ref().map(|df| {
+                let mut aegis_info = self.db.get_aegis_result(video_id).await.ok().flatten();
+                if aegis_info.is_none() {
+                    aegis_info = self.run_aegis_deepfake_detection(video_id).await.ok();
+                }
+                let aegis_context = aegis_info.as_ref().and_then(|df| {
                     let mut parts = Vec::new();
                     if df.audio.synthetic {
                         let target = df.audio.target_person.as_deref().unwrap_or("неустановена личност");
-                        parts.push(format!("Аудио анализ: Засечен клониран AI глас / синтетичен TTS ({:.0}% увереност, имитиран глас: {}).", df.audio.score * 100.0, target));
+                        parts.push(format!("Аудио анализ: Засечен клониран/изкуствен глас ({:.0}% риск, имитиран глас: {}).", df.audio.score * 100.0, target));
                     }
                     if df.video.synthetic {
                         let target = df.video.target_person.as_deref().unwrap_or("неустановена личност");
-                        parts.push(format!("Видео анализ: Засечен face-swap / генеративно видео ({:.0}% увереност, имитирано лице: {}).", df.video.score * 100.0, target));
+                        parts.push(format!("Видео анализ: Засечено подменено лице / генерирано видео ({:.0}% риск, имитирано лице: {}).", df.video.score * 100.0, target));
                     }
                     if df.multimodal.av_sync_mismatch {
-                        parts.push("AV синхрон: Открито фазово разминаване между устни и артикулиран звук (AI дублаж/lipsync).".to_string());
+                        parts.push("Синхрон звук-устни: Открито разминаване между устните и говора (изкуствен дублаж).".to_string());
                     }
                     if !parts.is_empty() {
-                        parts.push("ВНИМАНИЕ: Записът съдържа доказана цифрова синтетика от AEGIS. Ако твърдението приписва думи на публична личност чрез синтетичен глас или подменено лице, това представлява цифрова фалшификация!".to_string());
+                        parts.push("ВНИМАНИЕ: Записът съдържа доказана цифрова манипулация от AEGIS. Ако твърдението приписва думи на публична личност чрез изкуствен глас или подменено лице, това представлява цифрова фалшификация!".to_string());
+                        Some(parts.join("\n"))
+                    } else if df.overall_verdict.eq_ignore_ascii_case("SUSPECTED_SYNTHETIC") || df.overall_verdict.eq_ignore_ascii_case("suspicious") {
+                        Some(format!("AEGIS отчита съмнителни отклонения в записа (аудио риск {:.0}%, видео риск {:.0}%), но под прага за сигурна синтетика.", df.audio.score * 100.0, df.video.score * 100.0))
+                    } else {
+                        None
                     }
-                    parts.join("\n")
                 });
                 let user_prompt = build_verify_user_prompt(
                     &claim,
@@ -636,6 +721,7 @@ impl PipelineContext {
     }
 
     pub async fn run_claims_job(&self, video_id: &str) -> Result<()> {
+        let _ = self.run_aegis_deepfake_detection(video_id).await;
         self.extract_claims_for_video(video_id).await?;
         if let Ok(verify_job) = self.db.enqueue_job(Some(video_id), Stage::Verify).await {
             self.emit(CoreEvent::JobUpdated {
@@ -682,6 +768,7 @@ impl PipelineContext {
     }
 
     pub async fn run_research_more_job(&self, video_id: &str) -> Result<()> {
+        let _ = self.run_aegis_deepfake_detection(video_id).await;
         let mut claims = self.db.get_claims_for_video(video_id).await?;
         if claims.is_empty() {
             let _ = self.run_claims_job(video_id).await;
@@ -754,7 +841,6 @@ impl PipelineContext {
             }
         }
 
-        let _ = self.run_aegis_deepfake_detection(video_id).await;
         let _ = self.check_and_mark_video_verified(video_id).await;
         let _ = self.rank_all().await;
         if let Some(v) = self.db.get_video(video_id).await? {
@@ -835,5 +921,71 @@ impl PipelineContext {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn distill_claim_keywords_merges_spaced_numbers() {
+        let q = distill_claim_keywords(
+            "По данни на правителството над 550 000 души са излезли на протести във Франция",
+            None,
+            &[],
+        );
+        assert!(q.contains("550000"), "expected 550000 in query: {q}");
+        assert!(!q.split_whitespace().any(|t| t == "000"));
+    }
+
+    #[test]
+    fn demographic_fallacy_on_event_claim_forces_unverifiable() {
+        let claim = Claim {
+            id: 42,
+            video_id: "7697938534824430870".to_string(),
+            text_bg: "По данни на правителството, над 550 000 души са излезли по улиците, за да протестират срещу високите цени.".to_string(),
+            claim_type: "factual".to_string(),
+            speaker: None,
+            attribution: vec![],
+            start_ms: Some(12000),
+            end_ms: Some(20000),
+            checkworthiness: Some(0.9),
+            verdict: None,
+            label: None,
+            reasoning_bg: None,
+            evidence_strength: None,
+            verified_at: None,
+            cluster_id: None,
+        };
+
+        let passages = vec![
+            RankedPassage {
+                passage_id: "p1".to_string(),
+                source_url: "https://factcheck.bg/sample".to_string(),
+                source_name: Some("Factcheck.bg".to_string()),
+                source_kind: "factcheck".to_string(),
+                published_at: Some("2026-10-18".to_string()),
+                text: "През 1800 г. населението на Париж е било около 500 000 жители.".to_string(),
+                score: 1.2,
+            },
+        ];
+
+        let raw = RawVerificationLlmOutput {
+            claim_id: 42,
+            verdict: "CONTRADICTED".to_string(),
+            label: "false_claim".to_string(),
+            evidence: vec![RawEvidenceRef {
+                passage_id: "p1".to_string(),
+                stance: "contradicts".to_string(),
+            }],
+            reasoning_bg: "Опровергава се, тъй като според https://factcheck.bg/sample населението на Париж през 1800 г. е било 500 000 жители.".to_string(),
+            evidence_strength: 0.9,
+        };
+
+        let (verdict, label, _, _, _, forced) = enforce_verification_rules(&claim, &raw, &passages, 2);
+        assert_eq!(verdict, "UNVERIFIABLE");
+        assert_eq!(label, "unverifiable");
+        assert_eq!(forced.as_deref(), Some("demographic_fallacy_detected"));
     }
 }

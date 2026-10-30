@@ -124,12 +124,12 @@ impl TesseractOcr {
         if words.is_empty() {
             return Ok(None);
         }
-        let joined = words.join(" ");
-        if joined.chars().filter(|c| c.is_alphanumeric()).count() < 3 {
+        let mean_conf = confs.iter().sum::<f64>() / confs.len() as f64;
+        if mean_conf < 0.50 {
             return Ok(None);
         }
-        let mean_conf = confs.iter().sum::<f64>() / confs.len() as f64;
-        if mean_conf < 0.35 {
+        let joined = words.join(" ");
+        if !is_meaningful_ocr_text(&words, &joined) {
             return Ok(None);
         }
 
@@ -139,6 +139,59 @@ impl TesseractOcr {
             confidence: (mean_conf * 1000.0).round() / 1000.0,
         }))
     }
+}
+
+pub fn is_meaningful_ocr_text(words: &[String], joined: &str) -> bool {
+    let alpha_chars: Vec<char> = joined.chars().filter(|c| c.is_alphanumeric()).collect();
+    if alpha_chars.len() < 4 {
+        return false;
+    }
+
+    let symbol_count = joined.chars().filter(|c| !c.is_alphanumeric() && !c.is_whitespace()).count();
+    if symbol_count as f64 / joined.chars().count().max(1) as f64 > 0.30 {
+        return false;
+    }
+
+    let mut valid_words_count = 0usize;
+    let mut single_char_count = 0usize;
+    let mut has_cyrillic = false;
+    let mut has_latin = false;
+
+    for w in words {
+        let clean: String = w.chars().filter(|c| c.is_alphabetic()).collect();
+        let len = clean.chars().count();
+        if len == 1 {
+            single_char_count += 1;
+        } else if len >= 3 {
+            valid_words_count += 1;
+        }
+
+        for c in clean.chars() {
+            if ('\u{0400}'..='\u{04FF}').contains(&c) {
+                has_cyrillic = true;
+            } else if c.is_ascii_alphabetic() {
+                has_latin = true;
+            }
+        }
+    }
+
+    if words.len() <= 1 && valid_words_count == 0 && alpha_chars.len() < 5 {
+        return false;
+    }
+
+    if words.len() >= 3 && (single_char_count as f64 / words.len() as f64) >= 0.35 {
+        return false;
+    }
+
+    if has_cyrillic && has_latin && words.len() < 6 && single_char_count >= 2 {
+        return false;
+    }
+
+    if valid_words_count < 1 && alpha_chars.len() < 6 {
+        return false;
+    }
+
+    true
 }
 
 #[async_trait]

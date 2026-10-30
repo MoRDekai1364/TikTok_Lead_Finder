@@ -11,6 +11,8 @@
     deletePerson,
     researchPerson,
     autoClassifyPeople,
+    autoDedupPeople,
+    mergePeopleDirectly,
   } from '../lib/api';
   import { isJobActive, startAiJob, finishAiJob } from '../lib/aiTasks.svelte';
 
@@ -25,6 +27,12 @@
   let selectedEntityType = $state('all');
   let selectedSort = $state('rating');
   let toastMsg = $state<string | null>(null);
+
+  let selectedPeopleIds = $state<number[]>([]);
+  let isMergeModalOpen = $state(false);
+  let mergeMasterId = $state<number | null>(null);
+  let mergeCustomName = $state('');
+  let isMerging = $state(false);
 
   let researchingId = $state<number | null>(null);
   let editingPerson = $state<Person | null>(null);
@@ -126,6 +134,27 @@
     }
   }
 
+  let isAutoDeduping = $state(false);
+
+  async function handleAutoDedup() {
+    if (isAutoDeduping) return;
+    isAutoDeduping = true;
+    try {
+      const res = await autoDedupPeople();
+      const s = res.summary;
+      showToast(
+        currentLang === 'bg'
+          ? `Дедупликация: ${s.merged} обединени, ${s.split} разделени, ${s.tagged} коригирани.`
+          : `Dedup: ${s.merged} merged, ${s.split} split, ${s.tagged} cleaned.`
+      );
+      await loadData();
+    } catch {
+      showToast(currentLang === 'bg' ? 'Грешка при дедупликацията' : 'Dedup failed');
+    } finally {
+      isAutoDeduping = false;
+    }
+  }
+
   async function handleTriggerResearch(p: Person) {
     if (isJobActive('person-research', p.id)) return;
     startAiJob('person-research', p.id, p.canonical_name);
@@ -172,6 +201,49 @@
     try {
       await updatePerson(p.id, { rating: newR });
     } catch {}
+  }
+
+  function togglePersonSelection(id: number) {
+    if (selectedPeopleIds.includes(id)) {
+      selectedPeopleIds = selectedPeopleIds.filter(x => x !== id);
+    } else {
+      selectedPeopleIds = [...selectedPeopleIds, id];
+    }
+  }
+
+  function clearSelection() {
+    selectedPeopleIds = [];
+  }
+
+  function openMergeModal() {
+    if (selectedPeopleIds.length < 2) return;
+    mergeMasterId = selectedPeopleIds[0];
+    const master = people.find(p => p.id === mergeMasterId);
+    mergeCustomName = master ? master.canonical_name : '';
+    isMergeModalOpen = true;
+  }
+
+  async function handleExecuteMerge() {
+    if (!mergeMasterId || selectedPeopleIds.length < 2) return;
+    isMerging = true;
+    try {
+      const sourcesToMerge = selectedPeopleIds.filter(id => id !== mergeMasterId);
+      for (const srcId of sourcesToMerge) {
+        await mergePeopleDirectly({
+          source_id: srcId,
+          target_id: mergeMasterId,
+          custom_name: mergeCustomName.trim() || undefined,
+        });
+      }
+      showToast(currentLang === 'bg' ? '✓ Успешно обединяване!' : '✓ Merged successfully!');
+      isMergeModalOpen = false;
+      selectedPeopleIds = [];
+      await loadData();
+    } catch {
+      showToast(currentLang === 'bg' ? 'Грешка при обединяване' : 'Merge error');
+    } finally {
+      isMerging = false;
+    }
   }
 
   async function handleDeletePerson(p: Person) {
@@ -232,11 +304,11 @@
 <div class="people-screen">
   <header class="screen-header">
     <div class="header-titles">
-      <h2>👥 {currentLang === 'bg' ? 'Регистър на засечените обекти и профилиране' : 'Detected Objects Registry & OSINT Profiling'}</h2>
+      <h2>👥 {currentLang === 'bg' ? 'Лица, институции и събития' : 'Entities & Profiles'}</h2>
       <p class="header-desc">
         {currentLang === 'bg'
-          ? 'Постоянен каталог на засечени политици, магистрати, лекари и общественици с рейтинг за приоритизиране, неограничени тагове и дълбоко разузнаване.'
-          : 'Permanent directory of detected figures with prioritization rating, tags, and multi-dimensional OSINT dossiers.'}
+          ? 'Споменати лица, организации и теми в проверените видеа.'
+          : 'Mentioned figures, institutions, and topics across verified videos.'}
       </p>
     </div>
 
@@ -245,10 +317,13 @@
         <span class="screen-toast">{toastMsg}</span>
       {/if}
       <button class="btn btn-secondary btn-sm" onclick={handleAutoClassify} disabled={isClassifying}>
-        {isClassifying ? '⏳...' : '🤖 Авто-класификация'}
+        {isClassifying ? '⏳...' : '🤖 ' + (currentLang === 'bg' ? 'Подреди по вид' : 'Auto-classify')}
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick={handleAutoDedup} disabled={isAutoDeduping} title="Обединяване на дубликати и разделяне на съставни имена">
+        {isAutoDeduping ? '⏳...' : '⚡ ' + (currentLang === 'bg' ? 'Обедини дубликати' : 'Deduplicate')}
       </button>
       <button class="btn btn-primary btn-sm" onclick={() => (isCreatingNew = true)}>
-        + {currentLang === 'bg' ? 'Добави личност' : 'Add Person'}
+        + {currentLang === 'bg' ? 'Добави запис' : 'Add Entry'}
       </button>
     </div>
   </header>
@@ -305,9 +380,16 @@
       <div class="people-grid">
         {#each people as person (person.id)}
           {@const entInfo = getEntityTypeInfo(person.entity_type)}
-          <div class="person-card">
+          <div class="person-card" class:card-selected={selectedPeopleIds.includes(person.id)}>
             <div class="card-head">
               <div class="person-identity">
+                <input
+                  type="checkbox"
+                  class="person-select-checkbox"
+                  checked={selectedPeopleIds.includes(person.id)}
+                  onchange={() => togglePersonSelection(person.id)}
+                  title="Избери за обединяване"
+                />
                 <span class="person-avatar">{person.canonical_name.slice(0, 2).toUpperCase()}</span>
                 <div>
                   <h3 class="person-name">{person.canonical_name}</h3>
@@ -361,12 +443,12 @@
             {/if}
 
             <div class="claims-stat-bar">
-              <span class="stat-item" title="Общо засечени видеа">
+              <span class="stat-item" title="Брой видеа със споменаване">
                 🎬 {person.mentions ?? 0} {currentLang === 'bg' ? 'видеа' : 'videos'}
               </span>
               {#if person.researched_at}
                 <span class="stat-item stat-researched" title={person.researched_at}>
-                  ✓ {currentLang === 'bg' ? 'Проучен с OSINT' : 'Researched'}
+                  ✓ {currentLang === 'bg' ? 'Проучен' : 'Researched'}
                 </span>
               {/if}
             </div>
@@ -376,15 +458,15 @@
                 class="btn btn-primary btn-sm"
                 onclick={() => handleTriggerResearch(person)}
                 disabled={isJobActive('person-research', person.id)}
-                title="Стартирай автоматично 9-степенно OSINT проучване с AI"
+                title="Стартирай пълно проучване от открити източници"
               >
-                {isJobActive('person-research', person.id) ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи лицето' : 'OSINT Research')}
+                {isJobActive('person-research', person.id) ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи' : 'Research')}
               </button>
 
               <button
                 class="btn btn-secondary btn-sm"
                 onclick={() => (viewingDossier = person)}
-                title="Отвори пълното досие и структуриран разузнавателен профил"
+                title="Отвори пълното досие"
               >
                 📖 {currentLang === 'bg' ? 'Досие' : 'Dossier'}
               </button>
@@ -409,8 +491,84 @@
         {/each}
       </div>
     {/if}
+
+    {#if selectedPeopleIds.length > 0}
+      <div class="floating-bulk-bar">
+        <span class="bulk-count">
+          <strong>{selectedPeopleIds.length}</strong> {currentLang === 'bg' ? 'избрани записа' : 'selected'}
+        </span>
+        {#if selectedPeopleIds.length >= 2}
+          <button class="btn btn-primary btn-sm" onclick={openMergeModal}>
+            🔗 {currentLang === 'bg' ? 'Обедини избраните' : 'Merge selected'}
+          </button>
+        {/if}
+        <button class="btn btn-outline btn-sm" onclick={clearSelection}>
+          ✕ {currentLang === 'bg' ? 'Отказ' : 'Clear'}
+        </button>
+      </div>
+    {/if}
   </main>
 </div>
+
+{#if isMergeModalOpen}
+  <div class="modal-backdrop" onclick={() => (isMergeModalOpen = false)} role="presentation">
+    <div class="modal-dialog" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+      <div class="modal-head">
+        <h3>🔗 {currentLang === 'bg' ? 'Обединяване на избраните лица' : 'Merge Selected Entities'}</h3>
+        <button class="close-btn" onclick={() => (isMergeModalOpen = false)}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="merge-modal-subhint">
+          {currentLang === 'bg'
+            ? 'Изберете водещ запис. Всички видеа, тагове и цитати от останалите ще бъдат прехвърлени към него, а дублиращите се записи ще бъдат изчистени.'
+            : 'Select the primary record to keep. Videos, tags, and citations will be merged into it.'}
+        </p>
+
+        <div class="merge-candidates-list">
+          {#each selectedPeopleIds as id}
+            {@const p = people.find(item => item.id === id)}
+            {#if p}
+              <label class="merge-radio-row" class:is-master={mergeMasterId === p.id}>
+                <input
+                  type="radio"
+                  name="master_selection"
+                  value={p.id}
+                  checked={mergeMasterId === p.id}
+                  onchange={() => {
+                    mergeMasterId = p.id;
+                    mergeCustomName = p.canonical_name;
+                  }}
+                />
+                <div class="radio-info">
+                  <strong>{p.canonical_name}</strong>
+                  <span class="radio-sub">ID: {p.id} • {p.mentions ?? 0} видеа • {p.category || 'Без категория'}</span>
+                </div>
+                {#if mergeMasterId === p.id}
+                  <span class="master-tag">★ {currentLang === 'bg' ? 'Водещ запис' : 'Primary'}</span>
+                {/if}
+              </label>
+            {/if}
+          {/each}
+        </div>
+
+        <label class="merge-name-field">
+          <span>{currentLang === 'bg' ? 'Окончателно канонично име:' : 'Final canonical name:'}</span>
+          <input type="text" bind:value={mergeCustomName} class="merge-name-input" />
+        </label>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-outline btn-sm" onclick={() => (isMergeModalOpen = false)} disabled={isMerging}>
+          ✕ {currentLang === 'bg' ? 'Отказ' : 'Cancel'}
+        </button>
+        <button class="btn btn-primary btn-sm" onclick={handleExecuteMerge} disabled={isMerging}>
+          {isMerging ? '⏳...' : '✓ ' + (currentLang === 'bg' ? 'Потвърди обединяването' : 'Confirm Merge')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if isCreatingNew}
   <div class="modal-backdrop" onclick={() => (isCreatingNew = false)} role="presentation">
@@ -979,6 +1137,112 @@
     border-top-color: var(--primary-accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
+  }
+
+  .person-select-checkbox {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-right: 0.35rem;
+    cursor: pointer;
+    accent-color: var(--primary-accent, #3b82f6);
+  }
+
+  .person-card.card-selected {
+    border-color: var(--primary-accent, #3b82f6);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+  }
+
+  .floating-bulk-bar {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    border: 1px solid #3b82f6;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    border-radius: 9999px;
+    padding: 0.5rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    z-index: 1000;
+  }
+
+  .bulk-count {
+    font-size: 0.85rem;
+    color: #e2e8f0;
+  }
+
+  .merge-modal-subhint {
+    font-size: 0.82rem;
+    color: var(--text-secondary, #94a3b8);
+    margin-bottom: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .merge-candidates-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .merge-radio-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .merge-radio-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .merge-radio-row.is-master {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .radio-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .radio-sub {
+    font-size: 0.72rem;
+    color: var(--text-secondary, #94a3b8);
+  }
+
+  .master-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .merge-name-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+  }
+
+  .merge-name-input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.45rem 0.65rem;
+    color: inherit;
+    font-size: 0.88rem;
   }
 
   @keyframes spin {

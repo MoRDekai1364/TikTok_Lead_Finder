@@ -128,9 +128,9 @@
           <span class="badge badge-archive" title={t.alreadyCheckedBadge}>FactCheck</span>
         {/if}
 
-        {#if card.aegis_verdict === 'deepfake' || ((card.aegis_audio_score ?? 0) >= 0.65 || (card.aegis_video_score ?? 0) >= 0.65)}
-          <span class="badge badge-deepfake" title={card.aegis_target_person ? `AI Deepfake: ${card.aegis_target_person}` : 'Засечен AI Deepfake / Синтетика'}>
-            🛡️ {card.aegis_target_person ? card.aegis_target_person : 'Deepfake'}
+        {#if ['deepfake', 'confirmed_deepfake', 'ai_generated_video', 'ai_voice_clone', 'robotic_tts'].includes((card.aegis_verdict || '').toLowerCase()) || ((card.aegis_audio_score ?? 0) >= 0.60 || (card.aegis_video_score ?? 0) >= 0.60)}
+          <span class="badge badge-deepfake" title={card.aegis_target_person ? `Манипулиран запис: ${card.aegis_target_person}` : 'Засечен манипулиран запис'}>
+            🛡️ {card.aegis_target_person ? card.aegis_target_person : 'Манипулация'}
             {#if (card.aegis_audio_score ?? 0) >= (card.aegis_video_score ?? 0)}
               {Math.round((card.aegis_audio_score ?? 0) * 100)}%
             {:else}

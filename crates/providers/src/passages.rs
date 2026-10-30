@@ -176,6 +176,22 @@ impl PassageExtractorAndRanker {
             return Vec::new();
         }
 
+        let claim_low = claim_text.to_lowercase();
+        let is_event_claim = claim_low.contains("протест")
+            || claim_low.contains("стачк")
+            || claim_low.contains("демонстрац")
+            || claim_low.contains("сблъс")
+            || claim_low.contains("арест")
+            || claim_low.contains("жертв")
+            || claim_low.contains("разрушен")
+            || claim_low.contains("пострадал")
+            || claim_low.contains("погром")
+            || claim_low.contains("бунт")
+            || claim_low.contains("ранен")
+            || claim_low.contains("убит")
+            || claim_low.contains("митинг")
+            || claim_low.contains("безредиц");
+
         for (hit, full_text) in candidates {
             let chunks = if full_text.trim().is_empty() {
                 if !hit.snippet.trim().is_empty() {
@@ -195,6 +211,21 @@ impl PassageExtractorAndRanker {
                 if chunk.chars().count() < 30 {
                     continue;
                 }
+                if is_event_claim {
+                    let chunk_low = chunk.to_lowercase();
+                    let is_demographic_passage = chunk_low.contains("население")
+                        || chunk_low.contains("преброяване")
+                        || chunk_low.contains("жители")
+                        || chunk_low.contains("демографи");
+                    let has_event_in_passage = chunk_low.contains("протест")
+                        || chunk_low.contains("стачк")
+                        || chunk_low.contains("демонстрац")
+                        || chunk_low.contains("сблъс")
+                        || chunk_low.contains("безредиц");
+                    if is_demographic_passage && !has_event_in_passage {
+                        continue;
+                    }
+                }
                 let pass_lemmas = extract_lemmas(&self.lexicon, &chunk);
                 let score = compute_bm25_score(&query_lemmas, &pass_lemmas);
                 if score < 0.15 {
@@ -204,6 +235,7 @@ impl PassageExtractorAndRanker {
                     "factcheck" => 1.35,
                     "primary" => 1.25,
                     "news" => 1.10,
+                    "reference" => 0.80,
                     _ => 1.0,
                 };
                 let final_score = score * kind_bonus;
@@ -432,5 +464,44 @@ mod tests {
         assert!(extracted.contains("Български новинарски текст"));
         assert!(!extracted.contains("alert(1)"));
         assert!(!extracted.contains("color: red"));
+    }
+
+    #[test]
+    fn event_claims_discard_demographic_census_passages() {
+        let guard = PolitenessGuard::new(leadfinder_core::PolitenessPolicy {
+            requests_per_minute: 10,
+            breaker_failures: 5,
+            breaker_cooldown: std::time::Duration::from_secs(60),
+            cache_ttl: std::time::Duration::from_secs(60),
+        }, std::path::PathBuf::from("target/test_cache"));
+        let lex = Arc::new(LexiconNormalizer::empty());
+        let ranker = PassageExtractorAndRanker::new(guard, lex);
+
+        let claim = "По данни на правителството над 550 000 души са излезли по улиците на Париж, за да протестират срещу високите цени.";
+        let wiki_hit = SearchHit {
+            url: "https://bg.wikipedia.org/wiki/Париж".to_string(),
+            title: "Париж – Уикипедия".to_string(),
+            snippet: "Според преброяването населението на Париж през 1800 г. е било около 550 000 жители.".to_string(),
+            source_name: Some("Уикипедия".to_string()),
+            source_kind: "reference".to_string(),
+            published_at: None,
+        };
+        let news_hit = SearchHit {
+            url: "https://www.bta.bg/bg/news/france-protests".to_string(),
+            title: "Масови протести във Франция".to_string(),
+            snippet: "По данни на правителството над 550 000 души са излезли по улиците, за да протестират срещу високите цени в Париж.".to_string(),
+            source_name: Some("bta.bg".to_string()),
+            source_kind: "news".to_string(),
+            published_at: Some("2026-10-18".to_string()),
+        };
+
+        let candidates = vec![
+            (wiki_hit, "Според официалното преброяване в града Париж живеят 2 187 526 жители, а през 1800 г. населението достига 550 000 души.".to_string()),
+            (news_hit, "По данни на правителството над 550 000 души са излезли по улиците на Париж и други градове, за да протестират срещу високите цени.".to_string()),
+        ];
+
+        let ranked = ranker.rank_passages(claim, &candidates, 5);
+        assert!(!ranked.is_empty());
+        assert!(ranked.iter().all(|r| r.source_url == "https://www.bta.bg/bg/news/france-protests"));
     }
 }

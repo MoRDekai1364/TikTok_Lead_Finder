@@ -20,10 +20,17 @@
     researchPerson,
     retranscribeVideo,
     setCreatorWatchlist,
+    submitClaimFeedback,
     triggerAegisScan,
     updateTranscript,
   } from '../lib/api';
   import { isJobActive, startAiJob, finishAiJob, getActiveAiJobs } from '../lib/aiTasks.svelte';
+  import {
+    registerPlaybackElement,
+    unregisterPlaybackElement,
+    updatePlaybackProgress,
+    setPlaybackPlaying,
+  } from '../lib/playback.svelte';
   import type { GoogleAiQueryResult } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
@@ -59,6 +66,7 @@
   let isGoogleAudioTranscribing = $state(false);
   let isRetranscribing = $state(false);
   let copyToast = $state<string | null>(null);
+  let copyAllToast = $state<string | null>(null);
   let videoElement = $state<HTMLVideoElement | null>(null);
   let currentTimeMs = $state(0);
   let metadataOpen = $state(false);
@@ -74,6 +82,9 @@
   let isLoadingPreview = $state(false);
   let isResearchingPersonId = $state<number | null>(null);
   let expandedEvidenceId = $state<number | null>(null);
+  let activeEvidenceId = $state<number | null>(null);
+  let feedbackSubmitted = $state<Record<number, string>>({});
+  let feedbackPickerClaimId = $state<number | null>(null);
   let isPlaying = $state(false);
   let videoContainerRef = $state<HTMLElement | null>(null);
   let isVideoOutOfView = $state(false);
@@ -123,14 +134,53 @@
     }));
   });
 
-  let showOcr = $state(true);
+  function isDefiniteMeaningfulText(raw: string): boolean {
+    const text = raw.trim();
+    if (!text) return false;
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return false;
+
+    const alphaChars = text.replace(/[^a-zA-Zа-яА-Я0-9]/g, '');
+    if (alphaChars.length < 4) return false;
+
+    const symbolCount = text.replace(/[a-zA-Zа-яА-Я0-9\s]/g, '').length;
+    if (symbolCount / text.length > 0.28) return false;
+
+    let singleCharCount = 0;
+    let validWordsCount = 0;
+    let cyrillicChars = 0;
+    let latinChars = 0;
+
+    for (const w of words) {
+      const clean = w.replace(/[^a-zA-Zа-яА-Я]/g, '');
+      if (clean.length === 1) singleCharCount++;
+      else if (clean.length >= 3) validWordsCount++;
+
+      for (const ch of clean) {
+        if (/[а-яА-Я]/.test(ch)) cyrillicChars++;
+        else if (/[a-zA-Z]/.test(ch)) latinChars++;
+      }
+    }
+
+    if (words.length >= 3 && singleCharCount / words.length >= 0.35) return false;
+    if (cyrillicChars > 0 && latinChars > 0 && words.length < 6 && singleCharCount >= 2) return false;
+    if (validWordsCount < 1 && alphaChars.length < 6) return false;
+
+    return true;
+  }
+
+  let showOcr = $state(false);
 
   const ocrItems = $derived.by((): OcrText[] => {
     const rows = detail?.ocr_texts ?? [];
     return rows
       .map((o) => ({ ...o, text: (o.text || '').trim() }))
-      .filter((o) => o.text.length > 0)
+      .filter((o) => isDefiniteMeaningfulText(o.text))
       .sort((a, b) => a.frame_ms - b.frame_ms);
+  });
+
+  $effect(() => {
+    showOcr = ocrItems.length > 0;
   });
 
   const ocrBySegment = $derived.by(() => {
@@ -196,8 +246,14 @@
           fetchDeepfakeResult(id).then((df) => {
             if (df && activeLoadId === id && detail) {
               detail = { ...detail, aegis_deepfake: df };
+            } else if (!df && activeLoadId === id && detail && !isAegisScanning) {
+              handleTriggerAegis();
             }
-          }).catch(() => {});
+          }).catch(() => {
+            if (activeLoadId === id && detail && !isAegisScanning) {
+              handleTriggerAegis();
+            }
+          });
         }
       }
     } catch {
@@ -209,6 +265,25 @@
         isLoading = false;
       }
     }
+  }
+
+  function normalizeAegisVerdict(verdict?: string | null, audioSynth?: boolean, videoSynth?: boolean): 'deepfake' | 'suspicious' | 'authentic' {
+    const v = (verdict || '').toLowerCase();
+    if (
+      audioSynth ||
+      videoSynth ||
+      v === 'deepfake' ||
+      v === 'confirmed_deepfake' ||
+      v === 'ai_generated_video' ||
+      v === 'ai_voice_clone' ||
+      v === 'robotic_tts'
+    ) {
+      return 'deepfake';
+    }
+    if (v === 'suspicious' || v === 'suspected_synthetic') {
+      return 'suspicious';
+    }
+    return 'authentic';
   }
 
   async function handleTriggerAegis() {
@@ -256,8 +331,17 @@
   function handleTimeUpdate() {
     if (videoElement) {
       currentTimeMs = Math.round(videoElement.currentTime * 1000);
+      updatePlaybackProgress(videoElement.currentTime, videoElement.duration);
     }
   }
+
+  $effect(() => {
+    return () => {
+      if (videoElement) {
+        unregisterPlaybackElement(videoElement);
+      }
+    };
+  });
 
   function seekToMs(ms: number) {
     if (videoElement) {
@@ -268,15 +352,31 @@
 
   function jumpToClaim(claimId: number) {
     activeClaimId = claimId;
-    const el = document.getElementById(`claim-${claimId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const matchedClaim = detail?.claims.find(c => c.claim.id === claimId);
+    const nonJunkEv = (matchedClaim?.evidence || []).filter(ev => !isJunkSource(ev));
+    const primaryEv = nonJunkEv.find(e => e.stance === 'supports' || e.stance === 'contradicts') || nonJunkEv[0];
+    if (primaryEv) {
+      activeEvidenceId = primaryEv.id;
+      const evEl = document.getElementById(`evidence-${primaryEv.id}`);
+      if (evEl) {
+        evEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      setTimeout(() => {
+        if (activeEvidenceId === primaryEv.id) {
+          activeEvidenceId = null;
+        }
+      }, 3500);
+    } else {
+      const el = document.getElementById(`claim-${claimId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
     setTimeout(() => {
       if (activeClaimId === claimId) {
         activeClaimId = null;
       }
-    }, 2500);
+    }, 3500);
   }
 
   function jumpToSegment(startMs?: number | null) {
@@ -292,6 +392,60 @@
         highlightedSegmentMs = null;
       }
     }, 2500);
+  }
+
+  function jumpToEvidence(evidenceId: number) {
+    activeEvidenceId = evidenceId;
+    const el = document.getElementById(`evidence-${evidenceId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setTimeout(() => {
+      if (activeEvidenceId === evidenceId) {
+        activeEvidenceId = null;
+      }
+    }, 2500);
+  }
+
+  async function handleSendFeedback(claimId: number, rating: 'correct' | 'wrong_verdict' | 'unrelated_evidence', suggestedVerdict?: string) {
+    if (!detail) return;
+    feedbackSubmitted[claimId] = rating;
+    feedbackPickerClaimId = null;
+    try {
+      await submitClaimFeedback(claimId, {
+        video_id: detail.video.id,
+        rating,
+        suggested_verdict: suggestedVerdict,
+      });
+    } catch {
+    }
+  }
+
+  function escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function renderHighlightedSnippet(text: string, claimText: string): string {
+    if (!text) return '';
+    const kws = getMatchingKeywords(claimText, text);
+    let safe = escapeHtml(text);
+    if (kws.length === 0) return safe;
+    for (const kw of kws) {
+      if (kw.length >= 2) {
+        const reg = new RegExp(`(${escapeRegex(kw)})`, 'gi');
+        safe = safe.replace(reg, '<mark class="matched-passage">$1</mark>');
+      }
+    }
+    return safe;
   }
 
   function stemSet(text: string): Set<string> {
@@ -392,20 +546,35 @@
   function getMatchingKeywords(claimText: string, passageText: string): string[] {
     const stopWords = new Set([
       'това', 'след', 'като', 'беше', 'който', 'която', 'което', 'които', 'през', 'защото',
-      'всичко', 'няма', 'има', 'само', 'беше', 'може', 'биха', 'този', 'тази', 'тези',
+      'всичко', 'няма', 'има', 'само', 'може', 'биха', 'този', 'тази', 'тези',
       'един', 'една', 'едно', 'едни', 'дали', 'заради', 'върху', 'срещу', 'пред', 'към',
       'във', 'със', 'при', 'него', 'нея', 'тях', 'вече', 'още', 'много', 'малко', 'къде',
-      'какво', 'кога', 'защо', 'така', 'дали', 'нали', 'беше', 'бяха', 'също', 'ще', 'да'
+      'какво', 'кога', 'защо', 'така', 'нали', 'бяха', 'също', 'ще', 'да'
     ]);
-    const words = (claimText || '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || [];
+    const tokens = (claimText || '').toLowerCase().match(/\d+(?:\s\d{3})+|\d{2,}|[\p{L}]{4,}/gu) || [];
     const pLower = (passageText || '').toLowerCase();
+    const pWords = pLower.match(/[\p{L}]{4,}/gu) || [];
     const matched = new Set<string>();
-    for (const w of words) {
-      if (!stopWords.has(w) && pLower.includes(w)) {
+    for (const w of tokens) {
+      if (stopWords.has(w)) continue;
+      if (pLower.includes(w)) {
         matched.add(w);
+        continue;
+      }
+      const compactNum = w.replace(/\s+/g, '');
+      if (/^\d{4,}$/.test(compactNum) && pLower.includes(compactNum)) {
+        matched.add(compactNum);
+        continue;
+      }
+      if (w.length >= 5 && /^[\p{L}]+$/u.test(w)) {
+        const stem = w.slice(0, 5);
+        const foundWord = pWords.find(pw => pw.startsWith(stem));
+        if (foundWord) {
+          matched.add(foundWord);
+        }
       }
     }
-    return Array.from(matched).slice(0, 5);
+    return Array.from(matched).slice(0, 6);
   }
 
   function sourceCategoryLabel(kind: string): { label: string; icon: string; cls: string } {
@@ -413,18 +582,20 @@
       case 'primary':
         return { label: currentLang === 'bg' ? 'Официална институция' : 'Primary / Gov', icon: '🏛️', cls: 'cat-primary' };
       case 'factcheck':
-        return { label: currentLang === 'bg' ? 'Фактчек проверка' : 'Fact Check', icon: '🛡️', cls: 'cat-factcheck' };
+        return { label: currentLang === 'bg' ? 'Проверка на факти' : 'Fact Check', icon: '🛡️', cls: 'cat-factcheck' };
       case 'news':
         return { label: currentLang === 'bg' ? 'Новинарска медия' : 'News Media', icon: '📰', cls: 'cat-news' };
+      case 'reference':
+        return { label: currentLang === 'bg' ? 'Справочник' : 'Reference', icon: '📚', cls: 'cat-other' };
       default:
-        return { label: currentLang === 'bg' ? 'Външен уеб източник' : 'External Web', icon: '🌐', cls: 'cat-other' };
+        return { label: currentLang === 'bg' ? 'Външен източник' : 'External Source', icon: '🌐', cls: 'cat-other' };
     }
   }
 
   async function handleResearchPerson(person: Person) {
     if (isJobActive('person-research', person.id)) return;
     startAiJob('person-research', person.id, person.canonical_name);
-    copyToast = currentLang === 'bg' ? `⚡ Стартирано OSINT за ${person.canonical_name}...` : `⚡ Researching ${person.canonical_name}...`;
+    copyToast = currentLang === 'bg' ? `⚡ Проучване на ${person.canonical_name}...` : `⚡ Researching ${person.canonical_name}...`;
     try {
       const updated = await researchPerson(person.id, person.canonical_name);
       if (detail?.people) {
@@ -1031,6 +1202,288 @@
   const videoSrc = $derived(
     detail?.video.id ? `${getCoreUrl()}/api/media/${detail.video.id}/video.mp4` : ''
   );
+
+  function generateAllInformationText(): string {
+    if (!detail) return '';
+    const lines: string[] = [];
+    const bg = currentLang === 'bg';
+
+    lines.push('╔══════════════════════════════════════════════════════════════════════════════╗');
+    lines.push(bg ? '║               ПРЕГЛЕД НА СЪДЪРЖАНИЕТО И ДОКАЗАТЕЛСТВАТА                      ║' : '║                  CONTENT & EVIDENCE REVIEW REPORT                            ║');
+    lines.push('╠══════════════════════════════════════════════════════════════════════════════╣');
+    lines.push(`║ Видео ID:     ${detail.video.id}`);
+    lines.push(`║ TikTok URL:   ${detail.video.url}`);
+    lines.push(`║ Автор:        @${detail.video.creator_handle || 'неизвестен'}${detail.video.creator_display_name ? ` (${detail.video.creator_display_name})` : ''}`);
+    lines.push(`║ Показвания:   ${(detail.video.views || 0).toLocaleString()} | Времетраене: ${formatDuration(detail.video.duration_s)}`);
+    if (detail.video.posted_at) {
+      lines.push(`║ Публикувано:  ${detail.video.posted_at}`);
+    }
+    if (detail.video.caption) {
+      lines.push(`║ Описание:     ${detail.video.caption.trim().replace(/\n/g, ' ')}`);
+    }
+    lines.push('╚══════════════════════════════════════════════════════════════════════════════╝');
+    lines.push('');
+
+    lines.push(bg ? '┌── 🎙️ СТЕНОГРАМА И ТЕКСТ ОТ ВИДЕОТО ──────────────────────────────────────────' : '┌── 🎙️ TRANSCRIPT & SPEECH RECOGNITION ──────────────────────────────────────');
+    if (detail.transcript) {
+      const qPct = Math.round((detail.transcript.quality || 0) * 100);
+      lines.push(`│ Източник: ${detail.transcript.source} | Език: ${detail.transcript.language} | Качество: ${qPct}%`);
+      const txt = detail.transcript.edited_text || detail.transcript.text;
+      lines.push('│');
+      lines.push('│ [Пълен текст на стенограмата]:');
+      for (const l of (txt || '').split('\n')) {
+        if (l.trim()) lines.push(`│   ${l.trim()}`);
+      }
+      if (detail.transcript.segments && detail.transcript.segments.length > 0) {
+        lines.push('│');
+        lines.push('│ [Сегменти по таймкод]:');
+        for (const seg of detail.transcript.segments) {
+          const tStart = formatTime(seg.start_ms);
+          const tEnd = formatTime(seg.end_ms);
+          const spk = seg.speaker ? ` (${seg.speaker})` : '';
+          lines.push(`│   • [${tStart} - ${tEnd}]${spk}: ${seg.text}`);
+        }
+      }
+    } else {
+      lines.push(bg ? '│ (Няма налична стенограма)' : '│ (No transcript available)');
+    }
+
+    if (ocrItems && ocrItems.length > 0) {
+      lines.push('│');
+      lines.push(bg ? `│ ── 🖥️ ТЕКСТ НА ЕКРАНА (OCR) (${ocrItems.length} засечени кадъра) ────────────────` : `│ ── 🖥️ ON-SCREEN OCR TEXT (${ocrItems.length} frames) ──────────────────────────`);
+      for (const o of ocrItems) {
+        const tFrame = formatTime(o.frame_ms);
+        const confPct = Math.round((o.confidence ?? 0) * 100);
+        lines.push(`│   • [${tFrame}] (${confPct}% увереност): ${o.text}`);
+      }
+    }
+    lines.push('└─────────────────────────────────────────────────────────────────────────────');
+    lines.push('');
+
+    lines.push(bg ? '┌── 🛡️ ПРОВЕРКА ЗА МАНИПУЛИРАНО ВИДЕО И ГЛАС (AEGIS) ─────────────────────────' : '┌── 🛡️ AEGIS DEEPFAKE & SYNTHETIC FORENSICS ─────────────────────────────────');
+    if (detail.aegis_deepfake) {
+      const df = detail.aegis_deepfake;
+      const vNorm = normalizeAegisVerdict(df.overall_verdict, df.audio?.synthetic, df.video?.synthetic);
+      let verdictStr = '✅ ИСТИНСКИ ЗАПИС';
+      if (vNorm === 'deepfake') verdictStr = '🚨 МАНИПУЛИРАН ЗАПИС';
+      else if (vNorm === 'suspicious') verdictStr = '⚠️ СЪМНИТЕЛЕН ЗАПИС';
+
+      const audioRiskPct = Math.round((df.audio?.score ?? 0) * 100);
+      const videoRiskPct = Math.round((df.video?.score ?? 0) * 100);
+      const maxRisk = Math.max(audioRiskPct, videoRiskPct);
+
+      lines.push(`│ Заключение:   ${verdictStr} | Риск от манипулация: ${maxRisk}%`);
+      if (df.summary_bg) {
+        lines.push(`│ Обобщение:    ${df.summary_bg.trim().replace(/\n/g, ' ')}`);
+      }
+      lines.push('│');
+      lines.push('│ 🎵 Звук и глас');
+      const aClass = df.audio.classification === 'cloned_voice'
+        ? '🎭 Клониран глас'
+        : df.audio.classification === 'robotic_tts'
+        ? '🤖 Генериран глас'
+        : '🎙️ Естествен глас';
+      lines.push(`│   • Вид:           ${aClass} (Изкуствен сигнал: ${audioRiskPct}%)`);
+      if (df.audio.target_person && (df.audio.target_confidence ?? 0) >= 0.8) {
+        lines.push(`│   • Приписан глас: 🎯 ${df.audio.target_person} (${Math.round((df.audio.target_confidence ?? 0) * 100)}% точност)`);
+      }
+      if (df.audio.anomalies && df.audio.anomalies.length > 0) {
+        lines.push(`│   • Отклонения:    ${df.audio.anomalies.map(a => `⚡ ${a}`).join(', ')}`);
+      }
+      if (df.audio.metrics) {
+        const m = df.audio.metrics;
+        const f0 = m.f0_mean_hz !== undefined ? `${m.f0_mean_hz} Hz` : 'Н/Д';
+        const f0Std = (m.f0_std_hz ?? m.f0_std) !== undefined ? `${m.f0_std_hz ?? m.f0_std} Hz` : 'Н/Д';
+        const vc = m.spectral_cutoff_khz !== undefined
+          ? `${m.spectral_cutoff_khz} kHz`
+          : (m.vocoder_cutoff_freq ?? m.vocoder_cutoff_ratio) !== undefined
+          ? `${m.vocoder_cutoff_freq ?? m.vocoder_cutoff_ratio}`
+          : 'Н/Д';
+        lines.push(`│   • Показатели:    F0: ${f0} (±${f0Std}) | Честотен праг: ${vc}`);
+      }
+      lines.push('│');
+      lines.push('│ 🎬 Картина и лице');
+      lines.push(`│   • Вид:           ${df.video.synthetic ? '⚠️ Обработено / генерирано видео' : '✅ Реално заснето видео'} (Изкуствен сигнал: ${videoRiskPct}%)`);
+      if (df.video.metrics) {
+        const vm = df.video.metrics;
+        const fft = (vm.mean_fft_spectrum_ratio ?? vm.fft_ratio ?? vm.fft_anomaly_score) !== undefined
+          ? (vm.mean_fft_spectrum_ratio ?? vm.fft_ratio ?? vm.fft_anomaly_score)
+          : 'Н/Д';
+        const lap = (vm.mean_laplacian_variance ?? vm.laplacian_var ?? vm.laplacian_variance) !== undefined
+          ? (vm.mean_laplacian_variance ?? vm.laplacian_var ?? vm.laplacian_variance)
+          : 'Н/Д';
+        lines.push(`│   • Показатели:    FFT спектър: ${fft} | Рязкост (Laplacian): ${lap}`);
+      }
+      if (df.multimodal) {
+        lines.push('│');
+        lines.push('│ 🔗 Мултимодален AV-Sync анализ');
+        const syncScore = df.multimodal.av_sync_score !== undefined && df.multimodal.av_sync_score !== null
+          ? `${Math.round(Number(df.multimodal.av_sync_score) * 100)}%`
+          : 'Н/Д';
+        const mismatchStr = df.multimodal.av_sync_mismatch ? '⚠️ Засечено разминаване на устни и говор' : '✅ Нормален синхрон';
+        lines.push(`│   • AV-Sync статус: ${mismatchStr} (Синхрон: ${syncScore})`);
+      }
+    } else {
+      lines.push(bg ? '│ (Все още не е сканирано с AEGIS)' : '│ (Not scanned with AEGIS yet)');
+    }
+    lines.push('└─────────────────────────────────────────────────────────────────────────────');
+    lines.push('');
+
+    lines.push(bg ? `┌── ⚖️ ПРОВЕРЕНИ ТВЪРДЕНИЯ И ДОКАЗАТЕЛСТВА (${detail.claims.length}) ──────────────────────────` : `┌── ⚖️ VERIFIED CLAIMS & EVIDENCE (${detail.claims.length}) ──────────────────────────────`);
+    if (detail.claims.length === 0) {
+      lines.push(bg ? '│ (Няма открити проверими твърдения)' : '│ (No claims detected)');
+    } else {
+      detail.claims.forEach((cwith, idx) => {
+        const c = cwith.claim;
+        const vText = formatVerdictDisplay(c.verdict, c.label, currentLang);
+        const tStart = formatTime(c.start_ms || 0);
+        const tEnd = formatTime(c.end_ms || 0);
+        const src = claimSourceLabel(claimSource(c.text_bg));
+        lines.push('│');
+        lines.push(`│ ┌─ ТВЪРДЕНИЕ Т${idx + 1} [${(c.claim_type || 'fact').toUpperCase()}] [${src}] ───────────────────────────────`);
+        lines.push(`│ │ Твърдение:   "${c.text_bg}"`);
+        lines.push(`│ │ Присъда:     ${vText}`);
+        lines.push(`│ │ Интервал:    ${tStart} - ${tEnd} | Достоверност: ${Math.round((c.checkworthiness || 0) * 100)}% | Сила: ${Math.round((c.evidence_strength || 0) * 100)}%`);
+        if (c.reasoning_bg) {
+          lines.push(`│ │ Мотиви:      ${c.reasoning_bg}`);
+        }
+        if (c.attribution && c.attribution.length > 0) {
+          for (const attr of c.attribution) {
+            const actor = attr.actor || attr.asserted_part || 'Говорещият';
+            const about = attr.about || attr.attributed_part || '';
+            lines.push(`│ │ Приписване:  ${actor} каза: ${about}`);
+          }
+        }
+        const validEv = cwith.evidence.filter((ev) => !isJunkSource(ev));
+        if (validEv.length > 0) {
+          lines.push('│ │');
+          lines.push(`│ │ ── Доказателствена база (${validEv.length} външни източника) ────────────────────`);
+          for (const ev of validEv) {
+            const stLabel = ev.stance === 'supports' ? '✓ ПОТВЪРЖДАВА' : ev.stance === 'contradicts' ? '✗ ОПРОВЕРГАВА' : 'ℹ КОНТЕКСТ';
+            const sName = ev.source_name || ev.source_kind;
+            const sDate = ev.published_at ? ` (${ev.published_at.substring(0, 10)})` : '';
+            const simPct = ev.similarity ? ` [${Math.round(ev.similarity * 100)}% сходство]` : '';
+            lines.push(`│ │   • [${stLabel}] ${sName}${sDate}${simPct}`);
+            const rawTitle = (ev as any).title;
+            if (rawTitle) {
+              const cleanTitle = rawTitle.replace(/<[^>]*>/g, '').trim();
+              lines.push(`│ │     Заглавие: ${cleanTitle}`);
+            }
+            const snippet = ev.passage || (ev as any).snippet;
+            if (snippet) {
+              const cleanSnippet = snippet.replace(/<[^>]*>/g, '').trim().replace(/\n/g, ' ');
+              lines.push(`│ │     Цитат:    "${cleanSnippet}"`);
+            }
+            const url = ev.source_url || (ev as any).url;
+            if (url) {
+              lines.push(`│ │     URL:      ${url}`);
+            }
+          }
+        } else {
+          lines.push('│ │ (Няма намерени външни доказателства)');
+        }
+        lines.push('│ └──────────────────────────────────────────────────────────────────────────');
+      });
+    }
+    lines.push('└─────────────────────────────────────────────────────────────────────────────');
+    lines.push('');
+
+    if (detail.people && detail.people.length > 0) {
+      lines.push(bg ? `┌── 👥 ЗАСЕЧЕНИ ЛИЧНОСТИ И ОБЩЕСТВЕНИ ФИГУРИ (${detail.people.length}) ──────────────────────` : `┌── 👥 DETECTED FIGURES & ENTITIES (${detail.people.length}) ────────────────────────────`);
+      for (const p of detail.people) {
+        const cred = computePersonCredibility(p);
+        const eType = getEntityTypeInfo(p.entity_type).label;
+        lines.push(`│ • ${p.canonical_name} [${eType}]`);
+        if (p.role || (p as any).role_hint) {
+          lines.push(`│   Длъжност:       ${p.role || (p as any).role_hint}`);
+        }
+        lines.push(`│   Достоверност:   ${cred.score}% (${cred.levelLabel})`);
+        if (cred.stats && cred.stats.total > 0) {
+          lines.push(`│   Статистика:     ${cred.stats.total} твърдения (✓ Потвърдени: ${cred.stats.supported}, ✗ Опровергани: ${cred.stats.contradicted})`);
+        }
+        if (p.tags && p.tags.length > 0) {
+          lines.push(`│   Тагове:         ${p.tags.map(t => `#${t}`).join(', ')}`);
+        }
+        if (p.wikidata_id) {
+          lines.push(`│   Wikidata ID:    ${p.wikidata_id} (https://www.wikidata.org/wiki/${p.wikidata_id})`);
+        }
+        if (p.summary) {
+          lines.push(`│   Резюме:         ${p.summary.trim().replace(/\n/g, ' ')}`);
+        }
+        lines.push('│');
+      }
+      lines.push('└─────────────────────────────────────────────────────────────────────────────');
+      lines.push('');
+    }
+
+    if (detail.creator || detail.video.creator_handle) {
+      const creator = detail.creator || {
+        id: (detail.video.creator_handle || '').toLowerCase(),
+        handle: detail.video.creator_handle || '',
+        display_name: detail.video.creator_display_name,
+        follower_count: detail.video.creator_follower_count ?? null,
+        region: 'BG',
+        first_seen_at: new Date().toISOString(),
+        flagged_count: 0,
+        watchlist: false,
+        expansion_depth: 0,
+      };
+      const authorRisk = computeAuthorRisk(creator);
+      lines.push(bg ? '┌── 👤 ПРОФИЛ И ОЦЕНКА НА РИСКА НА АВТОРА ──────────────────────────────────' : '┌── 👤 CREATOR & REPUTATION RISK PROFILE ────────────────────────────────────');
+      lines.push(`│ Автор:         @${creator.handle}${creator.display_name ? ` (${creator.display_name})` : ''}`);
+      lines.push(`│ Последователи: ${(creator.follower_count || 0).toLocaleString()} | Регион: ${creator.region || 'BG'}`);
+      lines.push(`│ Флагнати видеа:${creator.flagged_count || 0} | Наблюдение: ${creator.watchlist ? '👁 ДА (Watchlist)' : 'НЕ'}`);
+      lines.push(`│ Рисков статус: ${authorRisk.label} | Системна увереност: ${authorRisk.confidencePercent}% (${authorRisk.confidenceText})`);
+      lines.push(`│ Мотиви / Риск: ${authorRisk.rationale}`);
+      if (authorRisk.webSources && authorRisk.webSources.length > 0) {
+        lines.push('│');
+        lines.push(`│ Открити уеб източници и проверки за автора (${authorRisk.webSources.length}):`);
+        for (const ws of authorRisk.webSources) {
+          lines.push(`│   • [${ws.domain}] ${ws.title} (${ws.url})`);
+        }
+      }
+      if (creatorVideos && creatorVideos.length > 0) {
+        lines.push('│');
+        lines.push(`│ Други засечени видеа от автора в базата (${creatorVideos.length}):`);
+        for (const ov of creatorVideos) {
+          const vLabel = formatVerdictDisplay(ov.top_claim_verdict, ov.top_claim_label, currentLang);
+          lines.push(`│   • [ID: ${ov.id}] 👁 ${(ov.views || 0).toLocaleString()} | ${vLabel}`);
+          if (ov.top_claim_text) {
+            lines.push(`│     "${ov.top_claim_text}"`);
+          }
+        }
+      }
+      lines.push('└─────────────────────────────────────────────────────────────────────────────');
+      lines.push('');
+    }
+
+    lines.push(bg ? '┌── 📊 ТЕХНИЧЕСКИ МЕТАДАННИ ──────────────────────────────────────────────────' : '┌── 📊 TECHNICAL METADATA ───────────────────────────────────────────────────');
+    lines.push(`│ Статус:       ${detail.video.state || 'UNKNOWN'}${detail.video.state_reason ? ` (${detail.video.state_reason})` : ''}`);
+    lines.push(`│ Lead Score:   ${detail.video.lead_score ?? 'Н/Д'}`);
+    lines.push(`│ Ангажираност: ${(detail.video.views || 0).toLocaleString()} гледания | ${(detail.video.likes || 0).toLocaleString()} харесвания | ${(detail.video.comments || 0).toLocaleString()} коментара | ${(detail.video.shares || 0).toLocaleString()} споделяния`);
+    if (detail.video.phash) {
+      lines.push(`│ Перцептивен хеш (pHash): ${detail.video.phash}`);
+    }
+    if (detail.video.hashtags && detail.video.hashtags.length > 0) {
+      lines.push(`│ Хаштагове:    ${detail.video.hashtags.map(h => `#${h}`).join(' ')}`);
+    }
+    lines.push('└─────────────────────────────────────────────────────────────────────────────');
+
+    return lines.join('\n');
+  }
+
+  async function handleCopyAllInformation() {
+    if (!detail) return;
+    try {
+      const fullText = generateAllInformationText();
+      await navigator.clipboard.writeText(fullText);
+      copyAllToast = currentLang === 'bg' ? '✓ Всичко е копирано!' : '✓ All copied!';
+    } catch {
+      copyAllToast = currentLang === 'bg' ? 'Грешка при копиране' : 'Copy failed';
+    } finally {
+      setTimeout(() => (copyAllToast = null), 2500);
+    }
+  }
 </script>
 
 <aside class="detail-drawer" aria-label={t.drawerTitle}>
@@ -1047,6 +1500,20 @@
       {/if}
     </div>
     <div class="drawer-header-actions">
+      {#if copyAllToast}
+        <span class="copy-toast">{copyAllToast}</span>
+      {/if}
+      {#if detail}
+        <button
+          class="btn btn-secondary btn-sm copy-all-btn"
+          onclick={handleCopyAllInformation}
+          title={currentLang === 'bg'
+            ? 'Копирай цялата информация от всички секции в структуриран текстов формат'
+            : 'Copy all information from all sections in structured text format'}
+        >
+          📋 {currentLang === 'bg' ? 'Копирай всичко' : 'Copy all'}
+        </button>
+      {/if}
       <button
         class="btn btn-danger btn-sm drawer-remove-btn"
         onclick={handleRemoveThisVideo}
@@ -1073,8 +1540,8 @@
             <h3>{t.transcriptHeading}</h3>
             <span class="section-subhint">
               {currentLang === 'bg'
-                ? 'Цветовете отразяват присъдата: Червено = Опровергано, Зелено = Потвърдено, Жълто = Непроверимо'
-                : 'Colors indicate verdict: Red = Contradicted, Green = Supported, Yellow = Unverifiable'}
+                ? 'Цветове: Червено = Опровергано, Зелено = Потвърдено, Жълто = Непроверимо'
+                : 'Colors: Red = Contradicted, Green = Supported, Yellow = Unverifiable'}
             </span>
           </div>
           <div class="transcript-btn-group">
@@ -1142,8 +1609,22 @@
               controls
               playsinline
               ontimeupdate={handleTimeUpdate}
-              onplay={() => (isPlaying = true)}
-              onpause={() => (isPlaying = false)}
+              onplay={() => {
+                isPlaying = true;
+                if (videoElement) {
+                  registerPlaybackElement(videoElement, {
+                    videoId: detail?.video?.id,
+                    creatorHandle: detail?.video?.creator_handle,
+                    caption: detail?.video?.caption,
+                    thumbnailUrl: detail?.video?.thumbnail_url,
+                  });
+                  setPlaybackPlaying(true);
+                }
+              }}
+              onpause={() => {
+                isPlaying = false;
+                setPlaybackPlaying(false);
+              }}
               class="feed-vertical-player"
             >
               <track kind="captions" />
@@ -1293,27 +1774,28 @@
         <div class="section-header aegis-header">
           <div>
             <div class="aegis-title-row">
-              <h3>🛡️ {currentLang === 'bg' ? 'AEGIS Детектор за Deepfake & Синтетично съдържание' : 'AEGIS Deepfake & Synthetic Forensics'}</h3>
+              <h3>🛡️ {currentLang === 'bg' ? 'Проверка за манипулирано видео и глас' : 'AEGIS Deepfake & Synthetic Forensics'}</h3>
               {#if detail.aegis_deepfake}
-                <span class="aegis-verdict-pill aegis-verdict-{detail.aegis_deepfake.overall_verdict}">
-                  {#if detail.aegis_deepfake.overall_verdict === 'deepfake'}
-                    🚨 {currentLang === 'bg' ? 'DEEPFAKE ОТКРИТ' : 'DEEPFAKE DETECTED'}
-                  {:else if detail.aegis_deepfake.overall_verdict === 'suspicious'}
+                {@const aegisState = normalizeAegisVerdict(detail.aegis_deepfake.overall_verdict, detail.aegis_deepfake.audio?.synthetic, detail.aegis_deepfake.video?.synthetic)}
+                <span class="aegis-verdict-pill aegis-verdict-{aegisState}">
+                  {#if aegisState === 'deepfake'}
+                    🚨 {currentLang === 'bg' ? 'МАНИПУЛИРАН ЗАПИС' : 'DEEPFAKE DETECTED'}
+                  {:else if aegisState === 'suspicious'}
                     ⚠️ {currentLang === 'bg' ? 'СЪМНИТЕЛЕН ЗАПИС' : 'SUSPICIOUS MEDIA'}
                   {:else}
-                    ✅ {currentLang === 'bg' ? 'АВТЕНТИЧЕН ЗАПИС' : 'AUTHENTIC MEDIA'}
+                    ✅ {currentLang === 'bg' ? 'ИСТИНСКИ ЗАПИС' : 'AUTHENTIC MEDIA'}
                   {/if}
                 </span>
               {:else}
                 <span class="aegis-verdict-pill aegis-verdict-unscanned">
-                  ⚪ {currentLang === 'bg' ? 'НЕ Е СКАНИРАНО' : 'NOT SCANNED'}
+                  ⚪ {currentLang === 'bg' ? 'НЕ Е ПРОВЕРЕНО' : 'NOT SCANNED'}
                 </span>
               {/if}
             </div>
             <span class="section-subhint">
               {currentLang === 'bg'
-                ? 'Отделен акустичен анализ на гласова синтеза, 2D FFT честотна матрица и лицево приписване на публични личности'
-                : 'Separate acoustic voice synthesis detection, 2D FFT visual artifacts and target public figure attribution'}
+                ? 'Проверка за изкуствен глас, подменено лице и разминаване в говора'
+                : 'Voice synthesis detection, visual artifacts, and lip-sync verification'}
             </span>
           </div>
           <button
@@ -1322,11 +1804,11 @@
             onclick={handleTriggerAegis}
           >
             {#if isAegisScanning}
-              <span class="aegis-spinner">⚡</span> {currentLang === 'bg' ? 'Сканиране...' : 'Scanning...'}
+              <span class="aegis-spinner">⚡</span> {currentLang === 'bg' ? 'Проверка...' : 'Scanning...'}
             {:else if detail.aegis_deepfake}
-              🔄 {currentLang === 'bg' ? 'Повторен анализ' : 'Rescan Media'}
+              🔄 {currentLang === 'bg' ? 'Провери отново' : 'Rescan Media'}
             {:else}
-              ⚡ {currentLang === 'bg' ? 'Сканирай за Deepfake' : 'Run Deepfake Scan'}
+              ⚡ {currentLang === 'bg' ? 'Провери записа' : 'Run Deepfake Scan'}
             {/if}
           </button>
         </div>
@@ -1344,21 +1826,21 @@
                 <div class="aegis-card-title">
                   <span class="aegis-icon">🎵</span>
                   <div>
-                    <h4>{currentLang === 'bg' ? 'Аудио: Гласова синтеза' : 'Audio: Voice Synthesis'}</h4>
+                    <h4>{currentLang === 'bg' ? 'Звук и глас' : 'Audio & Voice'}</h4>
                     <span class="aegis-class-label">
                       {#if detail.aegis_deepfake.audio.classification === 'cloned_voice'}
-                        🎭 {currentLang === 'bg' ? 'Клониран AI глас' : 'Cloned AI Voice'}
+                        🎭 {currentLang === 'bg' ? 'Клониран глас' : 'Cloned AI Voice'}
                       {:else if detail.aegis_deepfake.audio.classification === 'robotic_tts'}
-                        🤖 {currentLang === 'bg' ? 'Роботизиран глас (TTS)' : 'Robotic Voice (TTS)'}
+                        🤖 {currentLang === 'bg' ? 'Генериран глас' : 'Robotic Voice (TTS)'}
                       {:else}
-                        🎙️ {currentLang === 'bg' ? 'Автентичен човешки глас' : 'Authentic Human Voice'}
+                        🎙️ {currentLang === 'bg' ? 'Естествен глас' : 'Authentic Human Voice'}
                       {/if}
                     </span>
                   </div>
                 </div>
                 <div class="aegis-score-box" class:score-high={detail.aegis_deepfake.audio.score >= 0.7} class:score-med={detail.aegis_deepfake.audio.score >= 0.4 && detail.aegis_deepfake.audio.score < 0.7}>
                   <span class="aegis-score-num">{Math.round(detail.aegis_deepfake.audio.score * 100)}%</span>
-                  <span class="aegis-score-label">{currentLang === 'bg' ? 'Синтетика' : 'Synthetic'}</span>
+                  <span class="aegis-score-label">{currentLang === 'bg' ? 'Изкуствен' : 'Synthetic'}</span>
                 </div>
               </div>
 
@@ -1373,23 +1855,23 @@
                     <div class="target-badge-info">
                       <strong>{currentLang === 'bg' ? 'Приписан глас на:' : 'Attributed Voice:'}</strong>
                       <span class="target-name">{detail.aegis_deepfake.audio.target_person}</span>
-                      <span class="target-conf">({Math.round((detail.aegis_deepfake.audio.target_confidence ?? 0) * 100)}% {currentLang === 'bg' ? 'увереност' : 'confidence'})</span>
+                      <span class="target-conf">({Math.round((detail.aegis_deepfake.audio.target_confidence ?? 0) * 100)}% {currentLang === 'bg' ? 'точност' : 'confidence'})</span>
                     </div>
                   </div>
                 {:else if detail.aegis_deepfake.audio.synthetic}
                   <div class="aegis-target-unattributed">
-                    👤 {currentLang === 'bg' ? 'Синтетичен глас без достатъчна увереност за приписване на конкретна личност (< 80%)' : 'Synthetic voice detected without high attribution confidence (< 80%)'}
+                    👤 {currentLang === 'bg' ? 'Изкуствен глас без сигурно разпознаване на конкретно лице (< 80%)' : 'Synthetic voice detected without high attribution confidence (< 80%)'}
                   </div>
                 {:else}
                   <div class="aegis-target-clean">
-                    ✓ {currentLang === 'bg' ? 'Не се отчита гласова кражба на публична личност' : 'No public figure voice cloning detected'}
+                    ✓ {currentLang === 'bg' ? 'Няма данни за подправен глас' : 'No public figure voice cloning detected'}
                   </div>
                 {/if}
               </div>
 
               {#if detail.aegis_deepfake.audio.anomalies.length > 0}
                 <div class="aegis-anomalies-list">
-                  <span class="anomalies-head">{currentLang === 'bg' ? 'Аномалии:' : 'Anomalies:'}</span>
+                  <span class="anomalies-head">{currentLang === 'bg' ? 'Отклонения:' : 'Anomalies:'}</span>
                   {#each detail.aegis_deepfake.audio.anomalies as anomaly}
                     <span class="aegis-anomaly-chip">⚡ {anomaly}</span>
                   {/each}
@@ -1403,16 +1885,16 @@
                     <span class="m-val">{detail.aegis_deepfake.audio.metrics.f0_mean_hz} Hz</span>
                   </div>
                 {/if}
-                {#if detail.aegis_deepfake.audio.metrics?.f0_std !== undefined}
+                {#if (detail.aegis_deepfake.audio.metrics?.f0_std_hz ?? detail.aegis_deepfake.audio.metrics?.f0_std) !== undefined}
                   <div class="metric-item">
                     <span class="m-label">F0 Std:</span>
-                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.f0_std} Hz</span>
+                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.f0_std_hz ?? detail.aegis_deepfake.audio.metrics.f0_std} Hz</span>
                   </div>
                 {/if}
-                {#if detail.aegis_deepfake.audio.metrics?.vocoder_cutoff_ratio !== undefined}
+                {#if (detail.aegis_deepfake.audio.metrics?.spectral_cutoff_khz ?? detail.aegis_deepfake.audio.metrics?.vocoder_cutoff_ratio) !== undefined}
                   <div class="metric-item">
-                    <span class="m-label">12kHz Cutoff:</span>
-                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.vocoder_cutoff_ratio}</span>
+                    <span class="m-label">{detail.aegis_deepfake.audio.metrics?.spectral_cutoff_khz !== undefined ? 'Честотен праг:' : '12kHz Cutoff:'}</span>
+                    <span class="m-val">{detail.aegis_deepfake.audio.metrics.spectral_cutoff_khz !== undefined ? `${detail.aegis_deepfake.audio.metrics.spectral_cutoff_khz} kHz` : detail.aegis_deepfake.audio.metrics.vocoder_cutoff_ratio}</span>
                   </div>
                 {/if}
               </div>
@@ -1423,21 +1905,21 @@
                 <div class="aegis-card-title">
                   <span class="aegis-icon">🎬</span>
                   <div>
-                    <h4>{currentLang === 'bg' ? 'Видео: Лицева и визуална синтеза' : 'Video: Face & Visual Synthesis'}</h4>
+                    <h4>{currentLang === 'bg' ? 'Картина и лице' : 'Video & Face'}</h4>
                     <span class="aegis-class-label">
                       {#if detail.aegis_deepfake.video.classification === 'face_swap'}
-                        🎭 {currentLang === 'bg' ? 'Face-Swap (Разменено лице)' : 'Face-Swap Deepfake'}
+                        🎭 {currentLang === 'bg' ? 'Подменено лице' : 'Face-Swap Deepfake'}
                       {:else if detail.aegis_deepfake.video.classification === 'generative_video'}
-                        🤖 {currentLang === 'bg' ? 'Генеративно видео (AI Video)' : 'Generative Video'}
+                        🤖 {currentLang === 'bg' ? 'Генерирано видео' : 'Generative Video'}
                       {:else}
-                        📹 {currentLang === 'bg' ? 'Автентична камера' : 'Authentic Camera Capture'}
+                        📹 {currentLang === 'bg' ? 'Реално заснето видео' : 'Authentic Camera Capture'}
                       {/if}
                     </span>
                   </div>
                 </div>
                 <div class="aegis-score-box" class:score-high={detail.aegis_deepfake.video.score >= 0.7} class:score-med={detail.aegis_deepfake.video.score >= 0.4 && detail.aegis_deepfake.video.score < 0.7}>
                   <span class="aegis-score-num">{Math.round(detail.aegis_deepfake.video.score * 100)}%</span>
-                  <span class="aegis-score-label">{currentLang === 'bg' ? 'Синтетика' : 'Synthetic'}</span>
+                  <span class="aegis-score-label">{currentLang === 'bg' ? 'Изкуствено' : 'Synthetic'}</span>
                 </div>
               </div>
 
@@ -1452,23 +1934,23 @@
                     <div class="target-badge-info">
                       <strong>{currentLang === 'bg' ? 'Приписано лице на:' : 'Attributed Face:'}</strong>
                       <span class="target-name">{detail.aegis_deepfake.video.target_person}</span>
-                      <span class="target-conf">({Math.round((detail.aegis_deepfake.video.target_confidence ?? 0) * 100)}% {currentLang === 'bg' ? 'увереност' : 'confidence'})</span>
+                      <span class="target-conf">({Math.round((detail.aegis_deepfake.video.target_confidence ?? 0) * 100)}% {currentLang === 'bg' ? 'точност' : 'confidence'})</span>
                     </div>
                   </div>
                 {:else if detail.aegis_deepfake.video.synthetic}
                   <div class="aegis-target-unattributed">
-                    👤 {currentLang === 'bg' ? 'Модифицирано/синтетично лице без достатъчна увереност за приписване на личност (< 80%)' : 'Synthetic face detected without high attribution confidence (< 80%)'}
+                    👤 {currentLang === 'bg' ? 'Обработено лице без сигурно разпознаване на конкретна личност (< 80%)' : 'Synthetic face detected without high attribution confidence (< 80%)'}
                   </div>
                 {:else}
                   <div class="aegis-target-clean">
-                    ✓ {currentLang === 'bg' ? 'Не се отчита подменено лице на публична личност' : 'No public figure face swapping detected'}
+                    ✓ {currentLang === 'bg' ? 'Няма данни за подменено лице' : 'No public figure face swapping detected'}
                   </div>
                 {/if}
               </div>
 
               {#if detail.aegis_deepfake.video.anomalies.length > 0}
                 <div class="aegis-anomalies-list">
-                  <span class="anomalies-head">{currentLang === 'bg' ? 'Аномалии:' : 'Anomalies:'}</span>
+                  <span class="anomalies-head">{currentLang === 'bg' ? 'Отклонения:' : 'Anomalies:'}</span>
                   {#each detail.aegis_deepfake.video.anomalies as anomaly}
                     <span class="aegis-anomaly-chip">⚡ {anomaly}</span>
                   {/each}
@@ -1482,16 +1964,16 @@
                     <span class="m-val">{detail.aegis_deepfake.video.metrics.seam_gradient_ratio}x</span>
                   </div>
                 {/if}
-                {#if detail.aegis_deepfake.video.metrics?.fft_ratio !== undefined}
+                {#if (detail.aegis_deepfake.video.metrics?.mean_fft_spectrum_ratio ?? detail.aegis_deepfake.video.metrics?.fft_ratio) !== undefined}
                   <div class="metric-item">
-                    <span class="m-label">FFT Checkerboard:</span>
-                    <span class="m-val">{detail.aegis_deepfake.video.metrics.fft_ratio}</span>
+                    <span class="m-label">FFT спектър:</span>
+                    <span class="m-val">{detail.aegis_deepfake.video.metrics.mean_fft_spectrum_ratio ?? detail.aegis_deepfake.video.metrics.fft_ratio}</span>
                   </div>
                 {/if}
-                {#if detail.aegis_deepfake.video.metrics?.laplacian_var !== undefined}
+                {#if (detail.aegis_deepfake.video.metrics?.mean_laplacian_variance ?? detail.aegis_deepfake.video.metrics?.laplacian_var) !== undefined}
                   <div class="metric-item">
-                    <span class="m-label">Texture Var:</span>
-                    <span class="m-val">{detail.aegis_deepfake.video.metrics.laplacian_var}</span>
+                    <span class="m-label">Рязкост:</span>
+                    <span class="m-val">{detail.aegis_deepfake.video.metrics.mean_laplacian_variance ?? detail.aegis_deepfake.video.metrics.laplacian_var}</span>
                   </div>
                 {/if}
               </div>
@@ -1503,19 +1985,19 @@
               <div class="av-sync-info">
                 <span class="av-icon">🔄</span>
                 <div>
-                  <strong>{currentLang === 'bg' ? 'Мултимодален AV Синхрон (Говор-Артикулация)' : 'Multimodal AV-Sync (Lip-Sync Congruence)'}</strong>
+                  <strong>{currentLang === 'bg' ? 'Синхрон между звук и устни' : 'Lip-Sync Verification'}</strong>
                   <span class="av-desc">
                     {#if detail.aegis_deepfake.multimodal.av_sync_mismatch}
-                      {currentLang === 'bg' ? '⚠️ Открито разминаване между фонемния акустичен контур и движението на устните (типично за синтетичен дублаж / lipsync AI)' : '⚠️ Phoneme-viseme desynchronization detected (typical for AI dubbing / lipsync)'}
+                      {currentLang === 'bg' ? '⚠️ Открито е разминаване между говора и движението на устните' : '⚠️ Phoneme-viseme desynchronization detected'}
                     {:else}
-                      {currentLang === 'bg' ? '✓ Нормален синхрон между артикулация и аудио спектър' : '✓ Normal phoneme-viseme temporal coherence'}
+                      {currentLang === 'bg' ? '✓ Нормален синхрон между говор и устни' : '✓ Normal lip-sync temporal coherence'}
                     {/if}
                   </span>
                 </div>
               </div>
               {#if detail.aegis_deepfake.multimodal.av_sync_score !== null && detail.aegis_deepfake.multimodal.av_sync_score !== undefined}
                 <div class="av-score-pill">
-                  {Math.round(detail.aegis_deepfake.multimodal.av_sync_score * 100)}% {currentLang === 'bg' ? 'съгласуваност' : 'match'}
+                  {Math.round(detail.aegis_deepfake.multimodal.av_sync_score * 100)}% {currentLang === 'bg' ? 'съвпадение' : 'match'}
                 </div>
               {/if}
             </div>
@@ -1523,7 +2005,7 @@
 
           {#if detail.aegis_deepfake.summary_bg}
             <div class="aegis-summary-box">
-              <span class="summary-title">📝 {currentLang === 'bg' ? 'Форензичен доклад за журналисти:' : 'Forensic Report for Fact-Checkers:'}</span>
+              <span class="summary-title">📝 {currentLang === 'bg' ? 'Заключение:' : 'Summary:'}</span>
               <p>{detail.aegis_deepfake.summary_bg}</p>
             </div>
           {/if}
@@ -1531,8 +2013,8 @@
           <div class="aegis-empty-state">
             <p>
               {currentLang === 'bg'
-                ? 'Видеото все още не е преминало през форензичния модул AEGIS. Натиснете бутона по-горе за моментален мултимодален анализ на гласа и лицето.'
-                : 'This media has not been scanned by AEGIS yet. Click the button above to run acoustic and visual deepfake detection.'}
+                ? 'Записът още не е проверен за манипулация. Натиснете бутона горе за проверка на звука и картината.'
+                : 'This media has not been scanned yet. Click the button above to run audio and video verification.'}
             </p>
           </div>
         {/if}
@@ -1544,8 +2026,8 @@
             <h3>{t.claimsHeading}</h3>
             <span class="section-subhint">
               {currentLang === 'bg'
-                ? 'Директни връзки за фактчекинг в български и международни източници'
-                : 'Direct fact-checking search tools and external evidence verification'}
+                ? 'Бърза проверка в български и международни източници'
+                : 'Direct search tools and external evidence verification'}
             </span>
           </div>
         </div>
@@ -1599,6 +2081,19 @@
                 >
                   📋 {currentLang === 'bg' ? 'Цитат' : 'Cite'}
                 </button>
+
+                {#if cwith.evidence.length > 0}
+                  <button
+                    class="btn btn-shortcut btn-sm"
+                    onclick={() => {
+                      const firstValid = cwith.evidence.find(e => e.stance === 'supports' || e.stance === 'contradicts') || cwith.evidence[0];
+                      if (firstValid) jumpToEvidence(firstValid.id);
+                    }}
+                    title="Отиди на намереното доказателство за това твърдение"
+                  >
+                    🎯 {currentLang === 'bg' ? 'Към доказателството' : 'To evidence'}
+                  </button>
+                {/if}
               </div>
 
               <div class="claim-text">{claim.text_bg}</div>
@@ -1624,8 +2119,56 @@
                 </div>
               {/if}
 
+              <div class="claim-feedback-bar">
+                <span class="feedback-hint">{currentLang === 'bg' ? 'Оценка на резултата:' : 'Feedback:'}</span>
+                <button
+                  class="btn-feedback correct"
+                  class:selected={feedbackSubmitted[claim.id] === 'correct'}
+                  onclick={() => handleSendFeedback(claim.id, 'correct')}
+                  title="Преценката на системата е точна"
+                >
+                  👍 {currentLang === 'bg' ? 'Вярна преценка' : 'Correct'}
+                </button>
+                <button
+                  class="btn-feedback wrong"
+                  class:selected={feedbackSubmitted[claim.id] === 'wrong_verdict'}
+                  onclick={() => {
+                    feedbackPickerClaimId = feedbackPickerClaimId === claim.id ? null : claim.id;
+                  }}
+                  title="Преценката е погрешна"
+                >
+                  👎 {currentLang === 'bg' ? 'Грешна преценка' : 'Wrong'}
+                </button>
+                <button
+                  class="btn-feedback unrelated"
+                  class:selected={feedbackSubmitted[claim.id] === 'unrelated_evidence'}
+                  onclick={() => handleSendFeedback(claim.id, 'unrelated_evidence')}
+                  title="Доказателството не се отнася за събитието"
+                >
+                  ⚠️ {currentLang === 'bg' ? 'Несвързано доказателство' : 'Unrelated'}
+                </button>
+                {#if feedbackSubmitted[claim.id]}
+                  <span class="feedback-saved-badge">✓ {currentLang === 'bg' ? 'Запазено' : 'Saved'}</span>
+                {/if}
+              </div>
+
+              {#if feedbackPickerClaimId === claim.id}
+                <div class="feedback-verdict-picker">
+                  <span class="picker-label">{currentLang === 'bg' ? 'Истински резултат:' : 'True verdict:'}</span>
+                  <button class="btn btn-xs btn-outline" onclick={() => handleSendFeedback(claim.id, 'wrong_verdict', 'SUPPORTED')}>
+                    ✓ {currentLang === 'bg' ? 'Потвърдено' : 'Supported'}
+                  </button>
+                  <button class="btn btn-xs btn-outline" onclick={() => handleSendFeedback(claim.id, 'wrong_verdict', 'CONTRADICTED')}>
+                    ✕ {currentLang === 'bg' ? 'Опровергано' : 'Contradicted'}
+                  </button>
+                  <button class="btn btn-xs btn-outline" onclick={() => handleSendFeedback(claim.id, 'wrong_verdict', 'UNVERIFIABLE')}>
+                    ? {currentLang === 'bg' ? 'Непроверимо' : 'Unverifiable'}
+                  </button>
+                </div>
+              {/if}
+
               <div class="factcheck-action-bar">
-                <span class="factcheck-bar-title">🔍 {currentLang === 'bg' ? 'Проверка на фактите:' : 'Fact-check this claim:'}</span>
+                <span class="factcheck-bar-title">🔍 {currentLang === 'bg' ? 'Провери в:' : 'Check in:'}</span>
                 <div class="factcheck-links-grid">
                   <a
                     href={`https://www.google.com/search?q=${encodeURIComponent('site:factcheck.bg OR site:bnr.bg ' + claim.text_bg)}`}
@@ -1651,14 +2194,14 @@
                       openExternalUrl(`https://toolbox.google.com/factcheck/explorer/search/list:recent?query=${encodeURIComponent(claim.text_bg)}`);
                     }}
                   >
-                    🔎 Google Fact Check Tools ↗
+                    🔎 Google Fact Check ↗
                   </a>
                   <a
                     href={`https://www.google.com/search?q=${encodeURIComponent('site:bta.bg ' + claim.text_bg)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="factcheck-link-btn factcheck-bta"
-                    title="Търсене в архива на Българска телеграфна агенция (БТА)"
+                    title="Търсене в архива на БТА"
                     onclick={(e) => {
                       e.preventDefault();
                       openExternalUrl(`https://www.google.com/search?q=${encodeURIComponent('site:bta.bg ' + claim.text_bg)}`);
@@ -1682,7 +2225,7 @@
                   <button
                     class="btn btn-primary btn-sm factcheck-verify-btn"
                     onclick={() => handleTriggerClaimVerify(claim.text_bg)}
-                    title="Провери твърдението в българските медии и Factcheck.bg и извлечи цитати"
+                    title="Провери твърдението в българските медии и Factcheck.bg"
                   >
                     ⚡ {currentLang === 'bg' ? 'Провери твърдението' : 'Verify Claim'}
                   </button>
@@ -1698,19 +2241,24 @@
                       class="btn btn-outline btn-sm"
                       onclick={() => handleTriggerClaimVerify(claim.text_bg)}
                     >
-                      ⚡ {currentLang === 'bg' ? 'Търси доказателства в мрежата сега' : 'Search web evidence now'}
+                      ⚡ {currentLang === 'bg' ? 'Търси източници в мрежата' : 'Search web sources'}
                     </button>
                   </div>
                 {:else}
                   {#each cwith.evidence.filter(ev => !isJunkSource(ev)) as ev}
-                    <div class="evidence-item" class:expanded={expandedEvidenceId === ev.id}>
+                    <div
+                      id={`evidence-${ev.id}`}
+                      class="evidence-item"
+                      class:expanded={expandedEvidenceId === ev.id}
+                      class:evidence-pulse={activeEvidenceId === ev.id}
+                    >
                       <div class="evidence-connection-bar">
                         <span class="source-category-pill {sourceCategoryLabel(ev.source_kind).cls}">
                           {sourceCategoryLabel(ev.source_kind).icon} {sourceCategoryLabel(ev.source_kind).label}
                         </span>
                         <span class="stance-badge {stanceClass(ev.stance || '')}">{stanceLabel(ev.stance || '')}</span>
                         <span class="connection-strength-pill">
-                          🎯 {ev.stance === 'supports' ? (currentLang === 'bg' ? 'Потвърждаващ контекст' : 'Supporting Evidence') : ev.stance === 'contradicts' ? (currentLang === 'bg' ? 'Опровергаващ факт' : 'Contradicting Evidence') : (currentLang === 'bg' ? 'Тематичен контекст' : 'Related Context')}
+                          🎯 {ev.stance === 'supports' ? (currentLang === 'bg' ? 'Потвърждава' : 'Supports') : ev.stance === 'contradicts' ? (currentLang === 'bg' ? 'Опровергава' : 'Contradicts') : (currentLang === 'bg' ? 'Свързан контекст' : 'Related Context')}
                         </span>
                       </div>
                       <div class="evidence-meta">
@@ -1722,22 +2270,22 @@
                           <button
                             class="btn btn-outline btn-xs preview-act-btn"
                             onclick={() => handleLoadEvidencePreview(ev.source_url || (ev as any).url)}
-                            title="Зареди и виж скрапнатия пълен текст на статията"
+                            title="Отвори и виж цялата статия"
                           >
-                            📖 {currentLang === 'bg' ? 'Зареди статия / преглед' : 'Load article / preview'}
+                            📖 {currentLang === 'bg' ? 'Преглед на статията' : 'Preview'}
                           </button>
                         {/if}
                       </div>
                       {#if getMatchingKeywords(claim.text_bg, ev.passage || (ev as any).snippet || '').length > 0}
                         <div class="evidence-match-keywords">
-                          <span class="keywords-label">🔑 {currentLang === 'bg' ? 'Съвпадащи факти / термини:' : 'Matched terms:'}</span>
+                          <span class="keywords-label">🔑 {currentLang === 'bg' ? 'Ключови думи:' : 'Keywords:'}</span>
                           {#each getMatchingKeywords(claim.text_bg, ev.passage || (ev as any).snippet || '') as kw}
                             <span class="keyword-pill">{kw}</span>
                           {/each}
                         </div>
                       {/if}
                       <div class="evidence-snippet">
-                        {ev.passage || (ev as any).snippet}
+                        {@html renderHighlightedSnippet(ev.passage || (ev as any).snippet || '', claim.text_bg)}
                       </div>
                       <div class="evidence-actions-row">
                         {#if ev.source_url || (ev as any).url}
@@ -1762,8 +2310,8 @@
                           onclick={() => (expandedEvidenceId = expandedEvidenceId === ev.id ? null : ev.id)}
                         >
                           {expandedEvidenceId === ev.id
-                            ? (currentLang === 'bg' ? 'Свий цитата ▲' : 'Collapse ▲')
-                            : (currentLang === 'bg' ? 'Пълен цитат ▼' : 'Full passage ▼')}
+                            ? (currentLang === 'bg' ? 'Свий ▲' : 'Collapse ▲')
+                            : (currentLang === 'bg' ? 'Цял цитат ▼' : 'Full passage ▼')}
                         </button>
                         <button
                           class="btn btn-outline btn-xs delete-evidence-btn"
@@ -1789,8 +2337,8 @@
               <h3>{t.peopleHeading}</h3>
               <span class="section-subhint">
                 {currentLang === 'bg'
-                  ? 'Автоматично профилиране, оценка на достоверност и проверка на изказванията'
-                  : 'Automated figure dossier, credibility scale & statement verification'}
+                  ? 'Справка, достоверност и проверени изказвания'
+                  : 'Profile, credibility score & verified statements'}
               </span>
             </div>
           </div>
@@ -1848,24 +2396,24 @@
                   <button
                     class="btn btn-secondary btn-sm"
                     onclick={() => (viewingPersonDossier = person)}
-                    title="Виж пълното 2000-думи разузнавателно OSINT досие"
+                    title="Отвори пълното досие"
                   >
-                    📖 {currentLang === 'bg' ? 'Пълно досие' : 'Dossier'}
+                    📖 {currentLang === 'bg' ? 'Досие' : 'Dossier'}
                   </button>
                   <button
                     class="btn btn-primary btn-sm person-verify-btn"
                     onclick={() => handleResearchPerson(person)}
                     disabled={isJobActive('person-research', person.id)}
-                    title="Стартирай пълно 9-степенно OSINT разузнаване на лицето с AI"
+                    title="Проучи лицето от публични регистри и архиви"
                   >
-                    {isJobActive('person-research', person.id) ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи лицето' : 'OSINT Research')}
+                    {isJobActive('person-research', person.id) ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи' : 'Research')}
                   </button>
                   <button
                     class="btn btn-secondary btn-sm"
                     onclick={() => handleOpenDisambiguate(person)}
                     title="Смени или коригирай това лице (напр. политик вместо футболист)"
                   >
-                    ✏️ {currentLang === 'bg' ? 'Смени / Коригирай' : 'Disambiguate'}
+                    ✏️ {currentLang === 'bg' ? 'Коригирай' : 'Edit'}
                   </button>
                   <button
                     class="btn btn-danger btn-sm"
@@ -2005,12 +2553,12 @@
                 class="btn btn-outline btn-sm btn-web-risk"
                 onclick={handleAssessAuthorWebRisk}
                 disabled={isAssessingRisk}
-                title={currentLang === 'bg' ? 'Сканиране на мрежата за проверка на факти и надеждност на автора' : 'Scan web and fact-check archives for this creator'}
+                title={currentLang === 'bg' ? 'Проверка за предишни опровержения и надеждност на автора' : 'Scan fact-check archives for this creator'}
               >
                 {#if isAssessingRisk}
-                  <span class="loading-mini-spin">...</span> {currentLang === 'bg' ? 'Сканиране в уеб...' : 'Searching web...'}
+                  <span class="loading-mini-spin">...</span> {currentLang === 'bg' ? 'Проверка...' : 'Checking...'}
                 {:else}
-                  🌐 {currentLang === 'bg' ? 'Изчисли риск чрез уеб' : 'Calculate risk via web'}
+                  🌐 {currentLang === 'bg' ? 'Провери автора' : 'Check author'}
                 {/if}
               </button>
             </div>
@@ -2026,7 +2574,7 @@
             <div class="author-risk-assessment-card">
               <div class="risk-assessment-top">
                 <span class="risk-assessment-title">
-                  🛡️ {currentLang === 'bg' ? 'Оценка на риска и надеждност на автора' : 'Author Risk & Reputation Assessment'}
+                  🛡️ {currentLang === 'bg' ? 'Надеждност на автора' : 'Author Reliability'}
                 </span>
                 {#if authorRisk.lastCalculatedAt}
                   <span class="risk-calc-time">
@@ -2039,7 +2587,7 @@
 
               <div class="confidence-bar-container" title={authorRisk.confidenceReason}>
                 <div class="confidence-bar-label">
-                  <span>{currentLang === 'bg' ? 'Системно ниво на увереност:' : 'System confidence level:'}</span>
+                  <span>{currentLang === 'bg' ? 'Точност на оценката:' : 'Assessment confidence:'}</span>
                   <strong>{authorRisk.confidencePercent}% ({authorRisk.confidenceText})</strong>
                 </div>
                 <div class="confidence-bar-track">
@@ -2051,7 +2599,7 @@
               {#if authorRisk.webSources && authorRisk.webSources.length > 0}
                 <div class="author-web-sources-section">
                   <span class="web-sources-heading">
-                    🌐 {currentLang === 'bg' ? 'Открити уеб източници и проверки на факти (' + authorRisk.webSources.length + '):' : 'Web sources & fact-checks found (' + authorRisk.webSources.length + '):'}
+                    🌐 {currentLang === 'bg' ? 'Намерени публикации (' + authorRisk.webSources.length + '):' : 'Sources found (' + authorRisk.webSources.length + '):'}
                   </span>
                   <div class="web-sources-chips">
                     {#each authorRisk.webSources as src}
@@ -3560,6 +4108,91 @@
     padding: 0.45rem 0.65rem;
     margin-bottom: 0.35rem;
     font-size: 0.78rem;
+    transition: all 0.25s ease-in-out;
+  }
+
+  .evidence-item.evidence-pulse {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.45) !important;
+    transform: scale(1.01);
+  }
+
+  :global(mark.matched-passage) {
+    background-color: rgba(234, 179, 8, 0.28);
+    color: inherit;
+    font-weight: 600;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+
+  .claim-feedback-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.5rem 0;
+    padding: 0.35rem 0.6rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: 6px;
+    font-size: 0.8rem;
+    flex-wrap: wrap;
+  }
+
+  .feedback-hint {
+    color: var(--text-secondary, #94a3b8);
+    font-weight: 500;
+  }
+
+  .btn-feedback {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.76rem;
+    cursor: pointer;
+    color: inherit;
+    transition: all 0.15s ease;
+  }
+
+  .btn-feedback:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-feedback.selected.correct {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #34d399;
+  }
+
+  .btn-feedback.selected.wrong {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #f87171;
+  }
+
+  .btn-feedback.selected.unrelated {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+    color: #fbbf24;
+  }
+
+  .feedback-saved-badge {
+    color: #34d399;
+    font-size: 0.76rem;
+    font-weight: 600;
+    margin-left: 0.2rem;
+  }
+
+  .feedback-verdict-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.3rem 0 0.5rem 0.5rem;
+    font-size: 0.78rem;
+  }
+
+  .picker-label {
+    color: var(--text-secondary, #94a3b8);
   }
 
   .evidence-connection-bar {
@@ -4262,6 +4895,28 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .copy-all-btn {
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0.25rem 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .copy-all-btn:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.55);
+    color: #93c5fd;
   }
 
   .drawer-remove-btn {

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchGeminiStatus, fetchVideoDetail, getCoreUrl } from '../lib/api';
+  import { fetchGeminiStatus, fetchNotifications, fetchVideoDetail, getCoreUrl } from '../lib/api';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { BenchmarkProgress, PowerInfo, QueueCounts, ScaleStatus, Screen } from '../lib/types';
   import { getCapacityTierInfo } from '../lib/types';
+  import NotificationCenterModal from './NotificationCenterModal.svelte';
 
   let {
     activeScreen,
@@ -24,6 +25,7 @@
     onRequestExit,
     onToggleTheme,
     onToggleLang,
+    onRefreshPeople,
   }: {
     activeScreen: Screen;
     currentLang: Language;
@@ -42,9 +44,14 @@
     onRequestExit?: () => void;
     onToggleTheme: () => void;
     onToggleLang: () => void;
+    onRefreshPeople?: () => void;
   } = $props();
 
   let geminiConfigured = $state(false);
+  let isNotificationsOpen = $state(false);
+  let unreadNotificationsCount = $state(0);
+  let questionsCount = $state(0);
+  let notifTimer: ReturnType<typeof setInterval> | null = null;
 
   let pasteText = $state('');
   let isPasting = $state(false);
@@ -93,8 +100,23 @@
     fetchGeminiStatus().then((s) => {
       geminiConfigured = s.configured;
     }).catch(() => {});
-    return () => stopPolling();
+    checkNotifications();
+    notifTimer = setInterval(checkNotifications, 15000);
+    return () => {
+      stopPolling();
+      if (notifTimer !== null) {
+        clearInterval(notifTimer);
+        notifTimer = null;
+      }
+    };
   });
+
+  function checkNotifications() {
+    fetchNotifications().then((res) => {
+      unreadNotificationsCount = res.unread_count || 0;
+      questionsCount = res.questions_count || 0;
+    }).catch(() => {});
+  }
 
   function stopPolling() {
     if (pollTimer !== null) {
@@ -376,6 +398,21 @@
         </button>
       {/if}
 
+      <button
+        type="button"
+        class="indicator-pill notification-pill"
+        class:has-questions={questionsCount > 0}
+        onclick={() => (isNotificationsOpen = !isNotificationsOpen)}
+        title={currentLang === 'bg' ? 'Център за известия & Медия контроли' : 'Notification Center & Media Controls'}
+      >
+        <span class="bell-icon">🔔</span>
+        {#if questionsCount > 0 || unreadNotificationsCount > 0}
+          <span class="notification-badge" class:has-questions={questionsCount > 0}>
+            {questionsCount > 0 ? questionsCount : unreadNotificationsCount}
+          </span>
+        {/if}
+      </button>
+
       <button class="icon-btn" onclick={onToggleLang} title="Смяна на езика / Switch language" aria-label="Смяна на език">
         {currentLang.toUpperCase()}
       </button>
@@ -416,6 +453,21 @@
       {/if}
     </div>
   </div>
+
+  <NotificationCenterModal
+    isOpen={isNotificationsOpen}
+    {currentLang}
+    onClose={() => {
+      isNotificationsOpen = false;
+      checkNotifications();
+    }}
+    onRefreshPeople={() => {
+      checkNotifications();
+      if (onRefreshPeople) {
+        onRefreshPeople();
+      }
+    }}
+  />
 
   {#if lastPasted}
     <div class="pasted-preview-card">
@@ -668,6 +720,41 @@
     background-color: rgba(16, 185, 129, 0.15);
     border-color: rgba(16, 185, 129, 0.4);
     color: #34d399;
+  }
+
+  .notification-pill {
+    cursor: pointer;
+    position: relative;
+    transition: all 0.15s ease;
+    border: 1px solid var(--border-color);
+  }
+
+  .notification-pill:hover {
+    background: var(--hover-bg);
+  }
+
+  .notification-pill.has-questions {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.14);
+  }
+
+  .bell-icon {
+    font-size: 0.92rem;
+  }
+
+  .notification-badge {
+    background: #3b82f6;
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    line-height: 1;
+  }
+
+  .notification-badge.has-questions {
+    background: #f59e0b;
+    color: #1f2937;
   }
 
   .benchmark-pulsing-pill {

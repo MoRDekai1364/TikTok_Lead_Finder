@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { aiCheckTranscript, getCoreUrl } from '../lib/api';
+  import {
+    registerPlaybackElement,
+    unregisterPlaybackElement,
+    updatePlaybackProgress,
+    setPlaybackPlaying,
+  } from '../lib/playback.svelte';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { Lane, LeadCard } from '../lib/types';
@@ -55,6 +61,15 @@
   let isAiCheckingFeed = $state(false);
   let pullToast = $state<string | null>(null);
   let isPullingMore = $state(false);
+  let inboxVideoElement = $state<HTMLVideoElement | null>(null);
+
+  $effect(() => {
+    return () => {
+      if (inboxVideoElement) {
+        unregisterPlaybackElement(inboxVideoElement);
+      }
+    };
+  });
 
   const queuedBehindCap = $derived(laneCounts?.leads_queued ?? 0);
 
@@ -405,10 +420,28 @@
             <div class="feed-media-box">
               {#key selectedCard.id}
                 <video
+                  bind:this={inboxVideoElement}
                   src="{coreUrl}/api/media/{selectedCard.id}/video.mp4"
                   poster={selectedCard.thumbnail_url || undefined}
                   controls
                   class="feed-video-player"
+                  onplay={() => {
+                    if (inboxVideoElement) {
+                      registerPlaybackElement(inboxVideoElement, {
+                        videoId: selectedCard.id,
+                        creatorHandle: selectedCard.creator_handle,
+                        caption: selectedCard.top_claim_text,
+                        thumbnailUrl: selectedCard.thumbnail_url,
+                      });
+                      setPlaybackPlaying(true);
+                    }
+                  }}
+                  onpause={() => setPlaybackPlaying(false)}
+                  ontimeupdate={() => {
+                    if (inboxVideoElement) {
+                      updatePlaybackProgress(inboxVideoElement.currentTime, inboxVideoElement.duration);
+                    }
+                  }}
                 >
                   <track kind="captions" />
                 </video>

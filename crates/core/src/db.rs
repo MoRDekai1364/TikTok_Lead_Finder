@@ -67,6 +67,7 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS entity_intel_events (id INTEGER PRIMARY KEY AUTOINCREMENT, person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE, source_name TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, discovered_at TEXT NOT NULL, snippet TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS entity_sanctions_cache (person_id INTEGER PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE, payload_json TEXT NOT NULL, checked_at TEXT NOT NULL)",
             "ALTER TABLE people ADD COLUMN last_monitored_at TEXT",
+            "CREATE TABLE IF NOT EXISTS claim_verification_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, claim_id INTEGER NOT NULL, video_id TEXT NOT NULL, rating TEXT NOT NULL, suggested_verdict TEXT, notes TEXT, created_at TEXT NOT NULL)",
         ];
         for mig in migrations {
             let _ = sqlx::raw_sql(mig).execute(&pool).await;
@@ -1671,6 +1672,304 @@ impl Database {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn merge_people(&self, source_id: i64, target_id: i64) -> Result<()> {
+        self.merge_people_with_name(source_id, target_id, None).await
+    }
+
+    pub async fn merge_people_with_name(
+        &self,
+        source_id: i64,
+        target_id: i64,
+        custom_name: Option<&str>,
+    ) -> Result<()> {
+        if source_id == target_id {
+            return Ok(());
+        }
+
+        let source_row = sqlx::query("SELECT canonical_name, variants_json, tags_json FROM people WHERE id = ?1")
+            .bind(source_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let target_row = sqlx::query("SELECT canonical_name, variants_json, tags_json FROM people WHERE id = ?1")
+            .bind(target_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if let (Some(s_row), Some(t_row)) = (source_row, target_row) {
+            let s_name: String = s_row.get("canonical_name");
+            let mut t_variants: Vec<String> = t_row
+                .try_get::<Option<String>, _>("variants_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            let s_variants: Vec<String> = s_row
+                .try_get::<Option<String>, _>("variants_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+
+            if !t_variants.iter().any(|v| v.eq_ignore_ascii_case(&s_name)) {
+                t_variants.push(s_name);
+            }
+            for v in s_variants {
+                if !t_variants.iter().any(|x| x.eq_ignore_ascii_case(&v)) {
+                    t_variants.push(v);
+                }
+            }
+
+            let mut t_tags: Vec<String> = t_row
+                .try_get::<Option<String>, _>("tags_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            let s_tags: Vec<String> = s_row
+                .try_get::<Option<String>, _>("tags_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+
+            for tag in s_tags {
+                if !t_tags.iter().any(|t| t.eq_ignore_ascii_case(&tag)) {
+                    t_tags.push(tag);
+                }
+            }
+
+            let new_vars_json = serde_json::to_string(&t_variants)?;
+            let new_tags_json = serde_json::to_string(&t_tags)?;
+
+            if let Some(cn) = custom_name {
+                let trimmed = cn.trim();
+                if !trimmed.is_empty() {
+                    sqlx::query("UPDATE people SET canonical_name = ?2, variants_json = ?3, tags_json = ?4 WHERE id = ?1")
+                        .bind(target_id)
+                        .bind(trimmed)
+                        .bind(new_vars_json)
+                        .bind(new_tags_json)
+                        .execute(&self.pool)
+                        .await?;
+                } else {
+                    sqlx::query("UPDATE people SET variants_json = ?2, tags_json = ?3 WHERE id = ?1")
+                        .bind(target_id)
+                        .bind(new_vars_json)
+                        .bind(new_tags_json)
+                        .execute(&self.pool)
+                        .await?;
+                }
+            } else {
+                sqlx::query("UPDATE people SET variants_json = ?2, tags_json = ?3 WHERE id = ?1")
+                    .bind(target_id)
+                    .bind(new_vars_json)
+                    .bind(new_tags_json)
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
+
+        let links = sqlx::query("SELECT video_id, mentions, found_in FROM video_people WHERE person_id = ?1")
+            .bind(source_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        for r in links {
+            let vid: String = r.get("video_id");
+            let m: i64 = r.try_get("mentions").unwrap_or(1);
+            let fi: String = r.try_get("found_in").unwrap_or_else(|_| "merge".to_string());
+            self.add_person_to_video(&vid, target_id, m, &fi).await?;
+        }
+
+        sqlx::query("DELETE FROM video_people WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+
+        let _ = sqlx::query("UPDATE entity_intel_events SET person_id = ?2 WHERE person_id = ?1")
+            .bind(source_id)
+            .bind(target_id)
+            .execute(&self.pool)
+            .await;
+
+        let _ = sqlx::query("DELETE FROM entity_sanctions_cache WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await;
+
+        sqlx::query("DELETE FROM people WHERE id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn save_claim_feedback(
+        &self,
+        claim_id: i64,
+        video_id: &str,
+        rating: &str,
+        suggested_verdict: Option<&str>,
+        notes: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query("INSERT INTO claim_verification_feedback (claim_id, video_id, rating, suggested_verdict, notes, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+            .bind(claim_id)
+            .bind(video_id)
+            .bind(rating)
+            .bind(suggested_verdict)
+            .bind(notes)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn split_compound_person(&self, source_id: i64, target_names: &[String]) -> Result<Vec<i64>> {
+        let mut target_ids = Vec::new();
+        let now = Utc::now().to_rfc3339();
+
+        for name in target_names {
+            let clean = name.trim();
+            if clean.is_empty() {
+                continue;
+            }
+            let row_opt = sqlx::query("SELECT id FROM people WHERE LOWER(canonical_name) = LOWER(?1) LIMIT 1")
+                .bind(clean)
+                .fetch_optional(&self.pool)
+                .await?;
+
+            let tid = if let Some(r) = row_opt {
+                r.get::<i64, _>("id")
+            } else {
+                let vars_json = serde_json::to_string(&vec![clean.to_string()])?;
+                let res = sqlx::query(
+                    "INSERT INTO people (canonical_name, variants_json, public_figure, entity_type, researched_at) VALUES (?1, ?2, 1, 'person', ?3)",
+                )
+                .bind(clean)
+                .bind(vars_json)
+                .bind(&now)
+                .execute(&self.pool)
+                .await?;
+                res.last_insert_rowid()
+            };
+            target_ids.push(tid);
+        }
+
+        let links = sqlx::query("SELECT video_id, mentions, found_in FROM video_people WHERE person_id = ?1")
+            .bind(source_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        for r in links {
+            let vid: String = r.get("video_id");
+            let m: i64 = r.try_get("mentions").unwrap_or(1);
+            let fi: String = r.try_get("found_in").unwrap_or_else(|_| "split".to_string());
+            for tid in &target_ids {
+                self.add_person_to_video(&vid, *tid, m, &fi).await?;
+            }
+        }
+
+        sqlx::query("DELETE FROM video_people WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+
+        let _ = sqlx::query("DELETE FROM entity_intel_events WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await;
+
+        let _ = sqlx::query("DELETE FROM entity_sanctions_cache WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await;
+
+        sqlx::query("DELETE FROM people WHERE id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(target_ids)
+    }
+
+    pub async fn cleanup_person_as_tag(&self, source_id: i64, target_name: &str, tag: &str) -> Result<i64> {
+        let clean_target = target_name.trim();
+        let now = Utc::now().to_rfc3339();
+
+        let row_opt = sqlx::query("SELECT id, tags_json FROM people WHERE LOWER(canonical_name) = LOWER(?1) LIMIT 1")
+            .bind(clean_target)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let (target_id, mut tags) = if let Some(r) = row_opt {
+            let tid: i64 = r.get("id");
+            let t_vec: Vec<String> = r
+                .try_get::<Option<String>, _>("tags_json")
+                .ok()
+                .flatten()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            (tid, t_vec)
+        } else {
+            let vars_json = serde_json::to_string(&vec![clean_target.to_string()])?;
+            let res = sqlx::query(
+                "INSERT INTO people (canonical_name, variants_json, public_figure, entity_type, researched_at) VALUES (?1, ?2, 1, 'person', ?3)",
+            )
+            .bind(clean_target)
+            .bind(vars_json)
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+            (res.last_insert_rowid(), Vec::new())
+        };
+
+        if !tags.iter().any(|t| t.eq_ignore_ascii_case(tag)) {
+            tags.push(tag.to_string());
+            let tags_json = serde_json::to_string(&tags)?;
+            sqlx::query("UPDATE people SET tags_json = ?2 WHERE id = ?1")
+                .bind(target_id)
+                .bind(tags_json)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        let links = sqlx::query("SELECT video_id, mentions, found_in FROM video_people WHERE person_id = ?1")
+            .bind(source_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        for r in links {
+            let vid: String = r.get("video_id");
+            let m: i64 = r.try_get("mentions").unwrap_or(1);
+            let fi: String = r.try_get("found_in").unwrap_or_else(|_| "tag_cleanup".to_string());
+            self.add_person_to_video(&vid, target_id, m, &fi).await?;
+        }
+
+        sqlx::query("DELETE FROM video_people WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+
+        let _ = sqlx::query("DELETE FROM entity_intel_events WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await;
+
+        let _ = sqlx::query("DELETE FROM entity_sanctions_cache WHERE person_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await;
+
+        sqlx::query("DELETE FROM people WHERE id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(target_id)
     }
 
     pub async fn record_intel_event(

@@ -109,6 +109,47 @@ export interface EntityPivotRef {
   registry_status?: string | null;
 }
 
+export interface ArchivedSnapshot {
+  url: string;
+  timestamp: string;
+  original_url: string;
+  service: string;
+  status: string;
+}
+
+export interface InternetArchiveDoc {
+  identifier: string;
+  title: string;
+  date?: string | null;
+  mediatype?: string | null;
+  detail_url: string;
+}
+
+export interface WikiRevision {
+  user: string;
+  timestamp: string;
+  comment: string;
+}
+
+export interface WikiBioExtract {
+  title: string;
+  extract: string;
+  language: string;
+  revisions: WikiRevision[];
+}
+
+export interface AegisTemporalAudit {
+  target: string;
+  snapshots_checked: number;
+  oldest_capture?: string | null;
+  newest_capture?: string | null;
+  historical_snapshots: ArchivedSnapshot[];
+  internet_archive_docs: InternetArchiveDoc[];
+  wiki_bio?: WikiBioExtract | null;
+  scrubbed_or_altered_risk: string;
+  provenance_notes: string[];
+}
+
 export interface DetailedPersonProfile {
   report_markdown?: string;
   identity?: string;
@@ -123,6 +164,7 @@ export interface DetailedPersonProfile {
   delta_summary?: string;
   sanctions_matches?: SanctionsMatch[];
   entity_pivots?: EntityPivotRef[];
+  temporal_audit?: AegisTemporalAudit;
 }
 
 export type EntityType = 'person' | 'institution' | 'channel' | 'country' | 'group' | 'event';
@@ -699,4 +741,55 @@ export interface ModelTestResponse {
   raw_text: string;
   parsed_json?: any;
   error?: string | null;
+}
+
+export type DedupActionType = 'merge' | 'split' | 'cleanup_tag';
+
+export interface DedupProposal {
+  id: string;
+  action_type: 'Merge' | 'SplitCompound' | 'CleanupTag' | 'merge' | 'split' | 'cleanup_tag';
+  confidence: number;
+  title: string;
+  description: string;
+  source_id: number;
+  source_name: string;
+  target_names: string[];
+  target_ids: number[];
+  tag?: string;
+}
+
+export interface DedupSummary {
+  merged: number;
+  split: number;
+  tagged: number;
+  total_processed: number;
+}
+
+export interface SystemNotification {
+  id: string;
+  type: 'info' | 'question' | 'warning' | 'success';
+  title: string;
+  message: string;
+  timestamp: string;
+  count?: number;
+}
+
+export interface NotificationsResponse {
+  ok: boolean;
+  unread_count: number;
+  questions_count: number;
+  notifications: SystemNotification[];
+}
+
+export interface ClaimFeedbackRequest {
+  video_id: string;
+  rating: 'correct' | 'wrong_verdict' | 'unrelated_evidence';
+  suggested_verdict?: string;
+  notes?: string;
+}
+
+export interface DirectMergePeopleRequest {
+  source_id: number;
+  target_id: number;
+  custom_name?: string;
 }

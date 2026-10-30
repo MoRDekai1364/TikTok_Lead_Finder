@@ -1,5 +1,6 @@
 import type {
   AegisDeepfakeResult,
+  AegisTemporalAudit,
   BenchmarkProgress,
   BenchmarkStatusResponse,
   Creator,
@@ -7,6 +8,8 @@ import type {
   CuratedModelCatalogItem,
   CustomScanConfig,
   CustomScanResult,
+  DedupProposal,
+  DedupSummary,
   EntityIntelEvent,
   ExternalAiServerStatus,
   GeminiStatus,
@@ -17,6 +20,9 @@ import type {
   ModelHubRolesConfig,
   ModelTestRequest,
   ModelTestResponse,
+  NotificationsResponse,
+  ClaimFeedbackRequest,
+  DirectMergePeopleRequest,
   Person,
   PowerInfo,
   QueueCounts,
@@ -458,6 +464,52 @@ export async function refreshPersonIntelStream(personId: number): Promise<{ even
 
 export async function fetchPersonSanctions(personId: number): Promise<{ matches: SanctionsMatch[]; checked_at: string; cached: boolean }> {
   return fetchJson<{ matches: SanctionsMatch[]; checked_at: string; cached: boolean }>(`/api/people/${personId}/sanctions`);
+}
+
+export async function fetchPersonWayback(personId: number): Promise<{ ok: boolean; temporal_audit: AegisTemporalAudit; cached: boolean }> {
+  return fetchJson<{ ok: boolean; temporal_audit: AegisTemporalAudit; cached: boolean }>(`/api/people/${personId}/wayback`);
+}
+
+export async function refreshPersonWayback(personId: number): Promise<{ ok: boolean; temporal_audit: AegisTemporalAudit; cached: boolean }> {
+  return fetchJson<{ ok: boolean; temporal_audit: AegisTemporalAudit; cached: boolean }>(`/api/people/${personId}/wayback/refresh`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchDedupProposals(): Promise<DedupProposal[]> {
+  const res = await fetchJson<{ ok: boolean; proposals: DedupProposal[] }>('/api/people/dedup/proposals');
+  return res.proposals || [];
+}
+
+export async function applyDedupProposal(proposal: DedupProposal): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>('/api/people/dedup/apply', {
+    method: 'POST',
+    body: JSON.stringify(proposal),
+  });
+}
+
+export async function autoDedupPeople(): Promise<{ ok: boolean; summary: DedupSummary }> {
+  return fetchJson<{ ok: boolean; summary: DedupSummary }>('/api/people/dedup/auto', {
+    method: 'POST',
+  });
+}
+
+export async function mergePeopleDirectly(req: DirectMergePeopleRequest): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>('/api/people/merge', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function submitClaimFeedback(claimId: number, req: ClaimFeedbackRequest): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`/api/claims/${claimId}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function fetchNotifications(): Promise<NotificationsResponse> {
+  return fetchJson<NotificationsResponse>('/api/notifications');
 }
 
 export async function fetchVideosByCreator(creatorId: string, limit: number = 10): Promise<LeadCard[]> {
@@ -952,6 +1004,24 @@ function getMockFallback<T>(endpoint: string, options: RequestInit): T {
       { id: 'c2', handle: 'politika_bg', display_name: 'Политика БГ', region: 'BG', follower_count: 58000, first_seen_at: '2026-10-05T15:00:00Z', watchlist: true, flagged_count: 7, expansion_depth: 2 },
     ];
     return creators as T;
+  }
+
+  if (endpoint === '/api/people/dedup/proposals') {
+    return { ok: true, proposals: [] } as T;
+  }
+
+  if (endpoint === '/api/people/dedup/apply' || endpoint === '/api/people/dedup/auto') {
+    return { ok: true, summary: { merged: 0, split: 0, tagged: 0, total_processed: 0 } } as T;
+  }
+
+  if (endpoint === '/api/notifications') {
+    const res: NotificationsResponse = {
+      ok: true,
+      unread_count: 0,
+      questions_count: 0,
+      notifications: [],
+    };
+    return res as T;
   }
 
   return {} as T;
