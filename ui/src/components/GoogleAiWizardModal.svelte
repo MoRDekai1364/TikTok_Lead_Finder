@@ -141,12 +141,12 @@
           <div class="header-icon">✨</div>
           <div>
             <h3 class="wizard-title">
-              {currentLang === 'bg' ? 'Магьосник за Google AI (Gemini Studio)' : 'Google AI Setup Wizard (Gemini Studio)'}
+              {currentLang === 'bg' ? 'Настройка на Google AI (Gemini Studio)' : 'Google AI Setup (Gemini Studio)'}
             </h3>
             <p class="wizard-sub">
               {currentLang === 'bg'
-                ? 'Настройка за >95% точност на българска транскрипция и мулти-ключов пул'
-                : 'Setup for >95% Bulgarian speech accuracy & multi-key rotation pool'}
+                ? 'Свързване на API ключове за разпознаване на българска реч и аналитични справки'
+                : 'Setup for Bulgarian speech recognition & multi-key rotation'}
             </p>
           </div>
         </div>

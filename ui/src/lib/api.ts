@@ -36,6 +36,28 @@ import type {
 let cachedBaseUrl = localStorage.getItem('leadfinder_core_url') || 'http://127.0.0.1:17420';
 let cachedToken = localStorage.getItem('leadfinder_api_token') || '';
 
+export interface NativeDisplayHardwareInfo {
+  physical_width: number;
+  physical_height: number;
+  scale_factor: number;
+  logical_width: number;
+  logical_height: number;
+  aspect_ratio: number;
+  monitor_name: string | null;
+}
+
+export async function fetchDisplayHardwareInfo(): Promise<NativeDisplayHardwareInfo | null> {
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+    return null;
+  }
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return await invoke<NativeDisplayHardwareInfo | null>('get_display_hardware_info');
+  } catch {
+    return null;
+  }
+}
+
 export async function initDesktopConnection(): Promise<void> {
   if (!('__TAURI_INTERNALS__' in window)) {
     return;

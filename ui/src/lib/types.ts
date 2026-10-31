@@ -167,7 +167,15 @@ export interface DetailedPersonProfile {
   temporal_audit?: AegisTemporalAudit;
 }
 
-export type EntityType = 'person' | 'institution' | 'channel' | 'country' | 'group' | 'event';
+export type EntityType =
+  | 'person'
+  | 'institution'
+  | 'channel'
+  | 'country'
+  | 'group'
+  | 'event'
+  | 'infrastructure'
+  | 'building';
 
 export interface Person {
   id: number;
@@ -575,12 +583,12 @@ export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): Capa
 
   if (roundCap >= 1200) {
     return {
-      tierName: lang === 'bg' ? 'Експертна AI работна станция (Ultra Tier)' : 'Pro AI Workstation (Ultra Tier)',
+      tierName: lang === 'bg' ? 'Най-висок клас система' : 'Pro AI Workstation (Ultra Tier)',
       badgeClass: 'ultra',
       icon: '🏆',
       percentOfTarget,
       explanation: lang === 'bg'
-        ? 'Изключителна производителност! Системата ви е на ниво професионална AI работна станция. Може да следи десетки TikTok канали едновременно без никакво забавяне.'
+        ? 'Много висока скорост на обработка. Системата може да следи десетки TikTok канали едновременно без забавяне.'
         : 'Exceptional throughput! Pro workstation grade. Effortlessly monitors dozens of TikTok channels in real-time.',
       equivHoursPerDay,
       equivChannels,
@@ -590,12 +598,12 @@ export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): Capa
 
   if (roundCap >= 600) {
     return {
-      tierName: lang === 'bg' ? 'Висока производителност (High Performance)' : 'High Performance Desktop',
+      tierName: lang === 'bg' ? 'Висока производителност' : 'High Performance Desktop',
       badgeClass: 'high',
       icon: '⚡',
       percentOfTarget,
       explanation: lang === 'bg'
-        ? `Много висока скорост! Надвишава препоръчителния минимум (300 видеа/ден) с ${percentOfTarget - 100}%. Спокойно сканира и проверява целия дневен TikTok нюзфийд.`
+        ? `Висока скорост. Надвишава препоръчителния минимум (300 видеа/ден) с ${percentOfTarget - 100}% и обработва целия дневен поток.`
         : `Very fast processing! Exceeds target baseline (300/day) by ${percentOfTarget - 100}%. Effortlessly screens the entire daily feed.`,
       equivHoursPerDay,
       equivChannels,
@@ -605,12 +613,12 @@ export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): Capa
 
   if (roundCap >= 300) {
     return {
-      tierName: lang === 'bg' ? 'Препоръчително ниво (Recommended Tier)' : 'Recommended Baseline Tier',
+      tierName: lang === 'bg' ? 'Препоръчително ниво' : 'Recommended Baseline Tier',
       badgeClass: 'recommended',
       icon: '🚀',
       percentOfTarget,
       explanation: lang === 'bg'
-        ? 'Отлична скорост. Напълно покрива препоръчителния таргет на LeadFinder за постоянен автоматичен анализ на съдържание.'
+        ? 'Оптимална скорост. Покрива препоръчителното ниво за постоянен автоматичен анализ на съдържание.'
         : 'Optimal baseline speed. Fully satisfies the target quota for continuous automated screening.',
       equivHoursPerDay,
       equivChannels,
@@ -620,12 +628,12 @@ export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): Capa
 
   if (roundCap >= 150) {
     return {
-      tierName: lang === 'bg' ? 'Стандартно / Мобилно ниво (Standard Tier)' : 'Standard / Mobile Tier',
+      tierName: lang === 'bg' ? 'Стандартно ниво' : 'Standard / Mobile Tier',
       badgeClass: 'moderate',
       icon: '⚖️',
       percentOfTarget,
       explanation: lang === 'bg'
-        ? 'Добра скорост за лична употреба и по-малки списъци. При по-големи опашки се препоръчва работа на заден план.'
+        ? 'Подходяща скорост за лична употреба и по-малки списъци. При по-големи опашки се препоръчва работа на заден план.'
         : 'Good for personal use and smaller watchlists. Background processing is recommended for larger batches.',
       equivHoursPerDay,
       equivChannels,
@@ -634,12 +642,12 @@ export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): Capa
   }
 
   return {
-    tierName: lang === 'bg' ? 'Енергоспестяващ / Базов режим (Eco Tier)' : 'Power-Saver / Basic Tier',
+    tierName: lang === 'bg' ? 'Енергоспестяващ режим' : 'Power-Saver / Basic Tier',
     badgeClass: 'basic',
     icon: '🔋',
     percentOfTarget,
     explanation: lang === 'bg'
-      ? 'Икономичен режим за пестене на енергия. За максимална скорост включете зарядното или ползвайте безплатен Google AI ключ.'
+      ? 'Икономичен режим за пестене на енергия. За по-висока скорост включете захранването или добавете Google AI ключ.'
       : 'Power-saver mode. Connect to AC power or enable free Google AI cloud assist for maximum speed.',
     equivHoursPerDay,
     equivChannels,
@@ -767,17 +775,22 @@ export interface DedupSummary {
 
 export interface SystemNotification {
   id: string;
-  type: 'info' | 'question' | 'warning' | 'success';
+  type: 'info' | 'question' | 'warning' | 'success' | 'ongoing';
   title: string;
   message: string;
   timestamp: string;
   count?: number;
+  progress_pct?: number;
+  subject_id?: number | null;
+  video_id?: string | null;
+  subject_name?: string | null;
 }
 
 export interface NotificationsResponse {
   ok: boolean;
   unread_count: number;
   questions_count: number;
+  ongoing_count?: number;
   notifications: SystemNotification[];
 }
 

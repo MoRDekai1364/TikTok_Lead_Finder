@@ -1,485 +1,467 @@
 <script lang="ts">
   import type { Language } from '../lib/i18n';
+  import BookReaderToc from './BookReaderToc.svelte';
+  import type { TocItem } from './BookReaderToc.svelte';
 
   let { currentLang }: { currentLang: Language } = $props();
 
-  let activeSection = $state<'signs' | 'actions' | 'lanes' | 'verdicts' | 'dictionary'>('signs');
   let scrollContainer = $state<HTMLDivElement | null>(null);
 
-  function setSection(section: 'signs' | 'actions' | 'lanes' | 'verdicts' | 'dictionary') {
-    activeSection = section;
-    if (scrollContainer) {
-      scrollContainer.scrollTo({ top: 0, behavior: 'instant' });
-    }
-  }
+  const helpTocItems = $derived.by((): TocItem[] => {
+    const bg = currentLang === 'bg';
+    return [
+      { id: 'help-sec-signs', label: bg ? '1. Означения и индикатори' : '1. Badges & Indicators', level: 1 },
+      { id: 'help-sec-actions', label: bg ? '2. Клавишни комбинации' : '2. Keyboard Shortcuts', level: 1 },
+      { id: 'help-sec-lanes', label: bg ? '3. Категории списъци' : '3. Queue Categories', level: 1 },
+      { id: 'help-sec-verdicts', label: bg ? '4. Оценки на твърденията' : '4. Claim Assessments', level: 1 },
+      { id: 'help-sec-subjects', label: bg ? '5. Типове обекти и справки' : '5. Subject Types & Reports', level: 1 },
+      { id: 'help-sec-dictionary', label: bg ? '6. Потребителски речник' : '6. Custom Dictionary', level: 1 },
+    ];
+  });
 </script>
 
-<div class="help-scroll-wrapper" bind:this={scrollContainer}>
-  <div class="help-container">
-  <header class="help-header">
-    <div class="help-title-group">
-      <h1>{currentLang === 'bg' ? 'Помощен център & Ръководство' : 'Help Center & Documentation'}</h1>
-      <p class="help-subtitle">
-        {currentLang === 'bg'
-          ? 'Пълно ръководство за всички съкращения, еднобуквени означения, клавишни комбинации и функции в TikTok Lead Finder.'
-          : 'Complete reference for single-letter badges, keyboard shortcuts, lanes, verdicts, and dictionary parameters.'}
-      </p>
-    </div>
+<div class="help-reader-layout">
+  <BookReaderToc
+    variant="sidebar"
+    items={helpTocItems}
+    scrollContainer={scrollContainer}
+    title={currentLang === 'bg' ? 'Съдържание' : 'Contents'}
+  />
 
-    <nav class="help-nav" aria-label="Секции за помощ">
-      <button
-        class="help-nav-btn"
-        class:active={activeSection === 'signs'}
-        onclick={() => setSection('signs')}
-      >
-        🔤 {currentLang === 'bg' ? 'Означения (Q, C, E, R)' : 'Signings (Q, C, E, R)'}
-      </button>
-      <button
-        class="help-nav-btn"
-        class:active={activeSection === 'actions'}
-        onclick={() => setSection('actions')}
-      >
-        ⌨️ {currentLang === 'bg' ? 'Действия & Клавиши' : 'Actions & Keys'}
-      </button>
-      <button
-        class="help-nav-btn"
-        class:active={activeSection === 'lanes'}
-        onclick={() => setSection('lanes')}
-      >
-        📂 {currentLang === 'bg' ? 'Секции (Lanes)' : 'Lanes & Queues'}
-      </button>
-      <button
-        class="help-nav-btn"
-        class:active={activeSection === 'verdicts'}
-        onclick={() => setSection('verdicts')}
-      >
-        ⚖️ {currentLang === 'bg' ? 'Присъди' : 'Verdicts'}
-      </button>
-      <button
-        class="help-nav-btn"
-        class:active={activeSection === 'dictionary'}
-        onclick={() => setSection('dictionary')}
-      >
-        📖 {currentLang === 'bg' ? 'Речници & Жаргон' : 'Dictionary & Slang'}
-      </button>
-    </nav>
-  </header>
-
-  <div class="help-content">
-    {#if activeSection === 'signs'}
-      <section class="help-card">
-        <h2>{currentLang === 'bg' ? 'Еднобуквени означения и мини-индикатори' : 'Single-Letter Signings & Meter Badges'}</h2>
-        
-        <div class="definition-grid">
-          <div class="definition-item">
-            <div class="badge-display meter-q">Q</div>
-            <div class="definition-body">
-              <strong>Quality (Качество на стенограмата)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Показва качеството и акустичната увереност на разпознатия говор (0–100%). Ако видеото има оригинални субтитри от автора, Q е близко до 100%. При Whisper ASR отразява яснотата на речта и отсъствието на фонов шум.'
-                  : 'Measures transcript and audio acoustic clarity (0–100%). Videos with original captions reach ~100%. For Whisper ASR, it reflects speech clarity versus background music/noise.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display meter-c">C</div>
-            <div class="definition-body">
-              <strong>Check-worthiness (Значимост за проверка)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Оценява дали във видеото се изричат конкретни фактически твърдения (числа, имена на институции, закони, събития), или е само лично мнение. Колкото по-високо е C, толкова по-голяма е журналистическата стойност за проверка.'
-                  : 'Scores whether claims are verifiable factual statements (numbers, dates, institutions, events) rather than subjective opinions or satire. High C means high fact-check priority.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display meter-e">E</div>
-            <div class="definition-body">
-              <strong>Evidence Strength (Сила на доказателствата)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Измерва колко категорични и надеждни са намерените доказателства от официални източници, агенции (БТА, БНР) и факт-чек архиви, съпоставени с твърдението.'
-                  : 'Measures the similarity, strength, and authority of matched evidence passages retrieved from audited archives and official Bulgarian records.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-topbar">Q: 14</div>
-            <div class="definition-body">
-              <strong>Queued (В опашка - в горната лента)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Броят задачи, които изчакват ред в работната опашка (сваляне, транскрибиране, OCR, извличане на твърдения).'
-                  : 'Number of pending jobs currently queued in the local database awaiting execution.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-topbar">R: 2</div>
-            <div class="definition-body">
-              <strong>Running (В изпълнение - в горната лента)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Броят задачи, които в момента активно се изпълняват паралелно на вашия компютър.'
-                  : 'Number of worker tasks actively executing right now on your machine.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-btn">R</div>
-            <div class="definition-body">
-              <strong>Research More (Проучи задълбочено)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Бутон и бърз клавиш за стартиране на разширено търсене: извлича допълнителни факти, проверява публични личности в Уикиданни и анализира историята на автора.'
-                  : 'Button and keyboard shortcut to trigger deep retrieval across broader search domains, Wikidata public-figure resolution, and creator history.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-btn">U</div>
-            <div class="definition-body">
-              <strong>Undo (Отмени последното действие)</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Клавиш U веднага връща последно запазеното или отхвърленото видео обратно във входящия списък.'
-                  : 'Keyboard shortcut U immediately reverses your last keep or discard decision, restoring the card.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-special">ASR</div>
-            <div class="definition-body">
-              <strong>Whisper Automatic Speech Recognition</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Показва, че текстът е разпознат автоматично от гласа на говорещия с модела Whisper.'
-                  : 'Indicates the transcript was generated directly from video audio via Whisper speech recognition.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-special">found</div>
-            <div class="definition-body">
-              <strong>Оригинални субтитри</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Видеото съдържа авторски или вградени български субтитри от TikTok, които са извлечени директно.'
-                  : 'Original author captions were retrieved directly from TikTok metadata without needing speech recognition.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-special">📌 Pasted</div>
-            <div class="definition-body">
-              <strong>Ръчно добавено видео</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Линкът е въведен ръчно от вас. Тези видеа са с най-висок приоритет и се класират най-отгоре.'
-                  : 'Pasted manually by the user. These videos receive highest priority and are never suppressed by daily caps.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-special">FactCheck</div>
-            <div class="definition-body">
-              <strong>Архивен факт-чек</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Открито е съвпадение с вече съществуваща публикация от проверен факт-чекър (Factcheck.bg, БТА, AFP).'
-                  : 'Matched an existing published fact-check article from verified sources.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="definition-item">
-            <div class="badge-display badge-special">⚡</div>
-            <div class="definition-body">
-              <strong>Активно проучване</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'В момента тече фонова проверка или задълбочено проучване за това видео.'
-                  : 'Background deep research is actively in flight for this video.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    {:else if activeSection === 'actions'}
-      <section class="help-card">
-        <h2>{currentLang === 'bg' ? 'Клавишни комбинации и бързи действия' : 'Keyboard Shortcuts & Fast Triage'}</h2>
-        
-        <table class="help-table">
-          <thead>
-            <tr>
-              <th>{currentLang === 'bg' ? 'Клавиш' : 'Key'}</th>
-              <th>{currentLang === 'bg' ? 'Действие' : 'Action'}</th>
-              <th>{currentLang === 'bg' ? 'Описание' : 'Description'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><kbd>J</kbd></td>
-              <td>{currentLang === 'bg' ? 'Следващо видео' : 'Next Video'}</td>
-              <td>{currentLang === 'bg' ? 'Придвижва се към следващата карта в списъка.' : 'Moves selection down to next card.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>K</kbd></td>
-              <td>{currentLang === 'bg' ? 'Предишно видео' : 'Previous Video'}</td>
-              <td>{currentLang === 'bg' ? 'Придвижва се към предишната карта в списъка.' : 'Moves selection up to previous card.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>Space</kbd></td>
-              <td>{currentLang === 'bg' ? 'Преглед / Плейър' : 'Toggle Drawer'}</td>
-              <td>{currentLang === 'bg' ? 'Отваря или затваря детайлния страничен панел с видеоплейъра.' : 'Opens or closes the video detail drawer and synchronized player.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>Enter</kbd></td>
-              <td>{currentLang === 'bg' ? 'Запази (Keep)' : 'Keep Lead'}</td>
-              <td>{currentLang === 'bg' ? 'Маркира видеото като стойностен лийд и го запазва за експорт.' : 'Marks video as a valuable kept lead for investigation and export.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>Backspace</kbd></td>
-              <td>{currentLang === 'bg' ? 'Отхвърли (Discard)' : 'Discard Video'}</td>
-              <td>{currentLang === 'bg' ? 'Отстранява видеото от текущия списък в архив.' : 'Discards the video from current queue to archive.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>R</kbd></td>
-              <td>{currentLang === 'bg' ? 'Проучи (Research)' : 'Research More'}</td>
-              <td>{currentLang === 'bg' ? 'Стартира разширено търсене на източници и проверка на автора.' : 'Triggers deep retrieval across external archives and creator history.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>U</kbd></td>
-              <td>{currentLang === 'bg' ? 'Отмени (Undo)' : 'Undo Decision'}</td>
-              <td>{currentLang === 'bg' ? 'Връща обратно последно премахнатото видео.' : 'Restores the last kept or discarded video back into the active list.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>/</kbd></td>
-              <td>{currentLang === 'bg' ? 'Търсене' : 'Focus Search'}</td>
-              <td>{currentLang === 'bg' ? 'Фокусира текстовото поле за бързо търсене.' : 'Jumps focus immediately to the search input.'}</td>
-            </tr>
-            <tr>
-              <td><kbd>Esc</kbd></td>
-              <td>{currentLang === 'bg' ? 'Затвори' : 'Close'}</td>
-              <td>{currentLang === 'bg' ? 'Затваря детайлния панел или отменя търсенето.' : 'Closes active detail drawer or clears search focus.'}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-    {:else if activeSection === 'lanes'}
-      <section class="help-card">
-        <h2>{currentLang === 'bg' ? 'Работни потоци (Lanes) и организация' : 'Lanes & Queue Sections'}</h2>
-        
-        <div class="lanes-list">
-          <div class="lane-info-card">
-            <h3>📌 {currentLang === 'bg' ? 'Ръчно добавени (Pasted)' : 'Pasted Links'}</h3>
-            <p>
-              {currentLang === 'bg'
-                ? 'Всички видеа, чиито връзки сте поставили ръчно в горното поле. Те се обработват веднага с абсолютен приоритет и не се ограничават от дневния лимит.'
-                : 'All videos pasted manually by the user. They bypass background queues and receive immediate processing.'}
-            </p>
-          </div>
-
-          <div class="lane-info-card">
-            <h3>⭐ {currentLang === 'bg' ? 'Водещи новини (Leads)' : 'Leads'}</h3>
-            <p>
-              {currentLang === 'bg'
-                ? 'Видеа с проверими твърдения, сортирани по значимост, брой гледания и важност на темата. Това е основният входящ списък за проверка.'
-                : 'Highest ranking candidates filtered for factual claims and virality. Main triage feed.'}
-            </p>
-          </div>
-
-          <div class="lane-info-card">
-            <h3>🔍 {currentLang === 'bg' ? 'Вече проверени (Already Checked)' : 'Already Checked'}</h3>
-            <p>
-              {currentLang === 'bg'
-                ? 'Видеа, чиито твърдения напълно съвпадат с вече публикувани журналистически проверки на факти. Позволява бързо виждане на готовото опровержение.'
-                : 'Videos containing claims that already have published fact-checks in audited archives.'}
-            </p>
-          </div>
-
-          <div class="lane-info-card">
-            <h3>📉 {currentLang === 'bg' ? 'Нисък интерес / качество (Low Quality)' : 'Low Quality / Noise'}</h3>
-            <p>
-              {currentLang === 'bg'
-                ? 'Клипове с много ниско качество на звука (неясна реч, само музика) или с малко гледания под определения праг.'
-                : 'Videos with poor transcript clarity or views below the threshold.'}
-            </p>
-          </div>
-
-          <div class="lane-info-card">
-            <h3>🚫 {currentLang === 'bg' ? 'Отхвърлени (Screened Out)' : 'Screened Out'}</h3>
-            <p>
-              {currentLang === 'bg'
-                ? 'Видеа, в които липсват проверими фактически твърдения (напр. само танц, скеч, въпроси или лично мнение).'
-                : 'Videos screened out early due to lack of verifiable factual assertions.'}
-            </p>
-          </div>
-
-          <div class="lane-info-card">
-            <h3>⚠️ {currentLang === 'bg' ? 'Неуспешни (Failed)' : 'Failed'}</h3>
-            <p>
-              {currentLang === 'bg'
-                ? 'Видеа, които не са могли да бъдат изтеглени (изтрити от автора, заключени като лични или блокирани от мрежови грешки).'
-                : 'Videos that failed acquisition due to being deleted, private, or experiencing network errors.'}
-            </p>
-          </div>
-        </div>
-      </section>
-
-    {:else if activeSection === 'verdicts'}
-      <section class="help-card">
-        <h2>{currentLang === 'bg' ? 'Присъди и оценки на твърденията' : 'Fact-Check Verdicts'}</h2>
-        
-        <div class="verdict-guide">
-          <div class="verdict-row contradicted">
-            <span class="verdict-tag">CONTRADICTED</span>
-            <div class="verdict-desc">
-              <strong>{currentLang === 'bg' ? 'Опровергано / Невярно' : 'Contradicted'}</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Фактическото твърдение е в пряко противоречие с откритите официални данни, закони или проверка от поне два независими авторитетни източника.'
-                  : 'The statement directly contradicts official records or verified reporting from independent news outlets.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="verdict-row supported">
-            <span class="verdict-tag">SUPPORTED</span>
-            <div class="verdict-desc">
-              <strong>{currentLang === 'bg' ? 'Потвърдено' : 'Supported'}</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Твърдението се подкрепя от първични източници (правителствени регистри, НСИ, БНБ) или потвърдени съобщения.'
-                  : 'The assertion is corroborated by audited primary records or verified source publications.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="verdict-row unverifiable">
-            <span class="verdict-tag">UNVERIFIABLE</span>
-            <div class="verdict-desc">
-              <strong>{currentLang === 'bg' ? 'Непроверимо' : 'Unverifiable'}</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Твърдението е формулирано като факт, но в публичните източници липсва достатъчно надеждна информация за потвърждение или опровержение.'
-                  : 'Formulated as a fact, but insufficient credible public evidence exists to prove or disprove it.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="verdict-row not-checkable">
-            <span class="verdict-tag">NOT_CHECKABLE</span>
-            <div class="verdict-desc">
-              <strong>{currentLang === 'bg' ? 'Неподлежащо на проверка' : 'Not Checkable'}</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Изказването представлява субективно мнение, метафора, бъдеща прогноза или емоционална оценка, която не може да бъде измерена обективно.'
-                  : 'Subjective opinion, future speculation, artistic metaphor, or emotional statement.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="verdict-row already-checked">
-            <span class="verdict-tag">ALREADY_CHECKED</span>
-            <div class="verdict-desc">
-              <strong>{currentLang === 'bg' ? 'Вече проверено в архив' : 'Already Checked'}</strong>
-              <p>
-                {currentLang === 'bg'
-                  ? 'Открит е готов факт-чек от сертифицирана журналистическа медия с пряка препратка към статията.'
-                  : 'Exact match found in fact-checking database with direct link to published debunk.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    {:else if activeSection === 'dictionary'}
-      <section class="help-card">
-        <h2>{currentLang === 'bg' ? 'Параметри за потребителски речници, жаргон и диалекти' : 'Dictionary & Dialect Parameters'}</h2>
-        
-        <p class="intro-p">
-          {currentLang === 'bg'
-            ? 'Можете да обогатите системата със собствени разговорни думи, диалекти, сленг и чести грешки на Whisper. Те се добавят в конфигурацията `config/lexicon.bg.toml` или директно в текстовите списъци в `models/lexicon/`.'
-            : 'You can customize vocabulary, slang, dialect terms, and automatic Whisper corrections. Configuration is in `config/lexicon.bg.toml` and `models/lexicon/`.'}
-        </p>
-
-        <div class="param-box">
-          <h3>1. {currentLang === 'bg' ? 'Чести грешки на Whisper (ASR Repairs)' : 'Whisper ASR Confusion Pairs'}</h3>
-          <p>
+  <div class="help-scroll-wrapper" bind:this={scrollContainer}>
+    <div class="help-container">
+      <header class="help-header">
+        <div class="help-title-group">
+          <h1>{currentLang === 'bg' ? 'Помощен център и ръководство' : 'Help Center & Documentation'}</h1>
+          <p class="help-subtitle">
             {currentLang === 'bg'
-              ? 'Когато Whisper системно чува една дума грешно, посочете двойка `wrong` и `right`. Системата автоматично заменя сгрешената форма:'
-              : 'Direct drop-in replacements for words Whisper mishears:'}
+              ? 'Пълно ръководство за означенията, клавишните комбинации, оценките на твърденията и аналитичните справки.'
+              : 'Complete reference for badges, keyboard shortcuts, queue categories, assessments, and subject reports.'}
           </p>
-          <pre class="code-block"><code>[[asr_repairs]]
+        </div>
+      </header>
+
+      <div class="help-content">
+        <section id="help-sec-signs" class="help-card">
+          <h2>1. {currentLang === 'bg' ? 'Означения и кратки индикатори' : 'Single-Letter Badges & Indicators'}</h2>
+
+          <div class="definition-grid">
+            <div class="definition-item">
+              <div class="badge-display meter-q">Q</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Качество на стенограмата (Quality)' : 'Transcript Quality'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Показва яснотата на разпознатия говор (0–100%). При налични оригинални субтитри достига до 100%, а при гласово разпознаване отразява чистотата на звука.'
+                    : 'Measures transcript and audio clarity (0–100%). Videos with original captions reach ~100%.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display meter-c">C</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Значимост за проверка (Check-worthiness)' : 'Check-worthiness'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Оценява дали във видеото се изричат конкретни проверими факти (числа, дати, закони, решения на институции, събития) вместо лично мнение.'
+                    : 'Scores whether statements contain concrete verifiable facts rather than personal opinions.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display meter-e">E</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Сила на доказателствата (Evidence)' : 'Evidence Strength'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Измерва степента на съответствие и авторитетността на намерените външни източници — официални регистри, БТА, БНР и проверки на факти.'
+                    : 'Measures the authority and relevance of matched external primary records and news archives.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-topbar">Q: 14</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Чакащи задачи в опашката' : 'Queued Tasks'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Броят задачи, които изчакват обработка (изтегляне, стенограма, разпознаване на текст от екрана и проверка на твърдения).'
+                    : 'Number of pending jobs waiting in the local processing queue.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-topbar">R: 2</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Задачи в изпълнение' : 'Running Tasks'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Броят задачи, които се изпълняват паралелно в момента. Всички активни проучвания се виждат и в прозореца „Известия“.'
+                    : 'Number of worker tasks actively running right now. Also visible in the Notifications center.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-btn">R</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Допълнително проучване' : 'Research More'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Стартира разширено търсене по външни източници, публични регистри и история на автора.'
+                    : 'Triggers deeper retrieval across external archives, public registers, and creator history.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-btn">U</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Отмяна на последното действие' : 'Undo Last Action'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Връща последно запазеното или отхвърленото видео обратно в текущия списък.'
+                    : 'Immediately reverses your last keep or discard decision.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-special">ASR</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Автоматично разпознаване на реч' : 'Automatic Speech Recognition'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Показва, че стенограмата е извлечена автоматично от аудиозаписа чрез Whisper или Google Speech.'
+                    : 'Indicates the transcript was generated directly from video audio.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-special">{currentLang === 'bg' ? 'Субтитри' : 'Captions'}</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Оригинални субтитри' : 'Original Captions'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Видеото разполага с вградени субтитри в TikTok, които са извлечени директно.'
+                    : 'Original captions were retrieved directly from TikTok metadata.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-special">{currentLang === 'bg' ? '📌 Добавено' : '📌 Pasted'}</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Ръчно добавен адрес' : 'Manually Added Link'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Адресът е поставен ръчно от потребителя и се обработва с най-висок приоритет.'
+                    : 'Added manually by the user and processed with highest priority.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-special">{currentLang === 'bg' ? 'Проверено' : 'Checked'}</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Налична публикация за проверка' : 'Existing Fact-Check Match'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Открито е съвпадение с вече публикувана проверка във Factcheck.bg, БТА, БНР или международни редакции.'
+                    : 'Matched an existing published fact-check article from verified editorial sources.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="definition-item">
+              <div class="badge-display badge-special">⏳</div>
+              <div class="definition-body">
+                <strong>{currentLang === 'bg' ? 'Проучване в ход' : 'Ongoing Research'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Индикатор в горната лента и в „Известия“, показващ кои проучвания на обекти, автори или видеа се изпълняват в момента.'
+                    : 'Top-bar and Notification Center indicator showing live research tasks in progress.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="help-sec-actions" class="help-card">
+          <h2>2. {currentLang === 'bg' ? 'Клавишни комбинации и бърза навигация' : 'Keyboard Shortcuts & Navigation'}</h2>
+
+          <table class="help-table">
+            <thead>
+              <tr>
+                <th>{currentLang === 'bg' ? 'Клавиш' : 'Key'}</th>
+                <th>{currentLang === 'bg' ? 'Действие' : 'Action'}</th>
+                <th>{currentLang === 'bg' ? 'Описание' : 'Description'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><kbd>J</kbd></td>
+                <td>{currentLang === 'bg' ? 'Следващо видео' : 'Next Video'}</td>
+                <td>{currentLang === 'bg' ? 'Преминава към следващата карта в списъка.' : 'Moves selection down to the next card.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>K</kbd></td>
+                <td>{currentLang === 'bg' ? 'Предишно видео' : 'Previous Video'}</td>
+                <td>{currentLang === 'bg' ? 'Връща се към предходната карта в списъка.' : 'Moves selection up to the previous card.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>Space</kbd></td>
+                <td>{currentLang === 'bg' ? 'Детайлен панел' : 'Toggle Detail Panel'}</td>
+                <td>{currentLang === 'bg' ? 'Отваря или затваря панела за преглед на съдържанието и доказателствата.' : 'Opens or closes the video detail panel and player.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>Enter</kbd></td>
+                <td>{currentLang === 'bg' ? 'Запази' : 'Keep Video'}</td>
+                <td>{currentLang === 'bg' ? 'Отбелязва видеото като важно и го запазва за последваща работа или експорт.' : 'Marks the video as important and saves it for export.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>Backspace</kbd></td>
+                <td>{currentLang === 'bg' ? 'Отхвърли' : 'Discard Video'}</td>
+                <td>{currentLang === 'bg' ? 'Премества видеото извън активния списък.' : 'Removes the video from the current active queue.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>R</kbd></td>
+                <td>{currentLang === 'bg' ? 'Проучи' : 'Research More'}</td>
+                <td>{currentLang === 'bg' ? 'Стартира допълнително търсене на документи и проверка на автора.' : 'Starts additional source retrieval and creator verification.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>U</kbd></td>
+                <td>{currentLang === 'bg' ? 'Отмени' : 'Undo'}</td>
+                <td>{currentLang === 'bg' ? 'Връща последно премахнатото или запазеното видео.' : 'Restores the last kept or discarded video.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>/</kbd></td>
+                <td>{currentLang === 'bg' ? 'Търсене' : 'Search'}</td>
+                <td>{currentLang === 'bg' ? 'Поставя курсора в полето за търсене.' : 'Moves focus to the search input.'}</td>
+              </tr>
+              <tr>
+                <td><kbd>Esc</kbd></td>
+                <td>{currentLang === 'bg' ? 'Затвори' : 'Close'}</td>
+                <td>{currentLang === 'bg' ? 'Затваря отворения прозорец или детайлния панел.' : 'Closes active modal or detail panel.'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="help-sec-lanes" class="help-card">
+          <h2>3. {currentLang === 'bg' ? 'Категории списъци във входящата кутия' : 'Inbox Queue Categories'}</h2>
+
+          <div class="lanes-list">
+            <div class="lane-info-card">
+              <h3>📌 {currentLang === 'bg' ? 'Ръчно добавени' : 'Manually Added'}</h3>
+              <p>
+                {currentLang === 'bg'
+                  ? 'Видеа, чиито адреси са поставени ръчно в горното поле. Обработват се незабавно с най-висок приоритет.'
+                  : 'Videos pasted manually by the user, processed immediately with top priority.'}
+              </p>
+            </div>
+
+            <div class="lane-info-card">
+              <h3>⭐ {currentLang === 'bg' ? 'Важни видеа' : 'Priority Videos'}</h3>
+              <p>
+                {currentLang === 'bg'
+                  ? 'Видеа с конкретни проверими твърдения, подредени по обществена значимост, разпространение и сила на доказателствата.'
+                  : 'Videos with verifiable factual claims sorted by public relevance and reach.'}
+              </p>
+            </div>
+
+            <div class="lane-info-card">
+              <h3>🔍 {currentLang === 'bg' ? 'Вече проверени' : 'Already Checked'}</h3>
+              <p>
+                {currentLang === 'bg'
+                  ? 'Видеа, за чиито твърдения вече има публикувана журналистическа проверка с пряка връзка към статията.'
+                  : 'Videos matching already published fact-checks in verified archives.'}
+              </p>
+            </div>
+
+            <div class="lane-info-card">
+              <h3>📉 {currentLang === 'bg' ? 'Ниско качество' : 'Low Quality'}</h3>
+              <p>
+                {currentLang === 'bg'
+                  ? 'Клипове с неясен звук, само музика или брой гледания под зададения праг.'
+                  : 'Clips with poor audio clarity or minimal reach.'}
+              </p>
+            </div>
+
+            <div class="lane-info-card">
+              <h3>🚫 {currentLang === 'bg' ? 'Без фактически твърдения' : 'Screened Out'}</h3>
+              <p>
+                {currentLang === 'bg'
+                  ? 'Видеа без конкретни проверими факти (развлекателни клипове, шеги или общи коментари).'
+                  : 'Videos without concrete verifiable factual assertions.'}
+              </p>
+            </div>
+
+            <div class="lane-info-card">
+              <h3>⚠️ {currentLang === 'bg' ? 'Неуспешно изтегляне' : 'Failed Download'}</h3>
+              <p>
+                {currentLang === 'bg'
+                  ? 'Видеа, които са изтрити, ограничени от автора или недостъпни поради мрежова грешка.'
+                  : 'Videos unavailable due to deletion, privacy settings, or network failure.'}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="help-sec-verdicts" class="help-card">
+          <h2>4. {currentLang === 'bg' ? 'Оценки на твърденията' : 'Claim Assessments'}</h2>
+
+          <div class="verdict-guide">
+            <div class="verdict-row contradicted">
+              <span class="verdict-tag">ОПРОВЕРГАНО</span>
+              <div class="verdict-desc">
+                <strong>{currentLang === 'bg' ? 'Опровергано от външни документи' : 'Contradicted'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Твърдението противоречи пряко на официални регистри, нормативни актове, стенограми или независими журналистически проверки с цитиран външен адрес.'
+                    : 'Directly contradicted by official records, legislation, or independent fact-checks with cited external URLs.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="verdict-row supported">
+              <span class="verdict-tag">ПОТВЪРДЕНО</span>
+              <div class="verdict-desc">
+                <strong>{currentLang === 'bg' ? 'Потвърдено от първични източници' : 'Supported'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Твърдението съответства на данните в официални институционални източници (НСИ, БНБ, Търговски регистър, съдебни актове) или потвърдени агенционни новини.'
+                    : 'Corroborated by official institutional records or verified news dispatches.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="verdict-row unverifiable">
+              <span class="verdict-tag">НЕПРОВЕРИМО</span>
+              <div class="verdict-desc">
+                <strong>{currentLang === 'bg' ? 'Недостатъчно публични данни' : 'Unverifiable'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Изказването съдържа конкретно твърдение, но в откритите източници липсват преки първични документи за неговото потвърждаване или опровергаване.'
+                    : 'Formulated as a factual claim, but external primary records are insufficient to confirm or refute it.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="verdict-row not-checkable">
+              <span class="verdict-tag">МНЕНИЕ</span>
+              <div class="verdict-desc">
+                <strong>{currentLang === 'bg' ? 'Неподлежащо на фактическа проверка' : 'Not Checkable'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Лична оценка, коментар, прогноза или реторичен въпрос без проверими фактически величини.'
+                    : 'Personal opinion, commentary, or future prediction.'}
+                </p>
+              </div>
+            </div>
+
+            <div class="verdict-row already-checked">
+              <span class="verdict-tag">ВЕЧЕ ПРОВЕРЕНО</span>
+              <div class="verdict-desc">
+                <strong>{currentLang === 'bg' ? 'Налична архивна проверка' : 'Already Checked'}</strong>
+                <p>
+                  {currentLang === 'bg'
+                    ? 'Твърдението вече е разгледано в публикувана статия за проверка на факти с директна препратка.'
+                    : 'Already covered in a published fact-check article with direct citation.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="help-sec-subjects" class="help-card">
+          <h2>5. {currentLang === 'bg' ? 'Типове обекти и аналитични справки' : 'Subject Types & Analytical Reports'}</h2>
+          <p class="intro-p">
+            {currentLang === 'bg'
+              ? 'Разделът „Лица и обекти“ поддържа 8 типа субекти: Личност (👤), Институция (🏛️), Канал / Медия (📺), Държава (🌍), Група / Партия (👥), Събитие (📅), Инфраструктура (🛣️ — магистрали, мостове, язовири, жп линии, централи) и Сграда / Обект (🏢 — болници, училища, паметници на културата, комплекси).'
+              : 'The People & Subjects workspace supports 8 entity types: Person, Institution, Channel / Media, Country, Group / Party, Event, Infrastructure, and Building / Facility.'}
+          </p>
+          <p class="intro-p">
+            {currentLang === 'bg'
+              ? 'Всяка аналитична справка включва странично „Съдържание“ за бързо преминаване към отделна глава (напр. Глава 2 за Търговския регистър, АОП и имуществени декларации или Глава 5 за съдебни дела, КПКОНПИ, ДНСК и санкции), както и автоматично цветно открояване: датите са отбелязани в зелено, ЕИК/дела/решения в синьо, парични суми и дялове в кехлибарено, а дружества и контролни органи в индиго.'
+              : 'Every analytical report includes a Book-Reader Table of Contents for instant chapter navigation and automatic highlighting: dates in green, registry/case IDs in blue, monetary amounts in amber, and companies/oversight bodies in indigo.'}
+          </p>
+        </section>
+
+        <section id="help-sec-dictionary" class="help-card">
+          <h2>6. {currentLang === 'bg' ? 'Потребителски речник и езикови поправки' : 'Custom Dictionary & ASR Repairs'}</h2>
+
+          <p class="intro-p">
+            {currentLang === 'bg'
+              ? 'Можете да добавяте собствени поправки за често сгрешени думи при гласово разпознаване, разговорни изрази и защитени съкращения във файла config/lexicon.bg.toml.'
+              : 'Configure custom Whisper corrections, dialect mappings, and protected acronyms in config/lexicon.bg.toml.'}
+          </p>
+
+          <div class="param-box">
+            <h3>1. {currentLang === 'bg' ? 'Автоматични поправки при разпознаване на говор' : 'ASR Word Repairs'}</h3>
+            <p>
+              {currentLang === 'bg'
+                ? 'Двойки със сгрешена и правилна форма, които се заменят автоматично:'
+                : 'Drop-in replacements for recurring speech recognition errors:'}
+            </p>
+            <pre class="code-block"><code>[[asr_repairs]]
 wrong = "февро"
 right = "в евро"
 
 [[asr_repairs]]
 wrong = "дересе"
-right = "ДДС"
+right = "ДДС"</code></pre>
+          </div>
 
-[[asr_repairs]]
-wrong = "союза"
-right = "съюза"</code></pre>
-        </div>
-
-        <div class="param-box">
-          <h3>2. {currentLang === 'bg' ? 'Диалектни и разговорни думи (Dialect Glossary)' : 'Dialect & Slang Glossary'}</h3>
-          <p>
-            {currentLang === 'bg'
-              ? 'За разговорни думи и диалекти се дефинира терминът (`term`) и стандартното книжовно значение (`standard`):'
-              : 'Map informal or regional terms to standard Bulgarian vocabulary:'}
-          </p>
-          <pre class="code-block"><code>[[dialect_glossary]]
-term = "маняк"
-standard = "човек"
-
-[[dialect_glossary]]
+          <div class="param-box">
+            <h3>2. {currentLang === 'bg' ? 'Разговорни и диалектни думи' : 'Dialect & Colloquial Terms'}</h3>
+            <p>
+              {currentLang === 'bg'
+                ? 'Съответствие между разговорна дума и книжовно значение:'
+                : 'Mapping informal terms to standard Bulgarian:'}
+            </p>
+            <pre class="code-block"><code>[[dialect_glossary]]
 term = "демек"
 standard = "тоест"
 
 [[dialect_glossary]]
 term = "скивай"
-standard = "виж"
+standard = "виж"</code></pre>
+          </div>
 
-[[dialect_glossary]]
-term = "чуек"
-standard = "човек"</code></pre>
-        </div>
-
-        <div class="param-box">
-          <h3>3. {currentLang === 'bg' ? 'Защитени думи и теми (Domain Vocabulary)' : 'Domain Vocabulary'}</h3>
-          <p>
-            {currentLang === 'bg'
-              ? 'Списък от термини, имена и съкращения, които нормализаторът никога не трябва да променя или преправя:'
-              : 'Words and acronyms that must always be recognized as valid:'}
-          </p>
-          <pre class="code-block"><code>domain_vocabulary = [
-  "еврозоната", "инфлация", "ДДС", "НСИ", "БНБ", "НОИ", "КЕВР",
-  "вайб", "криндж", "подкаст", "инфлуенсър", "бийф"
+          <div class="param-box">
+            <h3>3. {currentLang === 'bg' ? 'Защитени термини и съкращения' : 'Protected Acronyms & Terms'}</h3>
+            <p>
+              {currentLang === 'bg'
+                ? 'Имена на институции и термини, които не се променят при автоматична обработка:'
+                : 'Acronyms and terms preserved verbatim:'}
+            </p>
+            <pre class="code-block"><code>domain_vocabulary = [
+  "еврозоната", "инфлация", "ДДС", "НСИ", "БНБ", "НОИ", "КЕВР", "КПКОНПИ", "ДНСК", "АПИ"
 ]</code></pre>
-        </div>
-      </section>
-    {/if}
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
-</div>
 </div>
 
 <style>
+  .help-reader-layout {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    overflow: hidden;
+    background: var(--bg-canvas);
+  }
+
   .help-scroll-wrapper {
     flex: 1 1 0;
     min-height: 0;
@@ -490,7 +472,6 @@ standard = "човек"</code></pre>
     overflow-x: hidden;
     background: var(--bg-canvas);
     box-sizing: border-box;
-    -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     outline: none;
     scrollbar-width: thin;
@@ -510,30 +491,28 @@ standard = "човек"</code></pre>
     border-radius: 4px;
   }
 
-  .help-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-    background: var(--text-muted);
-  }
-
   .help-container {
-    max-width: 1040px;
+    max-width: 1080px;
     width: 100%;
     margin: 0 auto;
-    padding: 1.5rem 1rem 4rem 1rem;
+    padding: 1.5rem 1.25rem 4rem 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
     box-sizing: border-box;
-    min-height: min-content;
+  }
+
+  .help-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
   }
 
   .help-header {
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    padding: 1.2rem 1.5rem;
   }
 
   .help-title-group h1 {
@@ -549,54 +528,23 @@ standard = "човек"</code></pre>
     color: var(--text-muted);
   }
 
-  .help-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    border-top: 1px solid var(--border-color);
-    padding-top: 0.75rem;
-  }
-
-  .help-nav-btn {
-    padding: 0.4rem 0.85rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: var(--surface-bg);
-    color: var(--text-body);
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .help-nav-btn:hover {
-    background: var(--hover-bg);
-    border-color: var(--primary-accent);
-  }
-
-  .help-nav-btn.active {
-    background: var(--primary-accent);
-    color: #fff;
-    border-color: var(--primary-accent);
-  }
-
   .help-card {
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1.5rem;
+    padding: 1.4rem 1.5rem;
   }
 
   .help-card h2 {
-    margin: 0 0 1.25rem 0;
-    font-size: 1.15rem;
+    margin: 0 0 1.15rem 0;
+    font-size: 1.12rem;
     color: var(--text-heading);
   }
 
   .definition-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 0.9rem;
   }
 
   .definition-item {
@@ -610,14 +558,15 @@ standard = "човек"</code></pre>
   }
 
   .badge-display {
-    min-width: 36px;
+    min-width: 38px;
     height: 36px;
+    padding: 0 6px;
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 800;
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     flex-shrink: 0;
   }
 
@@ -643,7 +592,7 @@ standard = "човек"</code></pre>
     background: var(--pill-bg);
     border: 1px solid var(--border-color);
     font-size: 0.75rem;
-    min-width: 50px;
+    min-width: 52px;
   }
 
   .badge-btn {
@@ -654,7 +603,7 @@ standard = "човек"</code></pre>
 
   .badge-special {
     font-size: 0.72rem;
-    min-width: 58px;
+    min-width: 68px;
     background: rgba(0, 0, 0, 0.06);
     border: 1px solid var(--border-color);
   }
@@ -747,7 +696,7 @@ standard = "човек"</code></pre>
   }
 
   .verdict-tag {
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     font-weight: 700;
     padding: 0.25rem 0.6rem;
     border-radius: 999px;
@@ -793,14 +742,14 @@ standard = "човек"</code></pre>
   }
 
   .intro-p {
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.85rem 0;
     font-size: 0.85rem;
     color: var(--text-body);
-    line-height: 1.45;
+    line-height: 1.5;
   }
 
   .param-box {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
     padding: 0.85rem 1rem;
     border-radius: 6px;
     border: 1px solid var(--border-color);

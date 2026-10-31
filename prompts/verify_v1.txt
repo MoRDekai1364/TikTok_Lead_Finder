@@ -13,20 +13,29 @@
 4. ЗАБРАНА ЗА ДЕМОГРАФСКИ И ИСТОРИЧЕСКИ ЗАБЛУДИ:
    Общото или историческо население на даден град или държава от енциклопедии (напр. жители на Париж през 1800 г. или днес) НЕ доказва и НЕ опровергава броя на участниците в конкретен протест, стачка, митинг или инцидент! Пасажи с обща демография, преброявания или история са ИРЕЛЕВАНТНИ за събитийни твърдения и ТРЯБВА да се игнорират. Ако няма надеждни данни за самото събитие, вердиктът ЗАДЪЛЖИТЕЛНО е "UNVERIFIABLE".
 5. Възможни стойности за label:
-   - "false_claim", "misleading", "missing_context", "satire_or_opinion", "unknown".
+   - "false_claim", "misleading", "missing_context", "satire_or_opinion", "supported", "unverifiable", "unknown".
    - НИКОГА не използвай думата "disinformation" — умисълът не може да бъде доказан.
 6. За всяко използвано доказателство в масива evidence посочи ТОЧНИЯ passage_id от списъка и stance ("supports", "contradicts" или "neutral"). Не измисляй passage_id!
-7. В полето reasoning_bg дай ясно и доказателствено обяснение на български език (1-2 изречения), в което ЗАДЪЛЖИТЕЛНО цитирай конкретния източник и точния му пълен URL адрес от реда "Източник URL:" (напр. "Според публикация в [URL]..."). Ако твърдението е UNVERIFIABLE, посочи защо липсва документално доказателство.
+7. ПОЕЛЕМЕНТЕН АНАЛИЗ (statement_checks) И ОБОБЩЕНИЕ (reasoning_bg):
+   - В масива statement_checks раздели твърдението на отделните му проверими елементи/подтвърдения (напр. отделно за всяка цифра, място, действие или приписан цитат) и оцени ВСЯКО подтвърдение поотделно със собствен status ("SUPPORTED", "CONTRADICTED" или "UNVERIFIABLE"). В check_bg дай кратко доказателство за конкретния елемент с пасаж (напр. p1) и точния URL адрес.
+   - В полето reasoning_bg дай цялостното заключително обобщение на български език (1-3 изречения), в което ЗАДЪЛЖИТЕЛНО цитирай конкретния източник и точния му пълен URL адрес от реда "Източник URL:". Ако твърдението е UNVERIFIABLE, посочи защо липсва документално доказателство.
 8. Полето evidence_strength е число от 0.0 до 1.0 (сила, категоричност и релевантност на намерените доказателства).
 
 Върни САМО валиден JSON обект със следната структура:
 {
   "claim_id": 1,
   "verdict": "SUPPORTED|CONTRADICTED|UNVERIFIABLE|NOT_CHECKABLE|ALREADY_CHECKED",
-  "label": "false_claim|misleading|missing_context|satire_or_opinion|unknown",
+  "label": "false_claim|misleading|missing_context|satire_or_opinion|supported|unverifiable|unknown",
   "evidence": [
     { "passage_id": "p1", "stance": "supports|contradicts|neutral" }
   ],
-  "reasoning_bg": "...",
+  "statement_checks": [
+    {
+      "statement_bg": "Конкретен елемент от твърдението",
+      "status": "SUPPORTED|CONTRADICTED|UNVERIFIABLE",
+      "check_bg": "Кратка проверка за този елемент с цитиран пасаж p1 и пълен URL."
+    }
+  ],
+  "reasoning_bg": "Цялостно обобщение на проверката с цитирани източници и URL адреси.",
   "evidence_strength": 0.85
 }

@@ -9,6 +9,8 @@
   import { translations } from '../lib/i18n';
   import type { BenchmarkProgress, BenchmarkStatusResponse, HardwareProfile, PowerInfo } from '../lib/types';
   import { getCapacityTierInfo } from '../lib/types';
+  import BookReaderToc from './BookReaderToc.svelte';
+  import type { TocItem } from './BookReaderToc.svelte';
 
   let {
     currentLang,
@@ -23,6 +25,18 @@
   let status = $state<BenchmarkStatusResponse | null>(null);
   let isCalibrating = $state(false);
   let isSavingOverrides = $state(false);
+  let calibScrollEl = $state<HTMLDivElement | null>(null);
+
+  const calibTocItems = $derived.by((): TocItem[] => {
+    const bg = currentLang === 'bg';
+    return [
+      { id: 'cal-power', label: bg ? 'Захранване' : 'Power Mode' },
+      { id: 'cal-ac', label: bg ? 'Профил в мрежата (AC)' : 'AC Profile' },
+      { id: 'cal-battery', label: bg ? 'Профил на батерия' : 'Battery Profile' },
+      { id: 'cal-hardware', label: bg ? 'Хардуер' : 'Hardware' },
+      { id: 'cal-overrides', label: bg ? 'Ръчни настройки' : 'Manual Settings' },
+    ];
+  });
 
   let asrOverride = $state('');
   let llmProviderOverride = $state('');
@@ -125,13 +139,13 @@
   }
 </script>
 
-<div class="screen-container">
+<div class="screen-container" bind:this={calibScrollEl}>
   <div class="screen-header">
     <div class="header-left">
       <h2>{t.tabCalibration}</h2>
       <span class="sub-text">
         {currentLang === 'bg'
-          ? 'Двупрофилно хардуерно калибриране: Мрежово захранване (AC) и Батерия'
+          ? 'Настройка на производителността за работа на зарядно (AC) и на батерия'
           : 'Dual-Profile Hardware Calibration: AC Power vs. Battery Mode'}
       </span>
     </div>
@@ -149,7 +163,14 @@
     {/if}
   </div>
 
-  <div class="power-status-banner">
+  <BookReaderToc
+    variant="compact"
+    items={calibTocItems}
+    scrollContainer={calibScrollEl}
+    title={currentLang === 'bg' ? 'Съдържание' : 'Contents'}
+  />
+
+  <div id="cal-power" class="power-status-banner">
     <div class="psb-icon">
       {power?.power_source === 'battery' ? '🔋' : '⚡'}
     </div>
@@ -158,7 +179,7 @@
         <strong class="psb-title">
           {power?.power_source === 'battery'
             ? (currentLang === 'bg' ? 'Текущ режим: Работа на батерия' : 'Current Mode: Battery Power')
-            : (currentLang === 'bg' ? 'Текущ режим: Мрежово захранване (AC Plugged In)' : 'Current Mode: AC Power')}
+            : (currentLang === 'bg' ? 'Текущ режим: Мрежово захранване' : 'Current Mode: AC Power')}
         </strong>
         {#if power?.battery_percent !== null && power?.battery_percent !== undefined}
           <span class="battery-pct-pill">{power.battery_percent}%</span>
@@ -166,7 +187,7 @@
       </div>
       <p class="psb-desc">
         {currentLang === 'bg'
-          ? 'LeadFinder съхранява 2 отделни калибрационни профила. При включване на зарядното системата автоматично задейства високоскоростния AC профил, а на батерия ограничава фоновата конкурентност за пестене на енергия.'
+          ? 'Системата поддържа два отделни профила. При включено зарядно използва пълната скорост на компютъра, а на батерия намалява паралелните задачи за пестене на енергия.'
           : 'LeadFinder maintains 2 distinct profiles. When plugged into AC power, high-throughput settings run; on battery, concurrency is tuned down to preserve battery life.'}
       </p>
     </div>
@@ -178,7 +199,7 @@
         <div class="apc-left">
           <span class="pulsing-dot"></span>
           <span class="apc-title">
-            {currentLang === 'bg' ? 'В процес на хардуерен бенчмарк...' : 'Hardware benchmark running...'}
+            {currentLang === 'bg' ? 'Измерване на скоростта в ход...' : 'Hardware benchmark running...'}
           </span>
           <span class="apc-stage mono">
             ({progress.stage_index}/{progress.total_stages}) {currentLang === 'bg' ? progress.status_text : (progress.status_text_en || progress.status_text)}
@@ -200,7 +221,7 @@
   {/if}
 
   <div class="dual-profiles-grid">
-    <div class="profile-card" class:active-mode={power?.power_source !== 'battery'}>
+    <div id="cal-ac" class="profile-card" class:active-mode={power?.power_source !== 'battery'}>
       <div class="pc-header">
         <div class="pc-title-group">
           <span class="pc-icon">⚡</span>
@@ -245,7 +266,7 @@
           <div class="tier-card-snippet tier-{acTier.badgeClass}">
             <div class="tcs-top">
               <span class="tcs-badge">{acTier.icon} {acTier.tierName}</span>
-              <span class="tcs-target">{acTier.percentOfTarget}% {currentLang === 'bg' ? 'от таргета' : 'of target'}</span>
+              <span class="tcs-target">{acTier.percentOfTarget}% {currentLang === 'bg' ? 'от целта' : 'of target'}</span>
             </div>
             <p class="tcs-desc">{acTier.explanation}</p>
             <div class="tcs-stats">
@@ -260,23 +281,23 @@
           onclick={() => handleStartBenchmark('ac')}
           disabled={isCalibrating || progress?.is_running}
         >
-          ⚡ {currentLang === 'bg' ? 'Повтори AC бенчмарка' : 'Re-run AC Benchmark'}
+          ⚡ {currentLang === 'bg' ? 'Измери отново (AC)' : 'Re-run AC Benchmark'}
         </button>
       {:else}
         <div class="empty-profile-state">
-          <p>{currentLang === 'bg' ? 'Все още няма калибриран профил за мрежово захранване.' : 'No AC power profile calibrated yet.'}</p>
+          <p>{currentLang === 'bg' ? 'Все още няма измерен профил за мрежово захранване.' : 'No AC power profile calibrated yet.'}</p>
           <button
             class="btn btn-primary"
             onclick={() => handleStartBenchmark('ac')}
             disabled={isCalibrating || progress?.is_running}
           >
-            ⚡ {currentLang === 'bg' ? 'Стартирай AC бенчмарк' : 'Run AC Benchmark'}
+            ⚡ {currentLang === 'bg' ? 'Измери скоростта (AC)' : 'Run AC Benchmark'}
           </button>
         </div>
       {/if}
     </div>
 
-    <div class="profile-card" class:active-mode={power?.power_source === 'battery'}>
+    <div id="cal-battery" class="profile-card" class:active-mode={power?.power_source === 'battery'}>
       <div class="pc-header">
         <div class="pc-title-group">
           <span class="pc-icon">🔋</span>
@@ -321,7 +342,7 @@
           <div class="tier-card-snippet tier-{batteryTier.badgeClass}">
             <div class="tcs-top">
               <span class="tcs-badge">{batteryTier.icon} {batteryTier.tierName}</span>
-              <span class="tcs-target">{batteryTier.percentOfTarget}% {currentLang === 'bg' ? 'от таргета' : 'of target'}</span>
+              <span class="tcs-target">{batteryTier.percentOfTarget}% {currentLang === 'bg' ? 'от целта' : 'of target'}</span>
             </div>
             <p class="tcs-desc">{batteryTier.explanation}</p>
             <div class="tcs-stats">
@@ -336,17 +357,17 @@
           onclick={() => handleStartBenchmark('battery')}
           disabled={isCalibrating || progress?.is_running}
         >
-          🔋 {currentLang === 'bg' ? 'Повтори бенчмарка за батерия' : 'Re-run Battery Benchmark'}
+          🔋 {currentLang === 'bg' ? 'Измери отново (батерия)' : 'Re-run Battery Benchmark'}
         </button>
       {:else}
         <div class="empty-profile-state">
-          <p>{currentLang === 'bg' ? 'Все още няма калибриран профил за работа на батерия.' : 'No battery profile calibrated yet.'}</p>
+          <p>{currentLang === 'bg' ? 'Все още няма измерен профил за работа на батерия.' : 'No battery profile calibrated yet.'}</p>
           <button
             class="btn btn-primary"
             onclick={() => handleStartBenchmark('battery')}
             disabled={isCalibrating || progress?.is_running}
           >
-            🔋 {currentLang === 'bg' ? 'Стартирай бенчмарк за батерия' : 'Run Battery Benchmark'}
+            🔋 {currentLang === 'bg' ? 'Измери скоростта (батерия)' : 'Run Battery Benchmark'}
           </button>
         </div>
       {/if}
@@ -354,7 +375,7 @@
   </div>
 
   <div class="grid-layout">
-    <div class="section-card">
+    <div id="cal-hardware" class="section-card">
       <h3>{currentLang === 'bg' ? 'Открит хардуер на системата' : 'Detected System Hardware'}</h3>
       {#if activeProfile}
         <div class="hw-spec-list">
@@ -373,16 +394,16 @@
             </div>
           {/each}
           <div class="spec-row">
-            <span class="spec-label">{currentLang === 'bg' ? 'Бекенди:' : 'Compute Backends:'}</span>
+            <span class="spec-label">{currentLang === 'bg' ? 'Ускорение:' : 'Compute Backends:'}</span>
             <span class="spec-val">{activeProfile.hardware.compute_backends.join(', ')}</span>
           </div>
         </div>
       {:else}
-        <p class="text-muted">{currentLang === 'bg' ? 'Хардуерът ще бъде идентифициран при първото калибриране.' : 'Hardware specs will be probed upon initial calibration.'}</p>
+        <p class="text-muted">{currentLang === 'bg' ? 'Хардуерът ще бъде разпознат при първото измерване.' : 'Hardware specs will be probed upon initial calibration.'}</p>
       {/if}
     </div>
 
-    <div class="section-card">
+    <div id="cal-overrides" class="section-card">
       <h3>{currentLang === 'bg' ? 'Ръчни настройки и презаписване' : 'Effective Models & Overrides'}</h3>
       <div class="overrides-form">
         <label>

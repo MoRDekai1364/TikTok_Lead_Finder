@@ -29,11 +29,20 @@ pub struct VerificationStageReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RawStatementCheck {
+    pub statement_bg: String,
+    pub status: String,
+    pub check_bg: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawVerificationLlmOutput {
     pub claim_id: i64,
     pub verdict: String,
     pub label: String,
     pub evidence: Vec<RawEvidenceRef>,
+    #[serde(default)]
+    pub statement_checks: Vec<RawStatementCheck>,
     pub reasoning_bg: String,
     pub evidence_strength: f64,
 }
@@ -47,7 +56,7 @@ pub struct RawEvidenceRef {
 pub fn verification_output_json_schema() -> Value {
     json!({
         "type": "object",
-        "required": ["claim_id", "verdict", "label", "evidence", "reasoning_bg", "evidence_strength"],
+        "required": ["claim_id", "verdict", "label", "evidence", "statement_checks", "reasoning_bg", "evidence_strength"],
         "additionalProperties": false,
         "properties": {
             "claim_id": { "type": "integer" },
@@ -68,6 +77,19 @@ pub fn verification_output_json_schema() -> Value {
                     "properties": {
                         "passage_id": { "type": "string", "minLength": 2 },
                         "stance": { "type": "string", "enum": ["supports", "contradicts", "neutral"] }
+                    }
+                }
+            },
+            "statement_checks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["statement_bg", "status", "check_bg"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "statement_bg": { "type": "string", "minLength": 2 },
+                        "status": { "type": "string", "enum": ["SUPPORTED", "CONTRADICTED", "UNVERIFIABLE"] },
+                        "check_bg": { "type": "string", "minLength": 4 }
                     }
                 }
             },
@@ -312,6 +334,39 @@ pub fn enforce_verification_rules(
         forced_reason = Some("no_valid_passage_ids_forced_unverifiable".to_string());
     }
 
+    if !raw_output.statement_checks.is_empty()
+        && forced_reason.as_deref() != Some("demographic_fallacy_detected")
+    {
+        let downgrade_all = matches!(
+            forced_reason.as_deref(),
+            Some("missing_external_source_url")
+                | Some("no_valid_passage_ids_forced_unverifiable")
+                | Some("intra_video_dispute_unverifiable")
+        );
+        let mut lines = Vec::new();
+        for sc in &raw_output.statement_checks {
+            let st_txt = sc.statement_bg.trim().replace('\n', " ");
+            let ch_txt = sc.check_bg.trim().replace('\n', " ");
+            if st_txt.is_empty() && ch_txt.is_empty() {
+                continue;
+            }
+            let tag = if downgrade_all {
+                "[НЕПРОВЕРИМО]"
+            } else {
+                match sc.status.trim().to_uppercase().as_str() {
+                    "SUPPORTED" => "[ПОТВЪРДЕНО]",
+                    "CONTRADICTED" => "[ОПРОВЕРГАНО]",
+                    _ => "[НЕПРОВЕРИМО]",
+                }
+            };
+            lines.push(format!("{tag} {st_txt} :: {ch_txt}"));
+        }
+        if !lines.is_empty() {
+            lines.push(format!("[ОБОБЩЕНИЕ] {reasoning}"));
+            reasoning = lines.join("\n");
+        }
+    }
+
     (verdict, label, stored_evidence, reasoning, strength, forced_reason)
 }
 
@@ -398,6 +453,7 @@ impl PipelineContext {
                 verdict: "NOT_CHECKABLE".to_string(),
                 label: "satire_or_opinion".to_string(),
                 evidence: Vec::new(),
+                statement_checks: Vec::new(),
                 reasoning_bg: "Субективно мнение или оценка.".to_string(),
                 evidence_strength: 0.0,
             };
@@ -600,6 +656,7 @@ impl PipelineContext {
                     verdict: "UNVERIFIABLE".to_string(),
                     label: "unverifiable".to_string(),
                     evidence: Vec::new(),
+                    statement_checks: Vec::new(),
                     reasoning_bg: "Няма намерени пасажи".to_string(),
                     evidence_strength: 0.0,
                 };
@@ -648,7 +705,7 @@ impl PipelineContext {
                     user_prompt,
                     json_schema: Some(verification_output_json_schema()),
                     temperature: 0.0,
-                    max_tokens: 1536,
+                    max_tokens: 2048,
                 };
                 let validated = runner.complete_validated(&llm_req, &self.db).await?;
                 let raw_parsed: RawVerificationLlmOutput =
@@ -979,6 +1036,7 @@ mod tests {
                 passage_id: "p1".to_string(),
                 stance: "contradicts".to_string(),
             }],
+            statement_checks: Vec::new(),
             reasoning_bg: "Опровергава се, тъй като според https://factcheck.bg/sample населението на Париж през 1800 г. е било 500 000 жители.".to_string(),
             evidence_strength: 0.9,
         };
@@ -987,5 +1045,63 @@ mod tests {
         assert_eq!(verdict, "UNVERIFIABLE");
         assert_eq!(label, "unverifiable");
         assert_eq!(forced.as_deref(), Some("demographic_fallacy_detected"));
+    }
+
+    #[test]
+    fn statement_checks_format_per_statement_and_summary() {
+        let claim = Claim {
+            id: 43,
+            video_id: "7697938534824430870".to_string(),
+            text_bg: "1200 арестувани и 150 ранени полицаи при протестите във Франция.".to_string(),
+            claim_type: "factual".to_string(),
+            speaker: None,
+            attribution: vec![],
+            start_ms: Some(1000),
+            end_ms: Some(8000),
+            checkworthiness: Some(0.9),
+            verdict: None,
+            label: None,
+            reasoning_bg: None,
+            evidence_strength: None,
+            verified_at: None,
+            cluster_id: None,
+        };
+        let passages = vec![RankedPassage {
+            passage_id: "p1".to_string(),
+            source_url: "https://factcheck.bg/france-protests".to_string(),
+            source_name: Some("Factcheck.bg".to_string()),
+            source_kind: "factcheck".to_string(),
+            published_at: Some("2026-10-18".to_string()),
+            text: "Според МВР има 850 арестувани и 150 ранени полицаи.".to_string(),
+            score: 1.4,
+        }];
+        let raw = RawVerificationLlmOutput {
+            claim_id: 43,
+            verdict: "CONTRADICTED".to_string(),
+            label: "misleading".to_string(),
+            evidence: vec![RawEvidenceRef {
+                passage_id: "p1".to_string(),
+                stance: "contradicts".to_string(),
+            }],
+            statement_checks: vec![
+                RawStatementCheck {
+                    statement_bg: "1200 арестувани".to_string(),
+                    status: "CONTRADICTED".to_string(),
+                    check_bg: "Пасаж p1 (https://factcheck.bg/france-protests) посочва 850 арестувани.".to_string(),
+                },
+                RawStatementCheck {
+                    statement_bg: "150 ранени полицаи".to_string(),
+                    status: "SUPPORTED".to_string(),
+                    check_bg: "Пасаж p1 потвърждава 150 ранени полицаи.".to_string(),
+                },
+            ],
+            reasoning_bg: "Според https://factcheck.bg/france-protests броят на арестуваните е завишен, макар броят на ранените полицаи да съвпада.".to_string(),
+            evidence_strength: 0.85,
+        };
+        let (verdict, _, _, reasoning, _, _) = enforce_verification_rules(&claim, &raw, &passages, 2);
+        assert_eq!(verdict, "CONTRADICTED");
+        assert!(reasoning.contains("[ОПРОВЕРГАНО] 1200 арестувани ::"));
+        assert!(reasoning.contains("[ПОТВЪРДЕНО] 150 ранени полицаи ::"));
+        assert!(reasoning.contains("[ОБОБЩЕНИЕ] Според https://factcheck.bg/france-protests"));
     }
 }

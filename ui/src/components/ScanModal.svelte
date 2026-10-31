@@ -199,17 +199,17 @@
       <div class="modal-head">
         <div class="modal-title-col">
           <div class="title-row">
-            <h3>🎯 {currentLang === 'bg' ? 'Фин скенер на TikTok' : 'Fine-Tuned TikTok Scanner'}</h3>
+            <h3>🎯 {currentLang === 'bg' ? 'Търсене на видеа в TikTok' : 'TikTok Video Search'}</h3>
             <span class="scan-mode-badge">
-              ⚡ {currentLang === 'bg' ? 'Директно сканиране' : 'Direct Scanner'}
+              ⚡ {currentLang === 'bg' ? 'Директно търсене' : 'Direct Search'}
             </span>
             <span class="scan-wl-badge">
-              📺 {watchlistCount} {currentLang === 'bg' ? 'активни канала' : 'watchlist channels'}
+              📺 {watchlistCount} {currentLang === 'bg' ? 'наблюдавани канала' : 'watchlist channels'}
             </span>
           </div>
           <span class="scan-sub">
             {currentLang === 'bg'
-              ? 'Автономно откриване и филтриране на актуално видео съдържание с персонализирани филтри'
+              ? 'Откриване и филтриране на актуални видеа по канали, ключови думи и минимален брой гледания'
               : 'Autonomous discovery and filtering of fresh video content with customized parameters'}
           </span>
         </div>
@@ -219,18 +219,18 @@
 
       <div class="modal-body">
         <div class="presets-bar">
-          <span class="presets-label">⚡ {currentLang === 'bg' ? 'Бързи профили:' : 'Quick Presets:'}</span>
+          <span class="presets-label">⚡ {currentLang === 'bg' ? 'Готови настройки:' : 'Quick Presets:'}</span>
           <button class="preset-btn" onclick={() => applyPreset('fast')}>
-            ⚡ {currentLang === 'bg' ? 'Бърз тест (5 канала, 3 видеа)' : 'Quick Test (5 channels, 3 vids)'}
+            ⚡ {currentLang === 'bg' ? 'Бърза проверка (5 канала, 3 видеа)' : 'Quick Test (5 channels, 3 vids)'}
           </button>
           <button class="preset-btn" onclick={() => applyPreset('open')}>
-            🌐 {currentLang === 'bg' ? 'Отворен скенер (без филтър)' : 'Open Scan (no filter)'}
+            🌐 {currentLang === 'bg' ? 'Общо търсене (без филтър)' : 'Open Scan (no filter)'}
           </button>
           <button class="preset-btn" onclick={() => applyPreset('full')}>
-            📺 {currentLang === 'bg' ? 'Пълен списък (всички 23 канала)' : 'Full Watchlist (all 23 channels)'}
+            📺 {currentLang === 'bg' ? 'Всички наблюдавани канали' : 'Full Watchlist'}
           </button>
           <button class="preset-btn" onclick={() => applyPreset('viral')}>
-            🔥 {currentLang === 'bg' ? 'Вирусни новини (>10k гледания)' : 'Viral Leads (>10k views)'}
+            🔥 {currentLang === 'bg' ? 'Популярни видеа (>10 хил. гледания)' : 'Popular Videos (>10k views)'}
           </button>
         </div>
 

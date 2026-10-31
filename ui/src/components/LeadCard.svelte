@@ -109,23 +109,23 @@
 
       <div class="badges-row">
         {#if card.lane === 'pasted' || (card.reason_flagged && card.reason_flagged.includes('paste'))}
-          <span class="badge badge-pasted" title="Ръчно добавено видео">📌 Pasted</span>
+          <span class="badge badge-pasted" title="Ръчно добавено видео">{currentLang === 'bg' ? '📌 Добавено' : '📌 Pasted'}</span>
         {/if}
 
         {#if card.transcript_source === 'found'}
-          <span class="badge badge-found" title={t.transcriptBadgeFound}>found</span>
+          <span class="badge badge-found" title={t.transcriptBadgeFound}>{currentLang === 'bg' ? 'Субтитри' : 'Captions'}</span>
         {:else if card.transcript_source === 'generated'}
           <span class="badge badge-gen" title={t.transcriptBadgeGen}>ASR</span>
         {/if}
 
         {#if card.cluster_size > 1}
-          <span class="badge badge-cluster" title={`${card.cluster_size} видеа в нарратива`}>
+          <span class="badge badge-cluster" title={`${card.cluster_size} видеа по същата тема`}>
             🔗 {card.cluster_size}
           </span>
         {/if}
 
         {#if card.top_claim_verdict === 'ALREADY_CHECKED'}
-          <span class="badge badge-archive" title={t.alreadyCheckedBadge}>FactCheck</span>
+          <span class="badge badge-archive" title={t.alreadyCheckedBadge}>{currentLang === 'bg' ? 'Проверено' : 'Checked'}</span>
         {/if}
 
         {#if ['deepfake', 'confirmed_deepfake', 'ai_generated_video', 'ai_voice_clone', 'robotic_tts'].includes((card.aegis_verdict || '').toLowerCase()) || ((card.aegis_audio_score ?? 0) >= 0.60 || (card.aegis_video_score ?? 0) >= 0.60)}
@@ -270,6 +270,14 @@
 
   .lead-card.compact .creator-handle {
     max-width: 120px;
+  }
+
+  :global([data-widescreen='true']) .lead-card.compact .creator-handle {
+    max-width: 220px;
+  }
+
+  :global([data-ultrawide='true']) .lead-card.compact .reason-flagged {
+    display: inline-block;
   }
 
   .lead-card.compact .reason-flagged {

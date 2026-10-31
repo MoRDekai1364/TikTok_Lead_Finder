@@ -331,6 +331,9 @@ pub struct TranscriptSegment {
     pub end_ms: i64,
     pub text: String,
     pub confidence: Option<f64>,
+    /// Optional speaker identifier (e.g., "Speaker_01").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

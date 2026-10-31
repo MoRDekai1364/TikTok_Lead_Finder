@@ -5,6 +5,7 @@
     deleteVideo,
     exitAndRunBackground,
     fetchCalibrationStatus,
+    fetchPeople,
     fetchProfile,
     fetchQueueStatus,
     fetchScaleStatus,
@@ -19,13 +20,14 @@
     triggerBenchmark,
   } from './lib/api';
   import type { Language } from './lib/i18n';
-  import type { BenchmarkProgress, Lane, LeadCard, PowerInfo, QueueCounts, ScaleStatus, Screen } from './lib/types';
+  import type { BenchmarkProgress, Lane, LeadCard, Person, PowerInfo, QueueCounts, ScaleStatus, Screen } from './lib/types';
 
   import BenchmarkOverlay from './components/BenchmarkOverlay.svelte';
   import CalibrationScreen from './components/CalibrationScreen.svelte';
   import CreatorsScreen from './components/CreatorsScreen.svelte';
   import ModelsScreen from './components/ModelsScreen.svelte';
   import PeopleScreen from './components/PeopleScreen.svelte';
+  import PersonDossierModal from './components/PersonDossierModal.svelte';
   import DetailDrawer from './components/DetailDrawer.svelte';
   import ExitPromptModal from './components/ExitPromptModal.svelte';
   import ExportScreen from './components/ExportScreen.svelte';
@@ -36,22 +38,31 @@
   import SettingsScreen from './components/SettingsScreen.svelte';
   import TopBar from './components/TopBar.svelte';
   import VirtualInbox from './components/VirtualInbox.svelte';
+  import { widescreen } from './lib/widescreen.svelte';
+  import { startAiJob, finishAiJob } from './lib/aiTasks.svelte';
 
   let activeScreen = $state<Screen>('inbox');
   let activeLane = $state<Lane>('leads');
   let currentLang = $state<Language>('bg');
   let theme = $state<'light' | 'dark'>('dark');
+  let globalDossierPerson = $state<Person | null>(null);
 
   let cards = $state<LeadCard[]>([]);
   let selectedId = $state<string | null>(null);
   let checkedIds = $state<Set<string>>(new Set());
 
   let drawerVideoId = $state<string | null>(null);
+  let widescreenDockDismissed = $state(false);
   let isVideoFeedOpen = $state<boolean>(
     typeof localStorage !== 'undefined' ? localStorage.getItem('leadfinder_video_feed') !== 'false' : true
   );
 
-  const activeDrawerId = $derived(drawerVideoId);
+  const activeDrawerId = $derived(
+    drawerVideoId ??
+      (widescreen.isActive && activeScreen === 'inbox' && isVideoFeedOpen && !widescreenDockDismissed
+        ? selectedId
+        : null)
+  );
 
   let queueCounts = $state<QueueCounts>({ queued: 0, running: 0, succeeded: 0, failed: 0 });
   let capacityPerDay = $state<number | null>(null);
@@ -115,14 +126,26 @@
         openExternalUrl(a.href);
       }
     };
+    let hwTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleResize = () => {
+      widescreen.updateMetrics();
+      if (hwTimer) clearTimeout(hwTimer);
+      hwTimer = setTimeout(() => {
+        void widescreen.initHardwareDetection();
+      }, 250);
+    };
+    void widescreen.initHardwareDetection();
+    window.addEventListener('resize', handleResize);
     document.addEventListener('click', handleDocumentClick);
 
     window.addEventListener('keydown', handleGlobalKeydown);
 
     return () => {
       disposed = true;
+      if (hwTimer) clearTimeout(hwTimer);
       unsub();
       unlistenExit();
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('click', handleDocumentClick);
       window.removeEventListener('keydown', handleGlobalKeydown);
     };
@@ -219,14 +242,19 @@
     }
     if (ev?.event === 'job_updated' && ev.data) {
       const j = ev.data;
-      if (j.stage === 'RESEARCH_MORE' && j.status === 'succeeded' && j.video_id) {
-        actionToast = {
-          icon: '✓',
-          text: currentLang === 'bg'
-            ? 'Проучването завърши успешно! Данните са обновени.'
-            : 'Deep research finished successfully! Data updated.',
-        };
-        setTimeout(() => { actionToast = null; }, 4500);
+      if (j.stage === 'RESEARCH_MORE' && j.video_id) {
+        if (j.status === 'succeeded') {
+          finishAiJob('video-research', j.video_id);
+          actionToast = {
+            icon: '✓',
+            text: currentLang === 'bg'
+              ? 'Проучването завърши успешно! Данните са обновени.'
+              : 'Deep research finished successfully! Data updated.',
+          };
+          setTimeout(() => { actionToast = null; }, 4500);
+        } else if (j.status === 'failed') {
+          finishAiJob('video-research', j.video_id);
+        }
       }
     }
     fetchVideos(activeLane).then((vids) => {
@@ -320,26 +348,42 @@
     if (c) {
       c.research_running = true;
       c.progress_pct = 75;
-      c.stage_desc = currentLang === 'bg' ? 'Задълбочено проучване...' : 'Deep research...';
+      c.stage_desc = currentLang === 'bg' ? 'Допълнителна проверка...' : 'Deep research...';
       cards = [...cards];
+      startAiJob('video-research', id, c.creator_handle ? `@${c.creator_handle}` : id);
       actionToast = {
         icon: '⚡',
         text: currentLang === 'bg'
-          ? 'Стартирано задълбочено проучване на твърденията...'
-          : 'Started deep fact-checking & OSINT research...',
+          ? 'Стартирана е допълнителна проверка на твърденията...'
+          : 'Started deep fact-checking research...',
       };
       setTimeout(() => { actionToast = null; }, 4000);
       try {
         await logDecision(id, 'research_more');
       } catch {
+        finishAiJob('video-research', id);
         actionToast = {
           icon: '⚠️',
           text: currentLang === 'bg'
-            ? 'Грешка при стартиране на проучването'
+            ? 'Грешка при стартиране на проверката'
             : 'Error starting research job',
         };
         setTimeout(() => { actionToast = null; }, 4000);
       }
+    }
+  }
+
+  async function handleOpenSubjectFromNotification(subjectId: number) {
+    try {
+      const list = await fetchPeople();
+      const found = list.find((p) => p.id === subjectId);
+      if (found) {
+        globalDossierPerson = found;
+      } else {
+        activeScreen = 'people';
+      }
+    } catch {
+      activeScreen = 'people';
     }
   }
 
@@ -371,11 +415,17 @@
 
   function toggleVideoFeed() {
     isVideoFeedOpen = !isVideoFeedOpen;
+    if (isVideoFeedOpen) {
+      widescreenDockDismissed = false;
+    }
     localStorage.setItem('leadfinder_video_feed', String(isVideoFeedOpen));
   }
 
   function handleCloseDrawer() {
     drawerVideoId = null;
+    if (widescreen.isActive) {
+      widescreenDockDismissed = true;
+    }
   }
 
   function advanceSelectionAfterRemoval(prevIdx: number) {
@@ -444,6 +494,7 @@
 
   function handleSelectCard(id: string) {
     selectedId = id;
+    widescreenDockDismissed = false;
     if (drawerVideoId) {
       drawerVideoId = id;
     }
@@ -469,7 +520,14 @@
   }
 </script>
 
-<div class="app-shell" data-theme={theme}>
+<div
+  class="app-shell"
+  data-theme={theme}
+  data-display-profile={widescreen.resolvedProfile}
+  class:widescreen-shell={widescreen.isActive}
+  class:ultrawide-shell={widescreen.isUltraWide}
+  class:eighteen-inch-shell={widescreen.isEighteenInch}
+>
   <TopBar
     {activeScreen}
     {currentLang}
@@ -488,6 +546,7 @@
     onRequestExit={() => (isExitPromptOpen = true)}
     onToggleTheme={toggleTheme}
     onToggleLang={toggleLang}
+    onOpenSubject={handleOpenSubjectFromNotification}
   />
 
   <main class="app-body">
@@ -501,7 +560,7 @@
           {checkedIds}
           {currentLang}
           {isVideoFeedOpen}
-          isDrawerOpen={Boolean(drawerVideoId)}
+          isDrawerOpen={Boolean(activeDrawerId)}
           onOpenDetail={(id) => (drawerVideoId = id)}
           onToggleVideoFeed={toggleVideoFeed}
           laneCounts={queueCounts.lane_counts}
@@ -612,6 +671,13 @@
           {currentLang === 'bg' ? 'Преглед' : 'View'}
         </button>
       </div>
+    {/if}
+    {#if globalDossierPerson}
+      <PersonDossierModal
+        person={globalDossierPerson}
+        {currentLang}
+        onClose={() => (globalDossierPerson = null)}
+      />
     {/if}
   </main>
 </div>

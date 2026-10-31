@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { assessCreatorRisk, fetchCreators, setCreatorWatchlist } from '../lib/api';
+  import { startAiJob, finishAiJob } from '../lib/aiTasks.svelte';
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { Creator } from '../lib/types';
@@ -33,11 +34,15 @@
     if (assessingHandles.has(c.handle)) return;
     assessingHandles.add(c.handle);
     assessingHandles = new Set(assessingHandles);
+    startAiJob('creator-risk', c.handle, currentLang === 'bg' ? `Проверка на автор: @${c.handle}` : `Creator check: @${c.handle}`);
     try {
       const res = await assessCreatorRisk(c.handle, c.display_name);
       c.risk_assessment = res;
       c.risk_assessment_json = JSON.stringify(res);
       creators = [...creators];
+      finishAiJob('creator-risk', c.handle, currentLang === 'bg' ? `✓ Проверката на @${c.handle} завърши` : `✓ @${c.handle} check complete`, true);
+    } catch {
+      finishAiJob('creator-risk', c.handle, currentLang === 'bg' ? `Грешка при проверка на @${c.handle}` : `Error checking @${c.handle}`, false);
     } finally {
       assessingHandles.delete(c.handle);
       assessingHandles = new Set(assessingHandles);
@@ -133,9 +138,9 @@
           <tr>
             <th>{currentLang === 'bg' ? 'Автор' : 'Handle'}</th>
             <th>{currentLang === 'bg' ? 'Последователи' : 'Followers'}</th>
-            <th>{currentLang === 'bg' ? 'Флагнати видеа' : 'Flagged videos'}</th>
-            <th>{currentLang === 'bg' ? 'Оценка на риска & Увереност' : 'Risk & Confidence'}</th>
-            <th>{currentLang === 'bg' ? 'Дълбочина' : 'Depth'}</th>
+            <th>{currentLang === 'bg' ? 'Маркирани видеа' : 'Flagged videos'}</th>
+            <th>{currentLang === 'bg' ? 'Риск и надеждност' : 'Risk & Confidence'}</th>
+            <th>{currentLang === 'bg' ? 'Ниво' : 'Depth'}</th>
             <th>{currentLang === 'bg' ? 'Наблюдение' : 'Watchlist'}</th>
           </tr>
         </thead>
@@ -163,12 +168,12 @@
                     class="btn-mini-web"
                     onclick={() => assessRisk(c)}
                     disabled={assessingHandles.has(c.handle)}
-                    title={currentLang === 'bg' ? 'Изчисли риск чрез уеб търсене' : 'Calculate risk via web search'}
+                    title={currentLang === 'bg' ? 'Провери автора в уеб източници' : 'Check creator in web sources'}
                   >
                     {#if assessingHandles.has(c.handle)}
                       ...
                     {:else}
-                      🌐 {currentLang === 'bg' ? 'Уеб' : 'Web'}
+                      🌐 {currentLang === 'bg' ? 'Провери' : 'Check'}
                     {/if}
                   </button>
                 </div>

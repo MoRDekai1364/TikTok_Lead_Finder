@@ -36,6 +36,10 @@
   import { translations } from '../lib/i18n';
   import type { AegisDeepfakeResult, ClaimWithEvidence, EntityType, LeadCard, OcrText, Person, VideoDetail } from '../lib/types';
   import { formatVerdictDisplay } from '../lib/types';
+  import { highlightPlainTextToHtml } from '../lib/reportHighlighter';
+  import { widescreen } from '../lib/widescreen.svelte';
+  import BookReaderToc from './BookReaderToc.svelte';
+  import type { TocItem } from './BookReaderToc.svelte';
   import PersonDossierModal from './PersonDossierModal.svelte';
 
   let {
@@ -98,6 +102,8 @@
   let disambiguateEntityType = $state<EntityType>('person');
   let isAegisScanning = $state(false);
   let aegisScanError = $state<string | null>(null);
+  let drawerBodyEl = $state<HTMLElement | null>(null);
+  let previewBodyEl = $state<HTMLElement | null>(null);
 
   function getEntityTypeInfo(type?: string) {
     switch (type) {
@@ -111,6 +117,10 @@
         return { label: currentLang === 'bg' ? 'Група / Партия' : 'Group / Party', icon: '👥', cssClass: 'type-group' };
       case 'event':
         return { label: currentLang === 'bg' ? 'Събитие' : 'Event', icon: '📅', cssClass: 'type-event' };
+      case 'infrastructure':
+        return { label: currentLang === 'bg' ? 'Инфраструктура' : 'Infrastructure', icon: '🛣️', cssClass: 'type-infrastructure' };
+      case 'building':
+        return { label: currentLang === 'bg' ? 'Сграда / Обект' : 'Building / Facility', icon: '🏢', cssClass: 'type-building' };
       default:
         return { label: currentLang === 'bg' ? 'Личност' : 'Person', icon: '👤', cssClass: 'type-person' };
     }
@@ -267,6 +277,214 @@
     }
   }
 
+  interface ReasoningStatementItem {
+    status: 'supported' | 'contradicted' | 'unverifiable';
+    statement?: string;
+    detail: string;
+    passageRefs: string[];
+  }
+
+  interface ReasoningBreakdown {
+    items: ReasoningStatementItem[];
+    summary: string;
+    extraNotes: string[];
+  }
+
+  function verdictColorKey(verdict?: string | null): 'supported' | 'contradicted' | 'unverifiable' | 'neutral' {
+    const v = (verdict || '').toUpperCase();
+    if (v === 'SUPPORTED') return 'supported';
+    if (v === 'CONTRADICTED') return 'contradicted';
+    if (v === 'UNVERIFIABLE' || v === 'ALREADY_CHECKED') return 'unverifiable';
+    return 'neutral';
+  }
+
+  function classifySentenceStatus(sentence: string, fallbackVerdict?: string | null): 'supported' | 'contradicted' | 'unverifiable' {
+    const low = sentence.toLowerCase();
+    const hasNegationOrMissing =
+      low.includes('не споменава') ||
+      low.includes('няма данни') ||
+      low.includes('не съдържа') ||
+      low.includes('не дават конкретни') ||
+      low.includes('не дава конкретни') ||
+      low.includes('не е релевантен') ||
+      low.includes('не може да се потвърди') ||
+      low.includes('няма достатъчно') ||
+      low.includes('липсва') ||
+      low.includes('липса на') ||
+      low.includes('непроверим') ||
+      low.includes('противоречиви данни');
+    const hasContradiction =
+      low.includes('опроверга') ||
+      low.includes('невярно') ||
+      low.includes('не отговаря на истината') ||
+      low.includes('оспорено') ||
+      low.includes('завишен') ||
+      low.includes('манипулиран') ||
+      low.includes('фалшиф') ||
+      low.includes('различно от') ||
+      low.includes('обратното') ||
+      low.includes('не съответства');
+    const hasSupport =
+      low.includes('потвърждава') ||
+      low.includes('подкрепя') ||
+      low.includes('съвпада') ||
+      low.includes('доказва, че') ||
+      low.includes('действително');
+
+    if (hasNegationOrMissing && !low.includes('пряко опровержение')) {
+      return 'unverifiable';
+    }
+    if (hasContradiction && !hasSupport) {
+      return 'contradicted';
+    }
+    if (hasSupport && !hasContradiction) {
+      return 'supported';
+    }
+    if (hasContradiction) {
+      return 'contradicted';
+    }
+    const fb = verdictColorKey(fallbackVerdict);
+    return fb === 'supported' || fb === 'contradicted' ? fb : 'unverifiable';
+  }
+
+  function extractPassageRefs(text: string): string[] {
+    const matches = text.match(/\bp\d{1,2}\b/gi) || [];
+    const unique = new Set<string>();
+    for (const m of matches) {
+      unique.add(m.toLowerCase());
+    }
+    return Array.from(unique);
+  }
+
+  function splitProseIntoSentences(text: string): string[] {
+    const placeholders: string[] = [];
+    let masked = text.replace(/https?:\/\/\S+/gi, (m) => {
+      const cleanUrl = m.replace(/[.,;)]+$/, '');
+      const trail = m.slice(cleanUrl.length);
+      const idx = placeholders.push(cleanUrl) - 1;
+      return `__URL_${idx}__${trail}`;
+    });
+    masked = masked.replace(/\b([a-z0-9-]+)\.(bg|com|org|net|eu|info|media|tv)\b/gi, '$1__DOT__$2');
+    masked = masked.replace(/\b(г|чл|ал|т|пр|напр|вкл|др|млн|млрд|хил)\./gi, '$1__ABBR__');
+
+    const rawParts = masked
+      .split(/(?<=[.!?])\s+(?=[А-ЯA-Z0-9„"\[(])/u)
+      .map((s) =>
+        s
+          .replace(/__DOT__/g, '.')
+          .replace(/__ABBR__/g, '.')
+          .replace(/__URL_(\d+)__/g, (_, i) => placeholders[Number(i)] || '')
+          .trim()
+      )
+      .filter(Boolean);
+
+    return rawParts;
+  }
+
+  function parseReasoningBreakdown(rawText: string, claimVerdict?: string | null): ReasoningBreakdown {
+    const cleaned = (rawText || '').trim();
+    if (!cleaned) {
+      return { items: [], summary: '', extraNotes: [] };
+    }
+
+    const extraNotes: string[] = [];
+    let working = cleaned;
+
+    const consensusIdx = working.search(/\[(Мулти-моделен консенсус|Разминаване в консенсуса)\]:/);
+    if (consensusIdx !== -1) {
+      extraNotes.push(working.slice(consensusIdx).trim());
+      working = working.slice(0, consensusIdx).trim();
+    }
+
+    const lines = working.split('\n').map((l) => l.trim()).filter(Boolean);
+    const hasStructuredTags = lines.some((l) =>
+      /^\[(ПОТВЪРДЕНО|ОПРОВЕРГАНО|НЕПРОВЕРИМО|ОБОБЩЕНИЕ)\]/.test(l)
+    );
+
+    if (hasStructuredTags) {
+      const items: ReasoningStatementItem[] = [];
+      const summaryParts: string[] = [];
+      for (const line of lines) {
+        const tagMatch = line.match(/^\[(ПОТВЪРДЕНО|ОПРОВЕРГАНО|НЕПРОВЕРИМО|ОБОБЩЕНИЕ)\]\s*(.*)$/);
+        if (tagMatch) {
+          const tag = tagMatch[1];
+          const body = tagMatch[2].trim();
+          if (tag === 'ОБОБЩЕНИЕ') {
+            if (body) summaryParts.push(body);
+          } else {
+            const status: 'supported' | 'contradicted' | 'unverifiable' =
+              tag === 'ПОТВЪРДЕНО' ? 'supported' : tag === 'ОПРОВЕРГАНО' ? 'contradicted' : 'unverifiable';
+            const sepIdx = body.indexOf('::');
+            if (sepIdx !== -1) {
+              const st = body.slice(0, sepIdx).trim();
+              const det = body.slice(sepIdx + 2).trim();
+              items.push({
+                status,
+                statement: st || undefined,
+                detail: det || st,
+                passageRefs: extractPassageRefs(`${st} ${det}`),
+              });
+            } else {
+              items.push({
+                status,
+                detail: body,
+                passageRefs: extractPassageRefs(body),
+              });
+            }
+          }
+        } else {
+          summaryParts.push(line);
+        }
+      }
+      return {
+        items,
+        summary: summaryParts.join(' '),
+        extraNotes,
+      };
+    }
+
+    let trailingParen = '';
+    const parenMatch = working.match(/\((Липсва[^)]+|Спорът[^)]+|Демографските[^)]+)\)\s*$/);
+    if (parenMatch && parenMatch.index !== undefined) {
+      trailingParen = parenMatch[0].trim();
+      working = working.slice(0, parenMatch.index).trim();
+    }
+
+    const sentences = splitProseIntoSentences(working);
+    if (sentences.length <= 1) {
+      const single = [working, trailingParen].filter(Boolean).join(' ');
+      return {
+        items: [],
+        summary: single,
+        extraNotes,
+      };
+    }
+
+    const conclusionRe = /^(следователно|поради|в заключение|в резултат|затова|липсата на|ето защо|общата оценка)/i;
+    let splitAt = sentences.findIndex((s, idx) => idx > 0 && conclusionRe.test(s));
+    if (splitAt === -1) {
+      splitAt = sentences.length - 1;
+    }
+
+    const itemSentences = sentences.slice(0, splitAt);
+    const summarySentences = sentences.slice(splitAt);
+    if (trailingParen) {
+      summarySentences.push(trailingParen);
+    }
+
+    const items: ReasoningStatementItem[] = itemSentences.map((s) => ({
+      status: classifySentenceStatus(s, claimVerdict),
+      detail: s,
+      passageRefs: extractPassageRefs(s),
+    }));
+
+    return {
+      items,
+      summary: summarySentences.join(' '),
+      extraNotes,
+    };
+  }
+
   function normalizeAegisVerdict(verdict?: string | null, audioSynth?: boolean, videoSynth?: boolean): 'deepfake' | 'suspicious' | 'authentic' {
     const v = (verdict || '').toLowerCase();
     if (
@@ -288,20 +506,24 @@
 
   async function handleTriggerAegis() {
     if (!detail?.video.id || isAegisScanning) return;
+    const vid = detail.video.id;
     isAegisScanning = true;
     aegisScanError = null;
+    startAiJob('aegis-scan', vid, currentLang === 'bg' ? `Проверка на записа: ${vid}` : `Media check: ${vid}`);
     try {
-      const res = await triggerAegisScan(detail.video.id);
+      const res = await triggerAegisScan(vid);
       if (res && detail) {
         detail = {
           ...detail,
           aegis_deepfake: res,
         };
       }
-      copyToast = currentLang === 'bg' ? '🛡️ AEGIS анализът завърши успешно!' : '🛡️ AEGIS scan completed!';
+      finishAiJob('aegis-scan', vid, currentLang === 'bg' ? `✓ Проверката на записа (${vid}) завърши` : `✓ Media check (${vid}) completed`, true);
+      copyToast = currentLang === 'bg' ? '🛡️ Проверката на записа завърши!' : '🛡️ Media scan completed!';
       setTimeout(() => (copyToast = null), 2500);
     } catch (err: any) {
       aegisScanError = err?.message || 'Error running AEGIS scan';
+      finishAiJob('aegis-scan', vid, currentLang === 'bg' ? 'Грешка при проверка на записа' : 'Media scan error', false);
     } finally {
       isAegisScanning = false;
     }
@@ -595,17 +817,17 @@
   async function handleResearchPerson(person: Person) {
     if (isJobActive('person-research', person.id)) return;
     startAiJob('person-research', person.id, person.canonical_name);
-    copyToast = currentLang === 'bg' ? `⚡ Проучване на ${person.canonical_name}...` : `⚡ Researching ${person.canonical_name}...`;
+    copyToast = currentLang === 'bg' ? `⚡ Проучване: ${person.canonical_name}...` : `⚡ Researching ${person.canonical_name}...`;
     try {
       const updated = await researchPerson(person.id, person.canonical_name);
       if (detail?.people) {
         detail.people = detail.people.map(p => p.id === person.id ? { ...p, ...updated } : p);
       }
-      finishAiJob('person-research', person.id, currentLang === 'bg' ? `✓ Досието на ${person.canonical_name} е готово!` : `✓ Researched: ${person.canonical_name}!`, true);
-      copyToast = currentLang === 'bg' ? `✓ Проучен: ${person.canonical_name}` : `✓ Researched: ${person.canonical_name}`;
+      finishAiJob('person-research', person.id, currentLang === 'bg' ? `✓ Справката за ${person.canonical_name} е готова` : `✓ Report ready: ${person.canonical_name}`, true);
+      copyToast = currentLang === 'bg' ? `✓ Готова справка: ${person.canonical_name}` : `✓ Researched: ${person.canonical_name}`;
     } catch {
-      finishAiJob('person-research', person.id, currentLang === 'bg' ? 'Грешка при проучване на лицето' : 'Research error', false);
-      copyToast = currentLang === 'bg' ? 'Грешка при проучване на лицето' : 'Research error';
+      finishAiJob('person-research', person.id, currentLang === 'bg' ? 'Грешка при проучване' : 'Research error', false);
+      copyToast = currentLang === 'bg' ? 'Грешка при проучване' : 'Research error';
     } finally {
       setTimeout(() => (copyToast = null), 3000);
     }
@@ -905,11 +1127,15 @@
 
   async function handleTriggerClaimVerify(claimText: string) {
     if (!detail) return;
+    const vid = detail.video.id;
+    startAiJob('video-research', vid, currentLang === 'bg' ? `Допълнителна проверка: ${vid}` : `Deep check: ${vid}`);
     copyToast = currentLang === 'bg' ? '🔍 Проверка в мрежата...' : '🔍 Searching online...';
     try {
-      await logDecision(detail.video.id, 'research_more', claimText);
-      copyToast = currentLang === 'bg' ? '✓ Изпратено за онлайн проверка!' : '✓ Enqueued for web research!';
+      await logDecision(vid, 'research_more', claimText);
+      finishAiJob('video-research', vid, currentLang === 'bg' ? `✓ Твърдението е поставено в опашката за проверка` : `✓ Enqueued for web verification`, true);
+      copyToast = currentLang === 'bg' ? '✓ Изпратено за проверка!' : '✓ Enqueued for web research!';
     } catch {
+      finishAiJob('video-research', vid, currentLang === 'bg' ? 'Грешка при изпращане' : 'Verification error', false);
       copyToast = currentLang === 'bg' ? 'Грешка при изпращане' : 'Verification error';
     } finally {
       setTimeout(() => (copyToast = null), 3000);
@@ -921,7 +1147,7 @@
     const author = detail.creator?.handle ? `@${detail.creator.handle}` : (detail.video.creator_handle ? `@${detail.video.creator_handle}` : 'неизвестен');
     const startS = Math.round((cwith.claim.start_ms || 0) / 1000);
     const endS = Math.round((cwith.claim.end_ms || 0) / 1000);
-    const citation = `"${cwith.claim.text_bg}" (Видео ID: ${detail.video.id}, Автор: ${author}, Времеви отрязък: ${startS}s-${endS}s, Източник: ${claimSourceLabel(claimSource(cwith.claim.text_bg))}, Присъда: ${cwith.claim.label || cwith.claim.verdict || 'Неверифицирано'})`;
+    const citation = `"${cwith.claim.text_bg}" (Видео ID: ${detail.video.id}, Автор: ${author}, Времеви отрязък: ${startS}s-${endS}s, Източник: ${claimSourceLabel(claimSource(cwith.claim.text_bg))}, Оценка: ${cwith.claim.label || cwith.claim.verdict || 'Непроверено'})`;
     await navigator.clipboard.writeText(citation);
     copyToast = currentLang === 'bg' ? '✓ Цитатът е копиран!' : '✓ Citation copied!';
     setTimeout(() => (copyToast = null), 2500);
@@ -1148,6 +1374,7 @@
     const handle = detail?.creator?.handle || detail?.video?.creator_handle;
     if (!handle || isAssessingRisk) return;
     isAssessingRisk = true;
+    startAiJob('creator-risk', handle, currentLang === 'bg' ? `Проверка на автор: @${handle}` : `Creator check: @${handle}`);
     try {
       const res = await assessCreatorRisk(handle, detail?.creator?.display_name || detail?.video?.creator_display_name);
       if (detail) {
@@ -1170,7 +1397,9 @@
           detail.creator.risk_assessment_json = JSON.stringify(res);
         }
       }
+      finishAiJob('creator-risk', handle, currentLang === 'bg' ? `✓ Проверката на @${handle} завърши` : `✓ @${handle} check complete`, true);
     } catch (err) {
+      finishAiJob('creator-risk', handle, currentLang === 'bg' ? `Грешка при проверка на @${handle}` : `Error checking @${handle}`, false);
       console.error('Failed to assess author risk via web:', err);
     } finally {
       isAssessingRisk = false;
@@ -1342,10 +1571,26 @@
         lines.push('│');
         lines.push(`│ ┌─ ТВЪРДЕНИЕ Т${idx + 1} [${(c.claim_type || 'fact').toUpperCase()}] [${src}] ───────────────────────────────`);
         lines.push(`│ │ Твърдение:   "${c.text_bg}"`);
-        lines.push(`│ │ Присъда:     ${vText}`);
+        lines.push(`│ │ Оценка:      ${vText}`);
         lines.push(`│ │ Интервал:    ${tStart} - ${tEnd} | Достоверност: ${Math.round((c.checkworthiness || 0) * 100)}% | Сила: ${Math.round((c.evidence_strength || 0) * 100)}%`);
         if (c.reasoning_bg) {
-          lines.push(`│ │ Мотиви:      ${c.reasoning_bg}`);
+          const rb = parseReasoningBreakdown(c.reasoning_bg, c.verdict);
+          if (rb.items.length > 0) {
+            lines.push('│ │ Мотиви и оценка по елементи:');
+            for (const it of rb.items) {
+              const sym = it.status === 'supported' ? '✓ [ПОТВЪРДЕНО]' : it.status === 'contradicted' ? '✗ [ОПРОВЕРГАНО]' : '? [НЕПРОВЕРИМО]';
+              const prefix = it.statement ? `${it.statement} — ` : '';
+              lines.push(`│ │   • ${sym} ${prefix}${it.detail}`);
+            }
+            if (rb.summary) {
+              lines.push(`│ │ 📌 Обобщение: ${rb.summary}`);
+            }
+            for (const note of rb.extraNotes) {
+              lines.push(`│ │ ℹ️ ${note}`);
+            }
+          } else {
+            lines.push(`│ │ 📌 Мотиви и обобщение: ${rb.summary || c.reasoning_bg}`);
+          }
         }
         if (c.attribution && c.attribution.length > 0) {
           for (const attr of c.attribution) {
@@ -1432,7 +1677,7 @@
       lines.push(bg ? '┌── 👤 ПРОФИЛ И ОЦЕНКА НА РИСКА НА АВТОРА ──────────────────────────────────' : '┌── 👤 CREATOR & REPUTATION RISK PROFILE ────────────────────────────────────');
       lines.push(`│ Автор:         @${creator.handle}${creator.display_name ? ` (${creator.display_name})` : ''}`);
       lines.push(`│ Последователи: ${(creator.follower_count || 0).toLocaleString()} | Регион: ${creator.region || 'BG'}`);
-      lines.push(`│ Флагнати видеа:${creator.flagged_count || 0} | Наблюдение: ${creator.watchlist ? '👁 ДА (Watchlist)' : 'НЕ'}`);
+      lines.push(`│ Маркирани видеа: ${creator.flagged_count || 0} | Наблюдение: ${creator.watchlist ? '👁 ДА' : 'НЕ'}`);
       lines.push(`│ Рисков статус: ${authorRisk.label} | Системна увереност: ${authorRisk.confidencePercent}% (${authorRisk.confidenceText})`);
       lines.push(`│ Мотиви / Риск: ${authorRisk.rationale}`);
       if (authorRisk.webSources && authorRisk.webSources.length > 0) {
@@ -1459,7 +1704,7 @@
 
     lines.push(bg ? '┌── 📊 ТЕХНИЧЕСКИ МЕТАДАННИ ──────────────────────────────────────────────────' : '┌── 📊 TECHNICAL METADATA ───────────────────────────────────────────────────');
     lines.push(`│ Статус:       ${detail.video.state || 'UNKNOWN'}${detail.video.state_reason ? ` (${detail.video.state_reason})` : ''}`);
-    lines.push(`│ Lead Score:   ${detail.video.lead_score ?? 'Н/Д'}`);
+    lines.push(`│ Приоритет:    ${detail.video.lead_score ?? 'Н/Д'}`);
     lines.push(`│ Ангажираност: ${(detail.video.views || 0).toLocaleString()} гледания | ${(detail.video.likes || 0).toLocaleString()} харесвания | ${(detail.video.comments || 0).toLocaleString()} коментара | ${(detail.video.shares || 0).toLocaleString()} споделяния`);
     if (detail.video.phash) {
       lines.push(`│ Перцептивен хеш (pHash): ${detail.video.phash}`);
@@ -1471,6 +1716,75 @@
 
     return lines.join('\n');
   }
+
+  const drawerTocItems = $derived.by((): TocItem[] => {
+    if (!detail) return [];
+    const bg = currentLang === 'bg';
+    const items: TocItem[] = [
+      {
+        id: 'sec-transcript',
+        label: bg ? 'Стенограма' : 'Transcript',
+        badge: detail.transcript ? `${transcriptDisplaySegments.length}` : undefined,
+      },
+      {
+        id: 'sec-aegis',
+        label: bg ? 'Запис' : 'Media Check',
+      },
+      {
+        id: 'sec-claims',
+        label: bg ? 'Твърдения' : 'Claims',
+        badge: `${detail.claims.length}`,
+      },
+    ];
+    detail.claims.forEach((cwith, idx) => {
+      const vc = verdictColorKey(cwith.claim.verdict);
+      items.push({
+        id: `claim-${cwith.claim.id}`,
+        label: `Т${idx + 1}`,
+        tone: vc === 'supported' ? 'green' : vc === 'contradicted' ? 'red' : vc === 'unverifiable' ? 'amber' : 'default',
+      });
+    });
+    if (detail.people && detail.people.length > 0) {
+      items.push({
+        id: 'sec-people',
+        label: bg ? 'Обекти' : 'Subjects',
+        badge: `${detail.people.length}`,
+      });
+    }
+    if (detail.creator || detail.video.creator_handle) {
+      items.push({
+        id: 'sec-creator',
+        label: bg ? 'Автор' : 'Author',
+      });
+    }
+    items.push({
+      id: 'sec-metadata',
+      label: bg ? 'Метаданни' : 'Metadata',
+    });
+    return items;
+  });
+
+  const previewParagraphs = $derived.by(() => {
+    if (!previewModalData?.text) return [];
+    return previewModalData.text
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+  });
+
+  const previewTocItems = $derived.by((): TocItem[] => {
+    if (previewParagraphs.length < 4) return [];
+    const items: TocItem[] = [];
+    const step = Math.max(2, Math.ceil(previewParagraphs.length / 6));
+    for (let i = 0; i < previewParagraphs.length; i += step) {
+      const sample = previewParagraphs[i].replace(/\s+/g, ' ').slice(0, 26).trim();
+      items.push({
+        id: `preview-para-${i}`,
+        label: `§${i + 1} ${sample}${previewParagraphs[i].length > 26 ? '…' : ''}`,
+      });
+    }
+    return items;
+  });
 
   async function handleCopyAllInformation() {
     if (!detail) return;
@@ -1486,7 +1800,16 @@
   }
 </script>
 
-<aside class="detail-drawer" aria-label={t.drawerTitle}>
+<aside
+  class="detail-drawer"
+  class:widescreen-mode={widescreen.isActive}
+  class:dual-pane-mode={widescreen.isDualPane}
+  class:statement-grid-mode={widescreen.isStatementGrid}
+  class:evidence-grid-mode={widescreen.isEvidenceGrid}
+  class:eighteen-inch-mode={widescreen.isEighteenInch}
+  class:ultrawide-mode={widescreen.isUltraWide}
+  aria-label={t.drawerTitle}
+>
   <div class="drawer-header">
     <div class="drawer-title-group">
       <h2 class="drawer-title">{t.drawerTitle}</h2>
@@ -1533,8 +1856,17 @@
       <span>{currentLang === 'bg' ? 'Зареждане на детайлите...' : 'Loading video details...'}</span>
     </div>
   {:else if detail}
-    <div class="drawer-body" onscroll={handleDrawerScroll}>
-      <div class="section-card transcript-section">
+    <div class="drawer-toc-bar">
+      <BookReaderToc
+        variant="compact"
+        items={drawerTocItems}
+        scrollContainer={widescreen.isDualPane ? null : drawerBodyEl}
+        title={currentLang === 'bg' ? 'Съдържание' : 'Contents'}
+      />
+    </div>
+    <div class="drawer-body" bind:this={drawerBodyEl} onscroll={handleDrawerScroll}>
+      <div class="drawer-col drawer-col-left" onscroll={handleDrawerScroll}>
+      <div id="sec-transcript" class="section-card transcript-section">
         <div class="section-header">
           <div>
             <h3>{t.transcriptHeading}</h3>
@@ -1770,7 +2102,7 @@
         {/if}
       </div>
 
-      <div class="section-card aegis-section">
+      <div id="sec-aegis" class="section-card aegis-section">
         <div class="section-header aegis-header">
           <div>
             <div class="aegis-title-row">
@@ -2019,8 +2351,10 @@
           </div>
         {/if}
       </div>
+      </div>
 
-      <div class="section-card claims-section">
+      <div class="drawer-col drawer-col-right">
+      <div id="sec-claims" class="section-card claims-section">
         <div class="section-header">
           <div>
             <h3>{t.claimsHeading}</h3>
@@ -2038,9 +2372,10 @@
           {#each detail.claims as cwith, cIdx}
             {@const claim = cwith.claim}
             {@const src = claimSource(claim.text_bg)}
+            {@const vColor = verdictColorKey(claim.verdict)}
             <div
               id={`claim-${claim.id}`}
-              class="claim-block"
+              class="claim-block claim-verdict-{vColor}"
               class:claim-pulse={activeClaimId === claim.id}
             >
               <div class="claim-header">
@@ -2114,8 +2449,79 @@
               {/if}
 
               {#if claim.reasoning_bg}
-                <div class="claim-reasoning">
-                  <strong>{currentLang === 'bg' ? 'Мотиви и оценка:' : 'Reasoning:'}</strong> {claim.reasoning_bg}
+                {@const rb = parseReasoningBreakdown(claim.reasoning_bg, claim.verdict)}
+                <div class="claim-reasoning reasoning-verdict-{vColor}">
+                  <div class="reasoning-head">
+                    <span class="reasoning-title">
+                      ⚖️ {currentLang === 'bg' ? 'Мотиви и оценка' : 'Reasoning & Evaluation'}
+                    </span>
+                    {#if rb.items.length > 0}
+                      <span class="reasoning-count-pill">
+                        {rb.items.length} {currentLang === 'bg' ? (rb.items.length === 1 ? 'елемент' : 'елемента') : 'checks'}
+                      </span>
+                    {/if}
+                  </div>
+
+                  {#if rb.items.length > 0}
+                    <div class="reasoning-statements-list">
+                      {#each rb.items as stmtItem, sIdx}
+                        <div class="reasoning-stmt-card stmt-{stmtItem.status}">
+                          <div class="stmt-top-row">
+                            <span class="stmt-index">#{sIdx + 1}</span>
+                            <span class="stmt-status-pill {stmtItem.status}">
+                              {#if stmtItem.status === 'supported'}
+                                ✓ {currentLang === 'bg' ? 'Потвърдено' : 'Supported'}
+                              {:else if stmtItem.status === 'contradicted'}
+                                ✕ {currentLang === 'bg' ? 'Опровергано' : 'Contradicted'}
+                              {:else}
+                                ? {currentLang === 'bg' ? 'Непроверимо' : 'Unverifiable'}
+                              {/if}
+                            </span>
+                            {#if stmtItem.statement}
+                              <strong class="stmt-subject">{stmtItem.statement}</strong>
+                            {/if}
+                            {#if stmtItem.passageRefs.length > 0}
+                              <span class="stmt-refs">
+                                {#each stmtItem.passageRefs as pref}
+                                  {@const matchedEv = cwith.evidence.find((e) => (e as any).passage_id?.toLowerCase() === pref)}
+                                  {#if matchedEv}
+                                    <button
+                                      type="button"
+                                      class="stmt-ref-btn"
+                                      onclick={() => jumpToEvidence(matchedEv.id)}
+                                      title={currentLang === 'bg' ? 'Отиди към цитирания източник' : 'Jump to cited source'}
+                                    >
+                                      [{pref}]
+                                    </button>
+                                  {:else}
+                                    <span class="stmt-ref-tag">[{pref}]</span>
+                                  {/if}
+                                {/each}
+                              </span>
+                            {/if}
+                          </div>
+                          <div class="stmt-detail">{stmtItem.detail}</div>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+
+                  {#if rb.summary}
+                    <div class="reasoning-summary-footer summary-{vColor}">
+                      <span class="summary-badge">
+                        📌 {currentLang === 'bg' ? 'Обобщение:' : 'Summary:'}
+                      </span>
+                      <span class="summary-text">{rb.summary}</span>
+                    </div>
+                  {/if}
+
+                  {#if rb.extraNotes.length > 0}
+                    <div class="reasoning-extra-notes">
+                      {#each rb.extraNotes as note}
+                        <div class="reasoning-extra-note">{note}</div>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
               {/if}
 
@@ -2245,6 +2651,7 @@
                     </button>
                   </div>
                 {:else}
+                  <div class="evidence-items-grid">
                   {#each cwith.evidence.filter(ev => !isJunkSource(ev)) as ev}
                     <div
                       id={`evidence-${ev.id}`}
@@ -2323,6 +2730,7 @@
                       </div>
                     </div>
                   {/each}
+                  </div>
                 {/if}
               </div>
             </div>
@@ -2331,7 +2739,7 @@
       </div>
 
       {#if detail.people.length > 0}
-        <div class="section-card people-section">
+        <div id="sec-people" class="section-card people-section">
           <div class="section-header">
             <div>
               <h3>{t.peopleHeading}</h3>
@@ -2396,9 +2804,9 @@
                   <button
                     class="btn btn-secondary btn-sm"
                     onclick={() => (viewingPersonDossier = person)}
-                    title="Отвори пълното досие"
+                    title="Отвори аналитичната справка"
                   >
-                    📖 {currentLang === 'bg' ? 'Досие' : 'Dossier'}
+                    📖 {currentLang === 'bg' ? 'Справка' : 'Report'}
                   </button>
                   <button
                     class="btn btn-primary btn-sm person-verify-btn"
@@ -2486,7 +2894,7 @@
       {#if detail.creator || detail.video.creator_handle}
         {@const creator = detail.creator || { id: (detail.video.creator_handle || '').toLowerCase(), handle: detail.video.creator_handle || '', display_name: detail.video.creator_display_name, follower_count: detail.video.creator_follower_count ?? null, region: 'BG', first_seen_at: new Date().toISOString(), flagged_count: 0, watchlist: false, expansion_depth: 0 }}
         {@const authorRisk = computeAuthorRisk(creator)}
-        <div class="section-card creator-section">
+        <div id="sec-creator" class="section-card creator-section">
           <div class="section-header">
             <div>
               <h3>{t.creatorHeading}</h3>
@@ -2656,7 +3064,7 @@
                         <span>⏱ {Math.round(ov.duration_s)}s</span>
                       {/if}
                       <span>Ранг: {Math.round((ov.lead_score || 0) * 100)}%</span>
-                      <span class="inspect-btn">Инспектирай ↗</span>
+                      <span class="inspect-btn">{currentLang === 'bg' ? 'Преглед ↗' : 'View ↗'}</span>
                     </div>
                   </div>
                 {/each}
@@ -2688,7 +3096,7 @@
         </div>
       {/if}
 
-      <div class="section-card metadata-section">
+      <div id="sec-metadata" class="section-card metadata-section">
         <button class="collapsible-header" onclick={() => (metadataOpen = !metadataOpen)}>
           <span>{t.metadataHeading}</span>
           <span>{metadataOpen ? '▲' : '▼'}</span>
@@ -2696,6 +3104,7 @@
         {#if metadataOpen}
           <pre class="metadata-dump">{JSON.stringify(detail.video, null, 2)}</pre>
         {/if}
+      </div>
       </div>
     </div>
   {/if}
@@ -2710,12 +3119,20 @@
           </div>
           <button class="close-btn" onclick={() => (previewModalData = null)}>✕</button>
         </div>
-        <div class="preview-modal-body">
-          {#if previewModalData.text}
-            {#each previewModalData.text.split('\n\n') as para}
-              {#if para.trim()}
-                <p class="preview-paragraph">{para.trim()}</p>
-              {/if}
+        {#if previewTocItems.length > 0}
+          <div class="preview-toc-wrap">
+            <BookReaderToc
+              variant="compact"
+              items={previewTocItems}
+              scrollContainer={previewBodyEl}
+              title={currentLang === 'bg' ? 'Съдържание' : 'Contents'}
+            />
+          </div>
+        {/if}
+        <div class="preview-modal-body" bind:this={previewBodyEl}>
+          {#if previewParagraphs.length > 0}
+            {#each previewParagraphs as para, pIdx}
+              <p id={`preview-para-${pIdx}`} class="preview-paragraph">{@html highlightPlainTextToHtml(para, true)}</p>
             {/each}
           {:else}
             <p class="empty-hint">Няма извлечен текст от този източник.</p>
@@ -2749,8 +3166,8 @@
       <div class="preview-modal google-ai-modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
         <div class="preview-modal-header">
           <div>
-            <span class="preview-domain-pill">{googleAiModalData.source === 'google_ai_mode' ? 'Google AI Mode (udm=50)' : 'AI Синтез & Проучване'}</span>
-            <h3 class="preview-modal-title">{googleAiModalData.mode === 'refine' ? 'Прецизиран текст' : googleAiModalData.query}</h3>
+            <span class="preview-domain-pill">{googleAiModalData.source === 'google_ai_mode' ? 'Google AI Mode' : 'Обобщено проучване'}</span>
+            <h3 class="preview-modal-title">{googleAiModalData.mode === 'refine' ? 'Поправен текст' : googleAiModalData.query}</h3>
           </div>
           <button class="close-btn" onclick={() => (googleAiModalData = null)}>✕</button>
         </div>
@@ -2758,7 +3175,7 @@
           {#if googleAiModalData.text}
             {#each googleAiModalData.text.split('\n\n') as para}
               {#if para.trim()}
-                <p class="preview-paragraph">{para.trim()}</p>
+                <p class="preview-paragraph">{@html highlightPlainTextToHtml(para.trim(), true)}</p>
               {/if}
             {/each}
           {:else}
@@ -2869,6 +3286,8 @@
               <option value="country">🌍 {currentLang === 'bg' ? 'Държава (геополитически субект)' : 'Country'}</option>
               <option value="group">👥 {currentLang === 'bg' ? 'Група / Партия (партия, коалиция, движение)' : 'Group / Party'}</option>
               <option value="event">📅 {currentLang === 'bg' ? 'Събитие (избори, инцидент, протест)' : 'Event'}</option>
+              <option value="infrastructure">🛣️ {currentLang === 'bg' ? 'Инфраструктура (магистрала, мост, язовир, АЕЦ)' : 'Infrastructure'}</option>
+              <option value="building">🏢 {currentLang === 'bg' ? 'Сграда / Обект (болница, училище, комплекс)' : 'Building / Facility'}</option>
             </select>
           </label>
           <label>
@@ -2921,6 +3340,23 @@
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12);
     position: relative;
     z-index: 50;
+    flex-shrink: 0;
+  }
+
+  .detail-drawer.widescreen-mode {
+    width: var(--drawer-docked-width, clamp(860px, 68vw, 2400px));
+  }
+
+  .detail-drawer.ultrawide-mode {
+    width: var(--drawer-docked-width, clamp(1180px, 72vw, 2800px));
+  }
+
+  .detail-drawer.eighteen-inch-mode .drawer-header {
+    padding: 0.62rem 1.05rem;
+  }
+
+  .detail-drawer.eighteen-inch-mode .drawer-toc-bar {
+    padding: 0.36rem 0.95rem;
   }
 
   .drawer-header {
@@ -2928,6 +3364,18 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.85rem 1.15rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .drawer-toc-bar {
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-bg);
+    flex-shrink: 0;
+  }
+
+  .preview-toc-wrap {
+    padding: 0.45rem 1.1rem;
     border-bottom: 1px solid var(--border-color);
   }
 
@@ -2987,6 +3435,42 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-height: 0;
+  }
+
+  .drawer-col {
+    display: contents;
+  }
+
+  .detail-drawer.dual-pane-mode .drawer-body {
+    display: grid;
+    grid-template-columns: var(--drawer-left-col, minmax(360px, 37%)) minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .detail-drawer.ultrawide-mode .drawer-body {
+    grid-template-columns: var(--drawer-left-col, minmax(440px, 36%)) minmax(0, 1fr);
+  }
+
+  .detail-drawer.dual-pane-mode .drawer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0.88rem 1rem;
+    min-height: 0;
+  }
+
+  .detail-drawer.eighteen-inch-mode .drawer-col {
+    gap: 0.78rem;
+    padding: 0.82rem 0.98rem;
+  }
+
+  .detail-drawer.dual-pane-mode .drawer-col-left {
+    border-right: 1px solid var(--border-color);
   }
 
   .loading-state {
@@ -3070,7 +3554,7 @@
 
   .feed-video-container {
     width: 100%;
-    height: 420px;
+    height: var(--video-stage-height, 420px);
     background: #000;
     display: flex;
     align-items: center;
@@ -3882,10 +4366,26 @@
   .claim-block {
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
+    border-left: 4px solid var(--border-color);
     border-radius: 6px;
-    padding: 0.8rem;
-    margin-bottom: 0.75rem;
+    padding: 0.85rem;
+    margin-bottom: 0.85rem;
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .claim-block.claim-verdict-supported {
+    border-left-color: #10b981;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.045) 0%, var(--surface-bg) 32%);
+  }
+
+  .claim-block.claim-verdict-contradicted {
+    border-left-color: #ef4444;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.05) 0%, var(--surface-bg) 32%);
+  }
+
+  .claim-block.claim-verdict-unverifiable {
+    border-left-color: #eab308;
+    background: linear-gradient(90deg, rgba(234, 179, 8, 0.045) 0%, var(--surface-bg) 32%);
   }
 
   .claim-pulse {
@@ -4009,13 +4509,236 @@
   }
 
   .claim-reasoning {
-    font-size: 0.8rem;
+    font-size: 0.81rem;
     color: var(--text-body);
-    margin-bottom: 0.65rem;
-    line-height: 1.4;
+    margin-bottom: 0.7rem;
+    line-height: 1.45;
     background: var(--card-bg);
-    padding: 0.45rem 0.65rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .claim-reasoning.reasoning-verdict-supported {
+    border-left-color: #10b981;
+    border-color: rgba(16, 185, 129, 0.28);
+    background: rgba(16, 185, 129, 0.04);
+  }
+
+  .claim-reasoning.reasoning-verdict-contradicted {
+    border-left-color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.045);
+  }
+
+  .claim-reasoning.reasoning-verdict-unverifiable {
+    border-left-color: #eab308;
+    border-color: rgba(234, 179, 8, 0.3);
+    background: rgba(234, 179, 8, 0.04);
+  }
+
+  .reasoning-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  }
+
+  .reasoning-title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-heading);
+  }
+
+  .reasoning-count-pill {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+  }
+
+  .reasoning-statements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.42rem;
+  }
+
+  .detail-drawer.statement-grid-mode .reasoning-statements-list,
+  .detail-drawer.ultrawide-mode .reasoning-statements-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--statement-card-min, 250px), 1fr));
+    gap: 0.48rem;
+  }
+
+  .reasoning-stmt-card {
+    padding: 0.45rem 0.6rem;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--border-color);
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .reasoning-stmt-card.stmt-supported {
+    border-left-color: #10b981;
+    border-color: rgba(16, 185, 129, 0.32);
+    background: rgba(16, 185, 129, 0.075);
+  }
+
+  .reasoning-stmt-card.stmt-contradicted {
+    border-left-color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  .reasoning-stmt-card.stmt-unverifiable {
+    border-left-color: #eab308;
+    border-color: rgba(234, 179, 8, 0.35);
+    background: rgba(234, 179, 8, 0.075);
+  }
+
+  .stmt-top-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .stmt-index {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: var(--text-muted);
+  }
+
+  .stmt-status-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 1px 6px;
     border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+
+  .stmt-status-pill.supported {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+  }
+
+  .stmt-status-pill.contradicted {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+  }
+
+  .stmt-status-pill.unverifiable {
+    background: rgba(234, 179, 8, 0.22);
+    color: #d97706;
+  }
+
+  :global([data-theme='dark']) .stmt-status-pill.unverifiable {
+    color: #fbbf24;
+  }
+
+  .stmt-subject {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .stmt-refs {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .stmt-ref-btn {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--primary-accent);
+    cursor: pointer;
+  }
+
+  .stmt-ref-btn:hover {
+    background: var(--primary-accent);
+    color: #fff;
+  }
+
+  .stmt-ref-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .stmt-detail {
+    font-size: 0.79rem;
+    color: var(--text-body);
+    line-height: 1.42;
+  }
+
+  .reasoning-summary-footer {
+    padding: 0.5rem 0.65rem;
+    border-radius: 5px;
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-top: 2px solid var(--border-color);
+    font-size: 0.81rem;
+    line-height: 1.45;
+  }
+
+  .reasoning-summary-footer.summary-supported {
+    border-top-color: #10b981;
+    background: rgba(16, 185, 129, 0.09);
+  }
+
+  .reasoning-summary-footer.summary-contradicted {
+    border-top-color: #ef4444;
+    background: rgba(239, 68, 68, 0.095);
+  }
+
+  .reasoning-summary-footer.summary-unverifiable {
+    border-top-color: #eab308;
+    background: rgba(234, 179, 8, 0.09);
+  }
+
+  .summary-badge {
+    font-weight: 800;
+    color: var(--text-heading);
+    margin-right: 0.3rem;
+  }
+
+  .summary-text {
+    color: var(--text-body);
+  }
+
+  .reasoning-extra-notes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+  }
+
+  .reasoning-extra-note {
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(148, 163, 184, 0.08);
     border: 1px dashed var(--border-color);
   }
 
@@ -4101,12 +4824,24 @@
     gap: 0.5rem;
   }
 
+  .evidence-items-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .detail-drawer.evidence-grid-mode .evidence-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--evidence-card-min, 260px), 1fr));
+    gap: 0.5rem;
+  }
+
   .evidence-item {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 0.45rem 0.65rem;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0;
     font-size: 0.78rem;
     transition: all 0.25s ease-in-out;
   }
@@ -4348,6 +5083,12 @@
     gap: 0.65rem;
   }
 
+  .detail-drawer.evidence-grid-mode .people-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--evidence-card-min, 255px), 1fr));
+    gap: 0.6rem;
+  }
+
   .person-card {
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
@@ -4428,6 +5169,18 @@
     background: rgba(236, 72, 153, 0.12);
     color: #ec4899;
     border: 1px solid rgba(236, 72, 153, 0.3);
+  }
+
+  .person-entity-badge.type-infrastructure {
+    background: rgba(14, 165, 233, 0.12);
+    color: #0284c7;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+  }
+
+  .person-entity-badge.type-building {
+    background: rgba(13, 148, 136, 0.12);
+    color: #0d9488;
+    border: 1px solid rgba(13, 148, 136, 0.3);
   }
 
   .person-role {
@@ -5034,6 +5787,10 @@
     flex-direction: column;
     overflow: hidden;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  :global([data-widescreen='true']) .preview-modal {
+    max-width: min(90vw, 1320px);
   }
 
   .preview-modal-header {

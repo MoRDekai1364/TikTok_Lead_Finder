@@ -151,6 +151,7 @@ mod tests {
                 end_ms: 2000,
                 text: "Запазен транскрипт след изтриване на видео файла.".to_string(),
                 confidence: Some(0.9),
+                speaker: None,
             }],
             edited_text: None,
         })

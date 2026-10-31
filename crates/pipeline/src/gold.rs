@@ -199,6 +199,7 @@ pub async fn run_gold_set_eval(
                         verdict: "UNVERIFIABLE".to_string(),
                         label: "unknown".to_string(),
                         evidence: Vec::new(),
+                        statement_checks: Vec::new(),
                         reasoning_bg: "Невалиден изход от модела след повторен опит.".to_string(),
                         evidence_strength: 0.0,
                     },
@@ -212,6 +213,7 @@ pub async fn run_gold_set_eval(
                     verdict: "UNVERIFIABLE".to_string(),
                     label: "unknown".to_string(),
                     evidence: Vec::new(),
+                    statement_checks: Vec::new(),
                     reasoning_bg: String::new(),
                     evidence_strength: 0.0,
                 },
@@ -352,6 +354,7 @@ mod tests {
                     stance: "contradicts".to_string(),
                 })
                 .collect(),
+            statement_checks: Vec::new(),
             reasoning_bg: "обяснение".to_string(),
             evidence_strength: 0.9,
         }

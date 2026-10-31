@@ -23,6 +23,19 @@ use crate::funnel::{screen_cheap, BudgetState, FunnelClaim, FunnelVideo, ScreenO
 use crate::janitor::run_media_retention_janitor;
 use crate::quota::ProviderQuotaGuard;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveResearchTask {
+    pub id: String,
+    pub kind: String,
+    pub subject_id: Option<i64>,
+    pub video_id: Option<String>,
+    pub subject_name: String,
+    pub title: String,
+    pub stage: String,
+    pub progress_pct: u8,
+    pub started_at: String,
+}
+
 #[derive(Clone)]
 pub struct PipelineContext {
     pub paths: RuntimePaths,
@@ -40,6 +53,7 @@ pub struct PipelineContext {
     pub benchmark_state: Arc<tokio::sync::RwLock<leadfinder_probe::BenchmarkState>>,
     pub model_download_state: Arc<tokio::sync::RwLock<leadfinder_core::ModelDownloadProgress>>,
     pub model_download_cancel: Arc<std::sync::atomic::AtomicBool>,
+    pub active_tasks: Arc<tokio::sync::RwLock<HashMap<String, ActiveResearchTask>>>,
 }
 
 impl PipelineContext {
@@ -97,7 +111,26 @@ impl PipelineContext {
             benchmark_state,
             model_download_state,
             model_download_cancel,
+            active_tasks: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         })
+    }
+
+    pub async fn upsert_active_task(&self, task: ActiveResearchTask) {
+        let mut map = self.active_tasks.write().await;
+        map.insert(task.id.clone(), task);
+    }
+
+    pub async fn update_active_task(&self, id: &str, stage: impl Into<String>, progress_pct: u8) {
+        let mut map = self.active_tasks.write().await;
+        if let Some(t) = map.get_mut(id) {
+            t.stage = stage.into();
+            t.progress_pct = progress_pct;
+        }
+    }
+
+    pub async fn remove_active_task(&self, id: &str) {
+        let mut map = self.active_tasks.write().await;
+        map.remove(id);
     }
 
     pub fn emit(&self, event: CoreEvent) {

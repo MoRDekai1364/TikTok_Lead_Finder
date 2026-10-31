@@ -242,30 +242,30 @@
   <header class="ms-header">
     <div class="ms-header-info">
       <div class="ms-title-row">
-        <h2>🤖 {currentLang === 'bg' ? 'AI Модели и мулти-моделна оркестрация' : 'AI Models & Multi-Model Orchestra'}</h2>
+        <h2>🤖 {currentLang === 'bg' ? 'Езикови и речеви модели' : 'AI & Speech Models'}</h2>
         <span class="active-models-pill">
           {installedModels.length} {currentLang === 'bg' ? 'налични модела' : 'models installed'}
         </span>
       </div>
       <p class="ms-sub">
         {currentLang === 'bg'
-          ? 'Разпределяйте специализирани AI модели за реч (ASR), екстракция на твърдения, проверка на факти и OSINT досиета. Инсталирайте нови модели с 1 клик или свържете Ollama и LM Studio.'
-          : 'Assign dedicated AI models for Speech (ASR), Claim Extraction, Fact Verification, and OSINT Dossiers. 1-click downloads or external Ollama/LM Studio servers.'}
+          ? 'Изберете модели за разпознаване на реч, извличане на твърдения, проверка на факти и аналитични справки. Поддържат се локални модели, Ollama, LM Studio и Google Gemini.'
+          : 'Assign dedicated models for Speech (ASR), Claim Extraction, Fact Verification, and Analytical Reports.'}
       </p>
     </div>
 
     <div class="ms-subtabs">
       <button class="subtab-btn" class:active={activeSubtab === 'roles'} onclick={() => activeSubtab = 'roles'}>
-        🎭 {currentLang === 'bg' ? 'Роли в конвейера' : 'Pipeline Roles'}
+        ⚙️ {currentLang === 'bg' ? 'Разпределение по задачи' : 'Task Assignment'}
       </button>
       <button class="subtab-btn" class:active={activeSubtab === 'catalog'} onclick={() => activeSubtab = 'catalog'}>
-        📦 {currentLang === 'bg' ? 'Каталог и сваляне' : 'Catalog & Downloads'}
+        📦 {currentLang === 'bg' ? 'Каталог и изтегляне' : 'Catalog & Downloads'}
       </button>
       <button class="subtab-btn" class:active={activeSubtab === 'servers'} onclick={() => activeSubtab = 'servers'}>
         🔌 {currentLang === 'bg' ? 'Външни сървъри (Ollama)' : 'External Servers'}
       </button>
       <button class="subtab-btn" class:active={activeSubtab === 'playground'} onclick={() => activeSubtab = 'playground'}>
-        🧪 {currentLang === 'bg' ? 'AI Тестово поле' : 'Model Playground'}
+        🧪 {currentLang === 'bg' ? 'Проба на модел' : 'Model Test'}
       </button>
     </div>
   </header>
@@ -424,18 +424,18 @@
 
           <div class="role-card">
             <div class="rc-header">
-              <span class="rc-icon">🕵️</span>
+              <span class="rc-icon">📋</span>
               <div>
-                <h4 class="rc-title">{currentLang === 'bg' ? 'OSINT Разследващи досиета' : 'OSINT Dossier Generator'}</h4>
-                <span class="rc-desc">{currentLang === 'bg' ? 'Генерира пълни биографични профили и досиета от 2000 думи' : 'Synthesizes exhaustive OSINT intelligence dossiers'}</span>
+                <h4 class="rc-title">{currentLang === 'bg' ? 'Аналитични справки за лица и обекти' : 'Analytical Subject Reports'}</h4>
+                <span class="rc-desc">{currentLang === 'bg' ? 'Съставя подробни справки по публични регистри, архиви и новини' : 'Synthesizes structured analytical reports from public registers and archives'}</span>
               </div>
             </div>
             {#if rolesConfig?.roles?.osint_dossier}
               <div class="rc-controls">
                 <label class="control-row">
-                  <span class="ctrl-label">{currentLang === 'bg' ? 'Провайдър:' : 'Provider:'}</span>
+                  <span class="ctrl-label">{currentLang === 'bg' ? 'Източник:' : 'Provider:'}</span>
                   <select bind:value={rolesConfig.roles.osint_dossier.provider}>
-                    <option value="gemini">Google Gemini (1M контекст, Препоръчителен)</option>
+                    <option value="gemini">Google Gemini (Препоръчителен)</option>
                     <option value="local">Локален GGUF</option>
                     <option value="ollama">Ollama</option>
                   </select>
@@ -444,7 +444,7 @@
                   <span class="ctrl-label">{currentLang === 'bg' ? 'Модел:' : 'Model:'}</span>
                   {#if rolesConfig.roles.osint_dossier.provider === 'gemini'}
                     <select bind:value={rolesConfig.roles.osint_dossier.model_name}>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash (Идеален за 2000-думи досие)</option>
+                      <option value="gemini-2.5-flash">gemini-2.5-flash (Препоръчителен за пълни справки)</option>
                       <option value="gemini-1.5-pro">gemini-1.5-pro</option>
                     </select>
                   {:else}
@@ -462,11 +462,11 @@
               <div class="cb-title-group">
                 <span class="cb-icon">🤝</span>
                 <div>
-                  <h4 class="cb-title">{currentLang === 'bg' ? 'Мулти-моделен консенсус (Ensemble Consensus Mode)' : 'Multi-Model Consensus & Debate'}</h4>
+                  <h4 class="cb-title">{currentLang === 'bg' ? 'Двойна проверка с втори модел' : 'Secondary Model Cross-Check'}</h4>
                   <p class="cb-sub">
                     {currentLang === 'bg'
-                      ? 'При съмнителни или гранични твърдения, системата активира втори независим AI модел за двойна проверка. При съгласие вердиктът получава 100% доверие, а при разминаване се отбелязват аргументите на двата модела.'
-                      : 'Executes secondary verification. When models agree, confidence is maximized; when they split, both rationales are logged for human review.'}
+                      ? 'При гранични твърдения системата сравнява преценката с втори независим модел. При разминаване се записват мотивите и на двата модела.'
+                      : 'Executes secondary verification. When models agree, confidence is maximized; when they split, both rationales are logged.'}
                   </p>
                 </div>
               </div>

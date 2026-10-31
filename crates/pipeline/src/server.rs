@@ -602,10 +602,38 @@ async fn handle_get_deepfake(
     }
 }
 
+struct ActiveTaskCleanup {
+    ctx: Arc<PipelineContext>,
+    task_id: String,
+}
+
+impl Drop for ActiveTaskCleanup {
+    fn drop(&mut self) {
+        let ctx = Arc::clone(&self.ctx);
+        let id = self.task_id.clone();
+        tokio::spawn(async move {
+            ctx.remove_active_task(&id).await;
+        });
+    }
+}
+
 async fn handle_trigger_deepfake(
     State(ctx): State<Arc<PipelineContext>>,
     Path(id): Path<String>,
 ) -> Response {
+    let task_id = format!("aegis_scan:{}", id);
+    ctx.upsert_active_task(crate::engine::ActiveResearchTask {
+        id: task_id.clone(),
+        kind: "aegis_scan".to_string(),
+        subject_id: None,
+        video_id: Some(id.clone()),
+        subject_name: format!("Видео {}", id),
+        title: format!("Проверка на записа: видео {}", id),
+        stage: "Анализ на аудио и видео поток...".to_string(),
+        progress_pct: 45,
+        started_at: chrono::Utc::now().to_rfc3339(),
+    }).await;
+    let _cleanup = ActiveTaskCleanup { ctx: Arc::clone(&ctx), task_id };
     match ctx.run_aegis_deepfake_detection(&id).await {
         Ok(res) => Json(serde_json::json!({ "ok": true, "result": res })).into_response(),
         Err(e) => (
@@ -644,6 +672,19 @@ async fn handle_decision(
                         status: "running".to_string(),
                     });
                     tokio::spawn(async move {
+                        let task_id = format!("video_research:{}", run_vid);
+                        run_ctx.upsert_active_task(crate::engine::ActiveResearchTask {
+                            id: task_id.clone(),
+                            kind: "video_research".to_string(),
+                            subject_id: None,
+                            video_id: Some(run_vid.clone()),
+                            subject_name: format!("Видео {}", run_vid),
+                            title: format!("Разширено търсене: видео {}", run_vid),
+                            stage: "Проверка на външни източници и регистри...".to_string(),
+                            progress_pct: 55,
+                            started_at: chrono::Utc::now().to_rfc3339(),
+                        }).await;
+                        let _cleanup = ActiveTaskCleanup { ctx: Arc::clone(&run_ctx), task_id };
                         let res = run_ctx.run_research_more_job(&run_vid).await;
                         match res {
                             Ok(()) => {
@@ -1543,7 +1584,41 @@ async fn handle_research_person(
     Path(id): Path<i64>,
     Json(body): Json<ResearchPersonRequest>,
 ) -> Response {
-    let name = body.name.unwrap_or_default();
+    let (existing_person, existing_cat, existing_ent, person_variants, db_name) =
+        if let Ok(Some(p)) = ctx.db.get_person_by_id(id).await {
+            let vars = p.variants.clone();
+            let cname = p.canonical_name.clone();
+            (Some(p.clone()), p.category, Some(p.entity_type), vars, cname)
+        } else {
+            (None, None, None, Vec::new(), String::new())
+        };
+
+    let name = body
+        .name
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or(db_name);
+    let entity_type = existing_ent
+        .filter(|t| !t.trim().is_empty())
+        .unwrap_or_else(|| leadfinder_providers::detect_entity_type(&name, None).to_string());
+
+    let task_id = format!("person_research:{}", id);
+    ctx.upsert_active_task(crate::engine::ActiveResearchTask {
+        id: task_id.clone(),
+        kind: "person_research".to_string(),
+        subject_id: Some(id),
+        video_id: None,
+        subject_name: name.clone(),
+        title: format!("Проучване на обект: {}", name),
+        stage: "Проверка на регистри, архиви и новини".to_string(),
+        progress_pct: 12,
+        started_at: chrono::Utc::now().to_rfc3339(),
+    })
+    .await;
+    let _task_guard = ActiveTaskCleanup {
+        ctx: ctx.clone(),
+        task_id: task_id.clone(),
+    };
+
     let cfg = ctx.config.read().await.clone();
     let lex = leadfinder_providers::global_lexicon(&ctx.paths, &cfg.normalisation.lexicon_config_file);
 
@@ -1557,7 +1632,7 @@ async fn handle_research_person(
         ctx.guard.clone(),
     );
     let ranker = leadfinder_providers::PassageExtractorAndRanker::new(ctx.guard.clone(), lex);
-    let mut hits_text = Vec::new();
+    let mut scraped_docs: Vec<ScrapedOsintDoc> = Vec::new();
 
     let py_script = if std::path::Path::new("scripts/google_ai_search.py").exists() {
         Some("scripts/google_ai_search.py")
@@ -1568,21 +1643,29 @@ async fn handle_research_person(
     };
 
     if let Some(script_path) = py_script {
-        if let Ok(py_out) = tokio::process::Command::new("python")
-            .arg(script_path)
-            .arg("--json")
-            .arg("--mode")
-            .arg("research")
-            .arg(&name)
-            .output()
-            .await
+        if let Ok(Ok(py_out)) = tokio::time::timeout(
+            std::time::Duration::from_secs(12),
+            tokio::process::Command::new("python")
+                .arg(script_path)
+                .arg("--json")
+                .arg("--mode")
+                .arg("research")
+                .arg(&name)
+                .output(),
+        )
+        .await
         {
             if py_out.status.success() {
                 if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&py_out.stdout) {
                     if let Some(ai_txt) = val.get("text").and_then(|v| v.as_str()) {
                         let clean = ai_txt.trim();
                         if !clean.is_empty() {
-                            hits_text.push(format!("Google AI Mode конспект:\n{}", clean));
+                            scraped_docs.push(ScrapedOsintDoc {
+                                bucket: "gov".to_string(),
+                                title: format!("Обобщена уеб справка за {}", name),
+                                url: String::new(),
+                                text: clean.to_string(),
+                            });
                         }
                     }
                 }
@@ -1590,97 +1673,132 @@ async fn handle_research_person(
         }
     }
 
-    let (existing_person, existing_cat, existing_ent, person_variants) = if let Ok(Some(p)) = ctx.db.get_person_by_id(id).await {
-        let vars = p.variants.clone();
-        (Some(p.clone()), p.category, Some(p.entity_type), vars)
-    } else {
-        (None, None, None, Vec::new())
-    };
-    let entity_type = existing_ent.unwrap_or_else(|| leadfinder_providers::detect_entity_type(&name, None).to_string());
-
     let sanctions_matcher = leadfinder_providers::SanctionsMatcher::new();
-    let sanctions_matches = sanctions_matcher.check_entity(&name, &person_variants).await.unwrap_or_default();
+    let news_stream = leadfinder_providers::DynamicNewsStream::new();
+    let (sanctions_res, news_res) = tokio::join!(
+        sanctions_matcher.check_entity(&name, &person_variants),
+        news_stream.fetch_events_for_entity(id, &name, &person_variants, 10)
+    );
+
+    let sanctions_matches = sanctions_res.unwrap_or_default();
     let _ = ctx.db.save_sanctions_matches(id, &sanctions_matches).await;
 
     let mut sanctions_summary_lines: Vec<String> = Vec::new();
-    if !sanctions_matches.is_empty() {
-        for sm in &sanctions_matches {
-            let mut line = format!("- [{}] {} (Увереност: {:.0}%)", sm.dataset, sm.caption, sm.match_score * 100.0);
-            if let Some(ref p) = sm.program {
-                line.push_str(&format!(" Програма: {}", p));
-            }
-            if let Some(ref s) = sm.sanctor {
-                line.push_str(&format!(" Санкциониращ орган: {}", s));
-            }
-            sanctions_summary_lines.push(line);
+    for sm in &sanctions_matches {
+        let mut line = format!("- [{}] {} (Съвпадение: {:.0}%)", sm.dataset, sm.caption, sm.match_score * 100.0);
+        if let Some(ref p) = sm.program {
+            line.push_str(&format!(" | Програма: {}", p));
         }
+        if let Some(ref s) = sm.sanctor {
+            line.push_str(&format!(" | Орган: {}", s));
+        }
+        sanctions_summary_lines.push(line);
     }
     let sanctions_context_block = if sanctions_summary_lines.is_empty() {
-        "Справка в международните регистри: Не са открити активни санкционни съвпадения в базите на ООН, US OFAC SDN, ЕС, UK OFSI, Швейцария SECO, НАЗК или Интерпол.".to_string()
+        "Проверени санкционни регистри (ООН, US OFAC SDN, ЕС, UK OFSI, SECO, НАЗК, Интерпол): не са установени активни вписвания.".to_string()
     } else {
-        format!("РЕГИСТРИРАНИ МЕЖДУНАРОДНИ САНКЦИОННИ И PEP СЪВПАДЕНИЯ:\n{}", sanctions_summary_lines.join("\n"))
+        format!("Вписвания в международни санкционни и PEP регистри:\n{}", sanctions_summary_lines.join("\n"))
     };
 
-    let news_stream = leadfinder_providers::DynamicNewsStream::new();
-    let live_events = news_stream.fetch_events_for_entity(id, &name, &person_variants, 8).await.unwrap_or_default();
+    let live_events = news_res.unwrap_or_default();
     let mut newly_recorded_events = 0usize;
     for ev in &live_events {
-        if let Ok(_) = ctx.db.record_intel_event(id, &ev.source_name, &ev.title, &ev.url, &ev.snippet).await {
+        if ctx
+            .db
+            .record_intel_event(id, &ev.source_name, &ev.title, &ev.url, &ev.snippet)
+            .await
+            .is_ok()
+        {
             newly_recorded_events += 1;
         }
-        hits_text.push(format!("Новинарски поток [{}] {}: {}\n{}", ev.source_name, ev.title, ev.url, ev.snippet));
+        scraped_docs.push(ScrapedOsintDoc {
+            bucket: "media".to_string(),
+            title: format!("[{}] {}", ev.source_name, ev.title),
+            url: ev.url.clone(),
+            text: format!("{}. {}", ev.title, ev.snippet),
+        });
     }
     let _ = ctx.db.touch_person_monitored(id).await;
 
+    ctx.update_active_task(&task_id, "Справка в архивни бази и Уикипедия", 32)
+        .await;
+
     let candidate_archive_urls: Vec<String> = live_events.iter().map(|e| e.url.clone()).collect();
     let web_archive_engine = leadfinder_providers::WebArchiveEngine::new();
-    let temporal_audit = web_archive_engine.run_aegis_temporal_audit(&name, &entity_type, &candidate_archive_urls).await;
-
-    if let Some(ref wb) = temporal_audit.wiki_bio {
-        hits_text.insert(0, format!("ОФИЦИАЛЕН ЕНЦИКЛОПЕДИЧЕН И БИОГРАФИЧЕН ПРОФИЛ [{}] (Уикипедия - {}):\n{}", wb.language, wb.title, wb.extract));
-    }
+    let temporal_audit = web_archive_engine
+        .run_aegis_temporal_audit(&name, &entity_type, &candidate_archive_urls)
+        .await;
 
     let mut archive_summary_lines: Vec<String> = Vec::new();
-    archive_summary_lines.push(format!("- Оценка на риска от заличаване/редакция на дигиталната памет: {}", temporal_audit.scrubbed_or_altered_risk));
+    archive_summary_lines.push(format!(
+        "- Състояние на архивната следа: {}",
+        temporal_audit.scrubbed_or_altered_risk
+    ));
     for note in &temporal_audit.provenance_notes {
         archive_summary_lines.push(format!("- {}", note));
     }
     for snap in &temporal_audit.historical_snapshots {
-        archive_summary_lines.push(format!("- [Wayback Machine Снимка] {} -> {} (Статус: {})", snap.timestamp, snap.url, snap.status));
+        archive_summary_lines.push(format!(
+            "- [Wayback Machine] {} -> {} (HTTP {})",
+            snap.timestamp, snap.url, snap.status
+        ));
     }
     for doc in &temporal_audit.internet_archive_docs {
-        archive_summary_lines.push(format!("- [Internet Archive Документ] {} ({}) -> {}", doc.title, doc.date.as_deref().unwrap_or("без дата"), doc.detail_url));
+        archive_summary_lines.push(format!(
+            "- [Internet Archive] {} ({}) -> {}",
+            doc.title,
+            doc.date.as_deref().unwrap_or("без дата"),
+            doc.detail_url
+        ));
     }
-    let archive_context_block = format!("ВРЕМЕВИ АРХИВ И ДИГИТАЛНА ПАМЕТ (Wayback Machine / Internet Archive / Revisions):\n{}", archive_summary_lines.join("\n"));
-    hits_text.push(archive_context_block.clone());
+    let archive_context_block = format!(
+        "Архивни копия и история на публикациите (Wayback Machine / Internet Archive / Уикипедия):\n{}",
+        archive_summary_lines.join("\n")
+    );
 
     let mut video_contexts: Vec<String> = Vec::new();
+    let mut aegis_dossier_notes: Vec<String> = Vec::new();
     if let Ok(vids) = ctx.db.get_videos_for_person(id).await {
         for (vid_id, caption, handle) in vids {
             let mut line = format!("Видео ID: {}", vid_id);
-            if let Some(h) = handle {
+            if let Some(ref h) = handle {
                 if !h.is_empty() {
                     line.push_str(&format!(" (Автор: @{})", h));
                 }
             }
-            if let Some(c) = caption {
+            if let Some(ref c) = caption {
                 if !c.is_empty() {
-                    line.push_str(&format!(" Описание: {}", c));
+                    line.push_str(&format!(" | Описание: {}", c));
+                }
+            }
+            if let Ok(Some(vdetail)) = ctx.db.get_video_detail(&vid_id).await {
+                for cwe in vdetail.claims.iter().take(6) {
+                    let verdict_tag = cwe.claim.verdict.as_deref().unwrap_or("НЕПРОВЕРЕНО");
+                    line.push_str(&format!(
+                        "\n  • Твърдение [{}]: {}",
+                        verdict_tag, cwe.claim.text_bg
+                    ));
+                    for ev in cwe.evidence.iter().take(3) {
+                        if !ev.source_url.is_empty()
+                            && ev.passage.chars().count() >= 35
+                            && !scraped_docs.iter().any(|d| d.url == ev.source_url)
+                        {
+                            scraped_docs.push(ScrapedOsintDoc {
+                                bucket: "media".to_string(),
+                                title: ev
+                                    .source_name
+                                    .clone()
+                                    .unwrap_or_else(|| "Доказателствен източник".to_string()),
+                                url: ev.source_url.clone(),
+                                text: ev.passage.clone(),
+                            });
+                        }
+                    }
                 }
             }
             video_contexts.push(line);
-        }
-    }
-    let vid_context_block = if video_contexts.is_empty() {
-        String::new()
-    } else {
-        format!("\n\nСвързан контекст от TikTok видеа:\n{}", video_contexts.join("\n"))
-    };
 
-    let mut aegis_dossier_notes: Vec<String> = Vec::new();
-    if let Ok(vids) = ctx.db.get_videos_for_person(id).await {
-        for (vid_id, _, _) in &vids {
-            if let Ok(Some(df)) = ctx.db.get_aegis_result(vid_id).await {
+            if let Ok(Some(df)) = ctx.db.get_aegis_result(&vid_id).await {
                 let v_up = df.overall_verdict.to_uppercase();
                 let is_df = v_up == "DEEPFAKE"
                     || v_up == "CONFIRMED_DEEPFAKE"
@@ -1690,17 +1808,25 @@ async fn handle_research_person(
                     || v_up == "SUSPECTED_SYNTHETIC"
                     || v_up == "SUSPICIOUS";
                 if is_df || df.audio.synthetic || df.video.synthetic {
-                    let mut note = format!("- Видео ID {}: Заключение '{}'.", vid_id, df.overall_verdict);
+                    let mut note = format!("- Видео ID {}: оценка '{}'.", vid_id, df.overall_verdict);
                     if df.audio.synthetic {
-                        note.push_str(&format!(" Аудио: {:.0}% ({})", df.audio.score * 100.0, df.audio.classification));
+                        note.push_str(&format!(
+                            " Аудио: {:.0}% ({})",
+                            df.audio.score * 100.0,
+                            df.audio.classification
+                        ));
                         if let Some(ref t) = df.audio.target_person {
-                            note.push_str(&format!(" [Имитиран глас: {}]", t));
+                            note.push_str(&format!(" [Глас: {}]", t));
                         }
                     }
                     if df.video.synthetic {
-                        note.push_str(&format!(" Видео: {:.0}% ({})", df.video.score * 100.0, df.video.classification));
+                        note.push_str(&format!(
+                            " Картина: {:.0}% ({})",
+                            df.video.score * 100.0,
+                            df.video.classification
+                        ));
                         if let Some(ref t) = df.video.target_person {
-                            note.push_str(&format!(" [Имитирано лице: {}]", t));
+                            note.push_str(&format!(" [Лице: {}]", t));
                         }
                     }
                     aegis_dossier_notes.push(note);
@@ -1708,200 +1834,429 @@ async fn handle_research_person(
             }
         }
     }
-    let aegis_summary_str = if aegis_dossier_notes.is_empty() {
-        "В анализираните до момента видеа в базата на TikTok Lead Finder не са регистрирани успешни deepfake атаки или опити за клониране на гласа на субекта.".to_string()
+
+    let vid_context_block = if video_contexts.is_empty() {
+        "Няма свързани локални видеа.".to_string()
     } else {
-        format!("AEGIS ФОРЕНЗИЧНИ РЕГИСТРАЦИИ НА ДИГИТАЛНА ИМИТАЦИЯ:\n{}", aegis_dossier_notes.join("\n"))
+        video_contexts.join("\n")
     };
 
-    let queries: Vec<String> = match entity_type.as_str() {
+    let aegis_summary_str = if aegis_dossier_notes.is_empty() {
+        "В проверените видеа в системата не са установени синтетично генерирани аудио или видео манипулации, свързани с обекта.".to_string()
+    } else {
+        format!("Установени синтетични или манипулирани видеозаписи:\n{}", aegis_dossier_notes.join("\n"))
+    };
+
+    ctx.update_active_task(
+        &task_id,
+        "Проверка на Търговския регистър, поръчки и съдебни актове",
+        50,
+    )
+    .await;
+
+    let bucketed_queries: Vec<(&str, String)> = match entity_type.as_str() {
+        "infrastructure" => vec![
+            ("fin", format!("\"{}\" поръчка OR договор OR ЦАИС", name)),
+            ("fin", format!("\"{}\" стойност OR бюджет OR милиона", name)),
+            ("net", format!("\"{}\" изпълнител OR консорциум OR ДЗЗД", name)),
+            ("net", format!("\"{}\" строител OR надзор OR ЕИК", name)),
+            ("gov", format!("\"{}\" МРРБ OR АПИ OR \"Акт 16\"", name)),
+            ("legal", format!("\"{}\" ДНСК OR КЗК OR ВАС OR проверка", name)),
+            ("media", format!("\"{}\" разследване OR ремонт OR сигнали", name)),
+        ],
+        "building" => vec![
+            ("fin", format!("\"{}\" собственост OR имот OR сделка", name)),
+            ("fin", format!("\"{}\" поръчка OR договор OR стойност", name)),
+            ("net", format!("\"{}\" инвеститор OR строител OR собственик", name)),
+            ("net", format!("\"{}\" дружество OR ЕООД OR ООД OR ЕИК", name)),
+            ("gov", format!("\"{}\" \"разрешение за строеж\" OR ПУП OR \"Акт 16\"", name)),
+            ("legal", format!("\"{}\" ДНСК OR ВАС OR съд OR глоба", name)),
+            ("media", format!("\"{}\" разследване OR реконструкция", name)),
+        ],
         "institution" => vec![
-            format!("{} институция ръководство структура правомощия дейност устав", name),
-            format!("{} бюджет финансиране обществени поръчки одит проверки сметна палата", name),
-            format!("{} решения съдебни дела скандали проверки критики констатации", name),
-            format!("{} европейски програми субсидии договори проекти финансиране", name),
-            format!("{} официален сайт седалище адрес контакти ръководител", name),
-        ],
-        "country" => vec![
-            format!("{} държавно управление институции правителство конституция структура", name),
-            format!("{} икономика геополитика международни договори санкции съюзи", name),
-            format!("{} кризи сигурност доклади права факти вътрешен ред", name),
-            format!("{} макроикономика бвп финанси валута търговия външен дълг", name),
-            format!("{} медийна среда свобода слово дезинформация външно влияние", name),
-        ],
-        "channel" => vec![
-            format!("{} автор водещ канал предаване аудитория последователи екип", name),
-            format!("{} медия продуцент собственост съдържание финансиране издател", name),
-            format!("{} дезинформация проверка на факти скандали критики опровержения", name),
-            format!("{} журналисти гости теми позиции интервюта предавания", name),
-            format!("{} платформи youtube tiktok facebook монетизация реклами", name),
+            ("fin", format!("\"{}\" бюджет OR поръчки OR договори", name)),
+            ("fin", format!("\"{}\" \"Сметна палата\" OR одит OR ЦАИС", name)),
+            ("net", format!("\"{}\" ръководство OR директор OR \"управителен съвет\"", name)),
+            ("gov", format!("\"{}\" закон OR отчети OR решения", name)),
+            ("legal", format!("\"{}\" ВАС OR дело OR проверки OR санкции", name)),
+            ("media", format!("\"{}\" разследване OR позиции", name)),
         ],
         "group" => vec![
-            format!("{} партия коалиция движение ръководство лидери членове устав", name),
-            format!("{} финансиране дарения активи свързани лица фирми сметна палата", name),
-            format!("{} платформа позиции избори скандали разследвания резултати", name),
-            format!("{} устав цели парламентарна група съюзници коалиция", name),
-            format!("{} лобистки интереси бизнес кръгове покровители спонсори", name),
+            ("fin", format!("\"{}\" финансиране OR субсидия OR дарения", name)),
+            ("fin", format!("\"{}\" \"Сметна палата\" OR отчет OR ЕИК", name)),
+            ("net", format!("\"{}\" председател OR ръководство OR коалиция", name)),
+            ("gov", format!("\"{}\" избори OR мандати OR парламент", name)),
+            ("legal", format!("\"{}\" ЦИК OR съд OR регистрация", name)),
+            ("media", format!("\"{}\" разследване OR позиции", name)),
+        ],
+        "channel" => vec![
+            ("fin", format!("\"{}\" собственост OR издател OR ЕИК", name)),
+            ("fin", format!("\"{}\" ЕООД OR ООД OR АД OR СЕМ", name)),
+            ("net", format!("\"{}\" собственик OR продуцент OR редакция", name)),
+            ("gov", format!("\"{}\" лиценз OR СЕМ OR регистър", name)),
+            ("legal", format!("\"{}\" СЕМ OR решение OR съд OR опровержение", name)),
+            ("media", format!("\"{}\" проверка OR анализ", name)),
+        ],
+        "country" => vec![
+            ("fin", format!("\"{}\" БВП OR бюджет OR дълг OR търговия", name)),
+            ("net", format!("\"{}\" правителство OR президент OR премиер", name)),
+            ("gov", format!("\"{}\" институции OR управление OR конституция", name)),
+            ("legal", format!("\"{}\" договори OR санкции OR съд", name)),
+            ("media", format!("\"{}\" икономика OR анализ", name)),
         ],
         _ => vec![
-            format!("{} биография дата раждане произход образование кариера семейство", name),
-            format!("{} търговски регистър фирми собственост управител съдружник папагал бра", name),
-            format!("{} обществени поръчки агенция аоп държавни договори бенефициент еврофондове", name),
-            format!("{} съдебни дела съд прокуратура кпконпи разследвания проверки санкции", name),
-            format!("{} политическа партия длъжности постове избори декларация имущество", name),
-            format!("{} bird bg bivol капитал медиапул разследване афера скандал", name),
-            format!("{} свързани лица партньори бизнес кръгове семейни връзки съдружници", name),
-            format!("{} интервюта медийни участия публични изявления конфликти позиции", name),
-            format!("{} дезинформация проверка на факти фактчек фалшиви новини", name),
-            format!("{} уикипедия wikidata профил официален сайт", name),
+            ("fin", format!("\"{}\" ЕИК OR ООД OR ЕООД OR АД", name)),
+            ("fin", format!("\"{}\" papagal OR \"търговски регистър\" OR дружество", name)),
+            ("fin", format!("\"{}\" декларация OR КПКОНПИ OR \"Сметна палата\"", name)),
+            ("net", format!("\"{}\" съдружник OR управител OR \"свързани лица\"", name)),
+            ("gov", format!("\"{}\" биография OR длъжност OR назначение", name)),
+            ("legal", format!("\"{}\" ВАС OR СЕС OR дело OR несъвместимост", name)),
+            ("media", format!("\"{}\" разследване OR bird OR капитал", name)),
         ],
     };
 
     let name_low = name.to_lowercase();
-    let name_tokens: Vec<&str> = name_low.split_whitespace().filter(|t| t.chars().count() >= 3).collect();
+    let name_tokens: Vec<String> = name_low
+        .split_whitespace()
+        .filter(|t| t.chars().count() >= 3)
+        .map(|s| s.to_string())
+        .collect();
 
-    for q_str in queries.into_iter().take(2) {
-        if hits_text.len() >= 6 {
-            break;
-        }
+    for (bucket, q_str) in bucketed_queries {
         let sq = leadfinder_core::SearchQuery {
             query: q_str,
             restrict_domains: Vec::new(),
             date_from: None,
             date_to: None,
-            max_results: 3,
+            max_results: 4,
         };
-        if let Ok(hits) = search_engine.search(&sq).await {
-            for hit in hits.into_iter().take(2) {
-                if hits_text.len() >= 6 {
-                    break;
+        if let Ok(Ok(hits)) =
+            tokio::time::timeout(std::time::Duration::from_secs(7), search_engine.search(&sq)).await
+        {
+            for hit in hits.into_iter().take(3) {
+                if scraped_docs.iter().any(|d| !d.url.is_empty() && d.url == hit.url) {
+                    continue;
                 }
-                if !hits_text.iter().any(|h| h.contains(&hit.url)) {
-                    let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
-                    let txt = ranker.extract_main_text(&html);
-                    if !txt.is_empty() {
-                        let combined = format!("{} {}", hit.title.to_lowercase(), txt.to_lowercase());
-                        let name_present = if name_tokens.len() >= 2 {
-                            combined.contains(&name_low) || name_tokens.iter().all(|t| combined.contains(t))
-                        } else {
-                            combined.contains(&name_low)
-                        };
-                        if name_present {
-                            hits_text.push(format!("Източник {}: {}\n{}", hit.title, hit.url, txt.chars().take(3500).collect::<String>()));
-                        }
+                let html = tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    ranker.fetch_html_cached(&hit.url),
+                )
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_default();
+                let extracted = ranker.extract_main_text(&html);
+                let body_text = if extracted.chars().count() >= 140 {
+                    if hit.snippet.trim().is_empty() {
+                        extracted.chars().take(3800).collect::<String>()
+                    } else {
+                        format!(
+                            "{}\n{}",
+                            hit.snippet.trim(),
+                            extracted.chars().take(3500).collect::<String>()
+                        )
                     }
+                } else {
+                    format!("{} {}", hit.title.trim(), hit.snippet.trim())
+                };
+                if body_text.trim().chars().count() < 25 {
+                    continue;
+                }
+                let combined_low = format!("{} {}", hit.title.to_lowercase(), body_text.to_lowercase());
+                let relevant = if name_tokens.len() >= 2 {
+                    combined_low.contains(&name_low)
+                        || name_tokens.iter().filter(|t| combined_low.contains(t.as_str())).count() >= 1
+                } else {
+                    combined_low.contains(&name_low)
+                };
+                if relevant {
+                    scraped_docs.push(ScrapedOsintDoc {
+                        bucket: bucket.to_string(),
+                        title: hit.title,
+                        url: hit.url,
+                        text: body_text,
+                    });
                 }
             }
         }
     }
 
-    let preliminary_combined = hits_text.join("\n");
-    let entity_pivots = leadfinder_providers::extract_entity_pivots(&preliminary_combined, &name);
+    let wiki_full_text = temporal_audit
+        .wiki_bio
+        .as_ref()
+        .map(|w| w.extract.as_str())
+        .unwrap_or_default();
 
-    for pivot in entity_pivots.iter().take(2) {
-        if hits_text.len() >= 8 {
-            break;
-        }
-        let pivot_query = format!("\"{}\" собственик управител съдружник сделки", pivot.entity_name);
+    let mut preliminary_corpus = String::new();
+    preliminary_corpus.push_str(wiki_full_text);
+    for doc in &scraped_docs {
+        preliminary_corpus.push('\n');
+        preliminary_corpus.push_str(&doc.title);
+        preliminary_corpus.push('\n');
+        preliminary_corpus.push_str(&doc.text);
+    }
+
+    let mut entity_pivots = leadfinder_providers::extract_entity_pivots(&preliminary_corpus, &name);
+
+    if !entity_pivots.is_empty() {
+        ctx.update_active_task(
+            &task_id,
+            "Проверка на свързани търговски дружества и ЕИК",
+            66,
+        )
+        .await;
+    }
+
+    for pivot in entity_pivots.iter().take(3) {
+        let pivot_query = format!(
+            "\"{}\" ЕИК OR управител OR съдружник",
+            pivot.entity_name
+        );
         let sq = leadfinder_core::SearchQuery {
             query: pivot_query,
             restrict_domains: Vec::new(),
             date_from: None,
             date_to: None,
-            max_results: 2,
+            max_results: 3,
         };
-        if let Ok(hits) = search_engine.search(&sq).await {
-            for hit in hits.into_iter().take(1) {
-                if !hits_text.iter().any(|h| h.contains(&hit.url)) {
-                    let html = ranker.fetch_html_cached(&hit.url).await.unwrap_or_default();
-                    let txt = ranker.extract_main_text(&html);
-                    if !txt.is_empty() {
-                        hits_text.push(format!("Пивот свързана организация [{}] {}: {}\n{}", pivot.entity_name, hit.title, hit.url, txt.chars().take(2500).collect::<String>()));
-                    }
+        if let Ok(Ok(hits)) =
+            tokio::time::timeout(std::time::Duration::from_secs(6), search_engine.search(&sq)).await
+        {
+            for hit in hits.into_iter().take(2) {
+                if scraped_docs.iter().any(|d| !d.url.is_empty() && d.url == hit.url) {
+                    continue;
+                }
+                let html = tokio::time::timeout(
+                    std::time::Duration::from_secs(4),
+                    ranker.fetch_html_cached(&hit.url),
+                )
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_default();
+                let extracted = ranker.extract_main_text(&html);
+                let body_text = if extracted.chars().count() >= 120 {
+                    format!(
+                        "{}\n{}",
+                        hit.snippet.trim(),
+                        extracted.chars().take(2800).collect::<String>()
+                    )
+                } else {
+                    format!("{} {}", hit.title.trim(), hit.snippet.trim())
+                };
+                if body_text.trim().chars().count() >= 25 {
+                    scraped_docs.push(ScrapedOsintDoc {
+                        bucket: "pivot".to_string(),
+                        title: format!("[{}] {}", pivot.entity_name, hit.title),
+                        url: hit.url,
+                        text: body_text,
+                    });
                 }
             }
         }
     }
 
+    let mut full_corpus = String::from(wiki_full_text);
+    for doc in &scraped_docs {
+        full_corpus.push('\n');
+        full_corpus.push_str(&doc.title);
+        full_corpus.push('\n');
+        full_corpus.push_str(&doc.text);
+    }
+    entity_pivots = leadfinder_providers::extract_entity_pivots(&full_corpus, &name);
+    let eik_numbers = leadfinder_providers::extract_eik_numbers(&full_corpus);
+
     let delta_summary = if let Some(ref prev) = existing_person {
         if prev.researched_at.is_some() {
             let mut deltas = Vec::new();
             if newly_recorded_events > 0 {
-                deltas.push(format!("{} нови събития в новинарския поток", newly_recorded_events));
+                deltas.push(format!("{} нови медийни публикации", newly_recorded_events));
             }
             if !sanctions_matches.is_empty() {
-                deltas.push(format!("Актуализирани {} международни санкционни/PEP съответствия", sanctions_matches.len()));
+                deltas.push(format!(
+                    "{} съвпадения в санкционни/PEP регистри",
+                    sanctions_matches.len()
+                ));
             }
             if !entity_pivots.is_empty() {
-                deltas.push(format!("Картографирани {} свързани корпоративни субекта ({})", entity_pivots.len(), entity_pivots.iter().take(3).map(|p| p.entity_name.as_str()).collect::<Vec<_>>().join(", ")));
+                deltas.push(format!(
+                    "{} установени търговски дружества/организации ({})",
+                    entity_pivots.len(),
+                    entity_pivots
+                        .iter()
+                        .take(3)
+                        .map(|p| p.entity_name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
             }
             if !temporal_audit.historical_snapshots.is_empty() {
-                deltas.push(format!("Крос-реферирани {} архивни снимки в Wayback Machine", temporal_audit.historical_snapshots.len()));
+                deltas.push(format!(
+                    "{} архивни уеб копия в Wayback Machine",
+                    temporal_audit.historical_snapshots.len()
+                ));
             }
             if deltas.is_empty() {
-                "Няма критични промени в правния и оперативен статус спрямо предходния скан.".to_string()
+                "Няма установени съществени промени спрямо предходната проверка.".to_string()
             } else {
-                format!("ДЕЛТА АНАЛИЗ (Какво се промени): {}", deltas.join("; "))
+                format!("Промени спрямо предходната проверка: {}", deltas.join("; "))
             }
         } else {
-            "Първоначално задълбочено разузнавателно картографиране на субекта.".to_string()
+            format!(
+                "Първоначална справка: проверени {} източника, {} дружества/организации и {} архивни записа.",
+                scraped_docs.len(),
+                entity_pivots.len(),
+                temporal_audit.historical_snapshots.len()
+            )
         }
     } else {
-        "Първоначално задълбочено разузнавателно картографиране на субекта.".to_string()
+        format!(
+            "Първоначална справка: проверени {} източника и {} свързани организации.",
+            scraped_docs.len(),
+            entity_pivots.len()
+        )
     };
 
-    let wiki_full_text = temporal_audit.wiki_bio.as_ref().map(|w| w.extract.as_str()).unwrap_or_default();
     let wiki_sections = parse_wiki_sections(wiki_full_text);
+    let headings = chapter_headings_for_type(&entity_type);
+
+    let fin_extracted = extract_matching_factual_passages(
+        &scraped_docs,
+        &["fin", "pivot"],
+        wiki_full_text,
+        &[
+            "еик", "булстат", "оод", "еоод", "ад", "еад", "дззд", "търговски регистър",
+            "управител", "съдружник", "дял", "капитал", "собственост", "имот", "декларац",
+            "кпконпи", "сметна палата", "поръчк", "договор", "лв", "лева", "евро", "долар", "$",
+            "млн", "млрд", "милион", "милиард", "финанс", "богатств", "актив", "приход", "печалб",
+            "доход", "компани", "корпорац", "организейшън", "холдинг", "консорциум", "сделк",
+            "инвеститор", "изпълнител", "акци",
+        ],
+        22,
+    );
+    let net_extracted = extract_matching_factual_passages(
+        &scraped_docs,
+        &["net", "pivot"],
+        wiki_full_text,
+        &[
+            "съдружник", "партньор", "свързан", "кръг", "коалиция", "партия", "управителен",
+            "съвет", "директор", "основател", "назнач", "предложен", "екип", "консорциум",
+            "семейств", "вицепрезидент", "съветник", "администрац",
+        ],
+        16,
+    );
+    let legal_extracted = extract_matching_factual_passages(
+        &scraped_docs,
+        &["legal", "gov"],
+        wiki_full_text,
+        &[
+            "съд", "вас", "вкс", "сес", "дело", "решение", "присъд", "осъден", "оправдан",
+            "обвинен", "импийчмънт", "иск", "оспор", "кпконпи", "кпк", "несъвместимост",
+            "прокуратур", "прокурор", "разследв", "проверка", "санкц", "магнитски", "ofac",
+            "глоба", "акт", "днск", "кзк", "отстранен", "обжалв",
+        ],
+        22,
+    );
 
     let mut b1_sources = Vec::new();
-    for (stitle, sbody) in &wiki_sections {
-        let slow = stitle.to_lowercase();
-        if slow.contains("въведение") || slow.contains("биография") || slow.contains("детство")
-            || slow.contains("образование") || slow.contains("военна") || slow.contains("ввс")
-            || slow.contains("генерал") || slow.contains("звания") || slow.contains("длъжности")
-            || slow.contains("награди") || slow.contains("семейство")
-        {
-            b1_sources.push(format!("### {}\n{}", stitle, sbody));
+    if !wiki_sections.is_empty() {
+        for (stitle, sbody) in wiki_sections.iter().take(8) {
+            b1_sources.push(format!("### Уикипедия: {}\n{}", stitle, sbody.chars().take(3200).collect::<String>()));
         }
     }
-    if b1_sources.is_empty() && !wiki_full_text.is_empty() {
-        b1_sources.push(wiki_full_text.chars().take(8000).collect::<String>());
+    if !eik_numbers.is_empty() {
+        b1_sources.push(format!("Открити ЕИК / БУЛСТАТ номера в източниците: {}", eik_numbers.join(", ")));
     }
-    for p in &entity_pivots {
-        b1_sources.push(format!("Пивот: {} ({}) - {}", p.entity_name, p.entity_kind, p.registry_status.as_deref().unwrap_or("активен")));
+    if !entity_pivots.is_empty() {
+        let piv_lines: Vec<String> = entity_pivots
+            .iter()
+            .map(|p| {
+                format!(
+                    "- {} ({}) — {}",
+                    p.entity_name,
+                    p.entity_kind,
+                    p.registry_status.as_deref().unwrap_or("открити данни"),
+                )
+            })
+            .collect();
+        b1_sources.push(format!("Установени търговски дружества и организации:\n{}", piv_lines.join("\n")));
     }
-    let b1_context = b1_sources.join("\n\n");
+    if !fin_extracted.is_empty() {
+        let lines: Vec<String> = fin_extracted
+            .iter()
+            .map(|fact| format!("- {}", fact))
+            .collect();
+        b1_sources.push(format!("Извлечени конкретни финансови, фирмени и имотни факти:\n{}", lines.join("\n")));
+    }
+    if !net_extracted.is_empty() {
+        let lines: Vec<String> = net_extracted
+            .iter()
+            .map(|fact| format!("- {}", fact))
+            .collect();
+        b1_sources.push(format!("Извлечени факти за свързани лица и организации:\n{}", lines.join("\n")));
+    }
+    for doc in scraped_docs
+        .iter()
+        .filter(|d| d.bucket == "fin" || d.bucket == "net" || d.bucket == "pivot")
+        .take(10)
+    {
+        b1_sources.push(format!(
+            "Документ [{}] ({}):\n{}",
+            doc.title,
+            doc.url,
+            doc.text.chars().take(1800).collect::<String>()
+        ));
+    }
+    let b1_context = b1_sources.join("\n\n").chars().take(24000).collect::<String>();
 
     let mut b2_sources = Vec::new();
     b2_sources.push(sanctions_context_block.clone());
-    for (stitle, sbody) in &wiki_sections {
-        let slow = stitle.to_lowercase();
-        if slow.contains("президент") || slow.contains("мандат") || slow.contains("правителство")
-            || slow.contains("кабинет") || slow.contains("донев") || slow.contains("денков")
-            || slow.contains("главчев") || slow.contains("кампания") || slow.contains("парламент")
-            || slow.contains("критики") || slow.contains("противоречия") || slow.contains("украйна")
-            || slow.contains("кремъл") || slow.contains("референдум") || slow.contains("3-ти март")
-        {
-            b2_sources.push(format!("### {}\n{}", stitle, sbody));
+    if wiki_sections.len() > 1 {
+        for (stitle, sbody) in wiki_sections.iter().skip(1) {
+            b2_sources.push(format!("### Уикипедия: {}\n{}", stitle, sbody.chars().take(2800).collect::<String>()));
         }
     }
-    for h in hits_text.iter().take(6) {
-        if !h.contains("ОФИЦИАЛЕН ЕНЦИКЛОПЕДИЧЕН") {
-            b2_sources.push(h.chars().take(1200).collect::<String>());
-        }
+    if !legal_extracted.is_empty() {
+        let lines: Vec<String> = legal_extracted
+            .iter()
+            .map(|fact| format!("- {}", fact))
+            .collect();
+        b2_sources.push(format!("Извлечени конкретни правни, регулаторни и съдебни факти:\n{}", lines.join("\n")));
     }
-    let b2_context = b2_sources.join("\n\n");
+    for doc in scraped_docs
+        .iter()
+        .filter(|d| d.bucket == "gov" || d.bucket == "legal" || d.bucket == "media")
+        .take(12)
+    {
+        b2_sources.push(format!(
+            "Документ [{}] ({}):\n{}",
+            doc.title,
+            doc.url,
+            doc.text.chars().take(1800).collect::<String>()
+        ));
+    }
+    let b2_context = b2_sources.join("\n\n").chars().take(24000).collect::<String>();
 
     let mut b3_sources = Vec::new();
     b3_sources.push(aegis_summary_str.clone());
     b3_sources.push(archive_context_block.clone());
-    for (i, h) in hits_text.iter().enumerate() {
-        let line = h.lines().next().unwrap_or("Източник");
-        b3_sources.push(format!("Източник {}: {}", i + 1, line));
+    for (idx, doc) in scraped_docs.iter().enumerate() {
+        if !doc.url.is_empty() {
+            b3_sources.push(format!("{}. {} — {}", idx + 1, doc.title, doc.url));
+        }
     }
-    let b3_context = b3_sources.join("\n\n");
+    let b3_context = b3_sources.join("\n\n").chars().take(18000).collect::<String>();
 
-    let runner = leadfinder_providers::LlmChainRunner::from_runtime(&ctx.paths, &cfg, &ctx.db).await;
+    ctx.update_active_task(
+        &task_id,
+        "Съставяне на аналитичната справка (Глави 1–9)",
+        78,
+    )
+    .await;
+
+    let runner =
+        leadfinder_providers::LlmChainRunner::from_role("osint_dossier", &ctx.paths, &cfg, &ctx.db)
+            .await;
 
     let chapter_block_schema = serde_json::json!({
         "type": "object",
@@ -1911,100 +2266,195 @@ async fn handle_research_person(
         "required": ["chapter_markdown"]
     });
 
+    let anti_boilerplate_rules = "СТРИКТНИ ПРАВИЛА ЗА СТИЛ И ТОЧНОСТ:\n\
+        1. Пиши в строг, неутрален, документален стил (като официален правен, одитен или журналистически доклад).\n\
+        2. АБСОЛЮТНО ЗАБРАНЕНО е използването на шпионски/разузнавателни клишета ('разузнавателно досие', 'обект на разследване', 'оперативен профил', 'радар', 'картографиране').\n\
+        3. АБСОЛЮТНО ЗАБРАНЕНО е писането на общи учебникарски дефиниции какво представляват Търговският регистър, КПКОНПИ или Сметната палата (напр. НЕ пиши 'При автоматизирания мониторинг се проверяват преки и непреки участия...').\n\
+        4. Посочвай САМО конкретни факти от подадените данни: точни имена на дружества (ООД/ЕООД/АД/ДЗЗД), ЕИК номера, дялове, конкретни дати, суми, номера/страни по дела (ВАС, ВКС, СЕС), актове на КПКОНПИ/БНБ/ДНСК/АОП и точни URL източници.\n\
+        5. Ако за дадена подточка липсват публични вписвания в подадените източници, запиши това ясно и кратко в 1-2 конкретни изречения (кои източници са проверени и че не са установени данни), без общи фрази.\n\
+        6. Използвай подзаглавия ### (напр. ### 2.1. ...) за прегледно съдържание.";
+
     let b1_system = format!(
-        "You are an elite OSINT intelligence analyst and master investigative journalist. Generate an exhaustive, deep, and fully verified report for Chapters 1, 2, and 3 on the subject in Bulgarian (Target: ~2,500 - 3,500 words). Focus 90% of your detailed analysis on the subject's personal biography, education, military/professional career, institutions, assets, and real-world actions. The 'chapter_markdown' field must contain rich, multi-paragraph factual prose with dates, entities, institutions, and citations:\n\
-        # ГЛАВА 1: ПЪЛНА ИДЕНТИЧНОСТ, ПРОИЗХОД И БИОГРАФИЧНА ХРОНОЛОГИЯ\n\
-        (Пълно име, варианти, дата и място на раждане, произход, семейна среда, гимназиално и висше образование, университет, академични квалификации, хронология на заеманите длъжности по години)\n\
-        # ГЛАВА 2: ТЪРГОВСКИ РЕГИСТЪР, КОРПОРАТИВНИ АКТИВИ И СОБСТВЕНОСТ\n\
-        (Изчерпателна справка по Търговския регистър - Агенция по вписванията, Papagal.bg, Brra.bg: търговски дружества, ЕИК, дял в капитала, текущ правен статус, управителни органи, съвети на директорите, ликвидации, несъстоятелност, холдингови и офшорни връзки)\n\
-        # ГЛАВА 3: МРЕЖА ОТ СВЪРЗАНИ ЛИЦА, СЪДРУЖНИЦИ И ВЛИЯТЕЛНИ КРЪГОВЕ\n\
-        (Картографиране на личните, икономическите и политическите връзки: ключови съдружници, бизнес партньори, семейни фирмени връзки, неформални влиятелни кръгове, политически покровители и финансови посредници)\n\
-        Do NOT write brief summaries. Write dense, extensive, multi-paragraph investigative analysis with facts. Output strictly valid JSON."
+        "Ти си правен и финансов анализатор. Състави детайлен документален текст на български език за Глави 1, 2 и 3 в полето 'chapter_markdown':\n\
+        # {}\n\
+        # {}\n\
+        # {}\n\n\
+        {}\nВърни валиден JSON.",
+        headings[0], headings[1], headings[2], anti_boilerplate_rules
     );
     let b1_req = leadfinder_core::LlmJsonRequest {
         system_prompt: b1_system,
-        user_prompt: format!("Субект: {} (Тип: {})\n\nСвързан контекст от видеа:\n{}\n\nРазузнавателни данни и биографичен архив:\n{}", name, entity_type, vid_context_block, b1_context),
+        user_prompt: format!(
+            "Обект: {} (Категория: {})\n\nСвързани локални видеа:\n{}\n\nСъбрани документални и регистърни данни:\n{}",
+            name,
+            entity_type_bg_label(&entity_type),
+            vid_context_block,
+            b1_context
+        ),
         json_schema: Some(chapter_block_schema.clone()),
         max_tokens: 4096,
         temperature: 0.1,
     };
-    let block1_md = tokio::time::timeout(std::time::Duration::from_secs(12), runner.complete_validated(&b1_req, &ctx.db)).await
-        .ok()
-        .and_then(|res| res.ok())
-        .and_then(|val| val.response.parsed_json.get("chapter_markdown").and_then(|v| v.as_str()).map(|s| s.to_string()))
-        .unwrap_or_default();
 
     let b2_system = format!(
-        "You are an elite OSINT intelligence analyst and financial crime investigator. Generate an exhaustive, deep, and fully verified report for Chapters 4, 5, and 6 on the subject in Bulgarian (Target: ~2,500 - 3,500 words). The 'chapter_markdown' field must contain rich, multi-paragraph factual prose with dates, legal files, contracts, and citations:\n\
-        # ГЛАВА 4: ДЪРЖАВНО УПРАВЛЕНИЕ, ПРЕЗИДЕНТСТВО И ОБЩЕСТВЕНИ РЕСУРСИ\n\
-        (Изборни кампании, мандати, служебни кабинети, държавни договори, въоръжение, обществени поръчки, европейски фондове)\n\
-        # ГЛАВА 5: СЪДЕБЕН СТАТУС, КПКОНПИ, САНКЦИИ И ИНСТИТУЦИОНАЛНИ СБЛЪСЪЦИ\n\
-        (Правен статус: PEP класификация, съдебни дела, преписки в Прокуратурата, проверки на КПКОНПИ, Сметна палата, санкционни списъци - ООН, Магнитски, ЕС)\n\
-        # ГЛАВА 6: МЕДИЙНИ СКАНДАЛИ, РАЗСЛЕДВАЩА ЖУРНАЛИСТИКА И ПОЗИЦИИ\n\
-        (Преглед на разследващата журналистика - Bird.bg, Bivol.bg, Капитал, Медиапул: скандали, геополитически тези, опровержения, конфликти с опоненти)\n\
-        Do NOT write brief summaries. Write dense, extensive, multi-paragraph investigative analysis with facts. Output strictly valid JSON."
+        "Ти си правен и институционален анализатор. Състави детайлен документален текст на български език за Глави 4, 5 и 6 в полето 'chapter_markdown':\n\
+        # {}\n\
+        # {}\n\
+        # {}\n\n\
+        {}\nВърни валиден JSON.",
+        headings[3], headings[4], headings[5], anti_boilerplate_rules
     );
     let b2_req = leadfinder_core::LlmJsonRequest {
         system_prompt: b2_system,
-        user_prompt: format!("Субект: {} (Тип: {})\n\nМеждународни санкции и PEP статус:\n{}\n\nСвързан контекст от анализирани видеа:\n{}\n\nПолитически контекст и институционални данни:\n{}", name, entity_type, sanctions_context_block, vid_context_block, b2_context),
+        user_prompt: format!(
+            "Обект: {} (Категория: {})\n\nСанкционни регистри:\n{}\n\nСвързани локални видеа:\n{}\n\nСъбрани правни, институционални и медийни данни:\n{}",
+            name,
+            entity_type_bg_label(&entity_type),
+            sanctions_context_block,
+            vid_context_block,
+            b2_context
+        ),
         json_schema: Some(chapter_block_schema.clone()),
         max_tokens: 4096,
         temperature: 0.1,
     };
-    let block2_md = tokio::time::timeout(std::time::Duration::from_secs(12), runner.complete_validated(&b2_req, &ctx.db)).await
-        .ok()
-        .and_then(|res| res.ok())
-        .and_then(|val| val.response.parsed_json.get("chapter_markdown").and_then(|v| v.as_str()).map(|s| s.to_string()))
-        .unwrap_or_default();
 
     let b3_system = format!(
-        "You are an elite OSINT and cyber-threat intelligence investigator specializing in disinformation and AI synthetic manipulation. Generate an exhaustive report for Chapters 7, 8, and 9 on the subject in Bulgarian (Target: ~2,000 - 3,000 words). The 'chapter_markdown' field must contain rich, multi-paragraph factual prose with forensic observations, narrative breakdown, risk matrix, and bibliography:\n\
-        # ГЛАВА 7: AEGIS АНАЛИЗ НА ДИГИТАЛНА ИМИТАЦИЯ, DEEPFAKE И ДЕЗИНФОРМАЦИЯ\n\
-        (Анализ от форензичния модул AEGIS: Всички регистрирани инциденти с клониран AI глас, роботизиран дублаж или лицева замяна - face swap в анализираните видеа, използвани синтетични модели, детекционна увереност, рискови дезинформационни наративи и уязвимост от дигитална кражба на самоличност)\n\
-        # ГЛАВА 8: ВРЕМЕВИ АРХИВ, WAYBACK MACHINE И ИСТОРИЧЕСКИ КРОС-РЕФЕРЕНС\n\
-        (Wayback Machine хронология, най-ранни и най-нови снимки, документи от Internet Archive, ревизии на Уикипедия, оценка на риска от заличаване на дигиталната памет)\n\
-        # ГЛАВА 9: КОМПЛЕКСНА ОЦЕНКА НА РИСКА (PEP/AML), ЗАКЛЮЧЕНИЯ И ИЗТОЧНИЦИ\n\
-        (Синтезирана оценка за риск от измама, пране на пари - AML или дезинформация. Препоръки за фактчекъри и разследващи журналисти. Изчерпателен библиографски списък на всички проверени открити регистри, уебсайтове и медийни публикации с линкове)\n\
-        Do NOT write brief summaries. Write dense, extensive, multi-paragraph investigative analysis with facts. Output strictly valid JSON."
+        "Ти си анализатор по проверка на източници и архиви. Състави детайлен документален текст на български език за Глави 7, 8 и 9 в полето 'chapter_markdown':\n\
+        # {}\n\
+        # {}\n\
+        # {}\n\n\
+        {}\nВ Глава 9 включи пълен номериран списък на проверените URL източници. Върни валиден JSON.",
+        headings[6], headings[7], headings[8], anti_boilerplate_rules
     );
     let b3_req = leadfinder_core::LlmJsonRequest {
         system_prompt: b3_system,
-        user_prompt: format!("Субект: {} (Тип: {})\n\nДанни от AEGIS модула за дигитална имитация:\n{}\n\nМеждународни санкции и PEP статус:\n{}\n\nСвързан контекст от видеа:\n{}\n\nВремеви архиви и източници:\n{}", name, entity_type, aegis_summary_str, sanctions_context_block, vid_context_block, b3_context),
-        json_schema: Some(chapter_block_schema.clone()),
+        user_prompt: format!(
+            "Обект: {} (Категория: {})\n\nПроверка на аудио-визуални записи:\n{}\n\nСанкционни регистри:\n{}\n\nСвързани локални видеа:\n{}\n\nАрхивни данни и проверени източници:\n{}",
+            name,
+            entity_type_bg_label(&entity_type),
+            aegis_summary_str,
+            sanctions_context_block,
+            vid_context_block,
+            b3_context
+        ),
+        json_schema: Some(chapter_block_schema),
         max_tokens: 4096,
         temperature: 0.1,
     };
-    let block3_md = tokio::time::timeout(std::time::Duration::from_secs(12), runner.complete_validated(&b3_req, &ctx.db)).await
-        .ok()
-        .and_then(|res| res.ok())
-        .and_then(|val| val.response.parsed_json.get("chapter_markdown").and_then(|v| v.as_str()).map(|s| s.to_string()))
-        .unwrap_or_default();
 
-    let block1_clean = if block1_md.split_whitespace().count() >= 300 {
+    let extract_md = |res: Result<
+        Result<leadfinder_providers::ValidatedLlmResult, leadfinder_core::ProviderError>,
+        tokio::time::error::Elapsed,
+    >|
+     -> String {
+        res.ok()
+            .and_then(|inner| inner.ok())
+            .and_then(|val| {
+                val.response
+                    .parsed_json
+                    .get("chapter_markdown")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+            .unwrap_or_default()
+    };
+
+    let primary_prov = runner.primary_provider_name();
+    let (block1_md, block2_md, block3_md) = if primary_prov == "heuristics" {
+        (String::new(), String::new(), String::new())
+    } else if primary_prov == "local" {
+        let step_timeout = std::time::Duration::from_secs(65);
+        let r1 = tokio::time::timeout(step_timeout, runner.complete_validated(&b1_req, &ctx.db)).await;
+        let r2 = tokio::time::timeout(step_timeout, runner.complete_validated(&b2_req, &ctx.db)).await;
+        let r3 = tokio::time::timeout(step_timeout, runner.complete_validated(&b3_req, &ctx.db)).await;
+        (extract_md(r1), extract_md(r2), extract_md(r3))
+    } else {
+        let llm_timeout = std::time::Duration::from_secs(75);
+        let (r1, r2, r3) = tokio::join!(
+            tokio::time::timeout(llm_timeout, runner.complete_validated(&b1_req, &ctx.db)),
+            tokio::time::timeout(llm_timeout, runner.complete_validated(&b2_req, &ctx.db)),
+            tokio::time::timeout(llm_timeout, runner.complete_validated(&b3_req, &ctx.db)),
+        );
+        (extract_md(r1), extract_md(r2), extract_md(r3))
+    };
+
+    let has_generic_boilerplate = |txt: &str| -> bool {
+        let low = txt.to_lowercase();
+        low.contains("при автоматизирания мониторинг на откритите регистри")
+            || low.contains("проверка в търговския регистър за преки и непреки участия")
+            || low.contains("отразява свързаност с институционалния или частния сектор")
+            || low.contains("анализират задължителните годишни декларации за недвижими имоти")
+            || low.contains("наличие на индивидуална собственост, съдружия или участия в надзорни")
+    };
+
+    let block1_raw = if block1_md.split_whitespace().count() >= 180 && !has_generic_boilerplate(&block1_md) {
         block1_md.trim().to_string()
     } else {
-        generate_fallback_block1(&name, &entity_type, &temporal_audit, &entity_pivots, &hits_text)
+        generate_fallback_block1(
+            &name,
+            &entity_type,
+            &temporal_audit,
+            &entity_pivots,
+            &eik_numbers,
+            &scraped_docs,
+        )
     };
+    let block1_clean = ensure_concrete_facts_preserved_block1(
+        block1_raw,
+        &entity_pivots,
+        &eik_numbers,
+        &fin_extracted,
+        &net_extracted,
+    );
 
-    let block2_clean = if block2_md.split_whitespace().count() >= 300 {
+    let block2_raw = if block2_md.split_whitespace().count() >= 180 && !has_generic_boilerplate(&block2_md) {
         block2_md.trim().to_string()
     } else {
-        generate_fallback_block2(&name, &entity_type, &temporal_audit, &sanctions_matches, &hits_text)
+        generate_fallback_block2(
+            &name,
+            &entity_type,
+            &temporal_audit,
+            &sanctions_matches,
+            &scraped_docs,
+        )
     };
+    let block2_clean = ensure_concrete_facts_preserved_block2(
+        block2_raw,
+        &sanctions_matches,
+        &legal_extracted,
+    );
 
-    let block3_clean = if block3_md.split_whitespace().count() >= 300 {
+    let block3_clean = if block3_md.split_whitespace().count() >= 140 && !has_generic_boilerplate(&block3_md) {
         block3_md.trim().to_string()
     } else {
-        generate_fallback_block3(&name, &entity_type, &aegis_summary_str, &temporal_audit, &video_contexts, &hits_text)
+        generate_fallback_block3(
+            &name,
+            &entity_type,
+            &aegis_summary_str,
+            &temporal_audit,
+            &video_contexts,
+            &scraped_docs,
+        )
     };
 
     let mut dossier_parts: Vec<String> = Vec::new();
-    dossier_parts.push(format!("# OSINT РАЗУЗНАВАТЕЛНО ДОСИЕ: {}\n\n**Обект на разследване**: {} | **Тип**: {} | **Статус**: Пълен оперативен профил (AEGIS / Dynamic Living OSINT)\n\n> [!NOTE]\n> **{}**\n", name, name, entity_type, delta_summary));
+    dossier_parts.push(format!(
+        "# АНАЛИТИЧНА СПРАВКА: {}\n\n**Обект**: {} | **Категория**: {} | **Проверени източници**: {}\n\n> [!NOTE]\n> **{}**\n",
+        name,
+        name,
+        entity_type_bg_label(&entity_type),
+        scraped_docs.len(),
+        delta_summary
+    ));
     dossier_parts.push(block1_clean);
     dossier_parts.push(block2_clean);
     dossier_parts.push(block3_clean);
 
     let report_md = dossier_parts.join("\n\n---\n\n");
+
+    ctx.update_active_task(&task_id, "Извличане на обобщени полета и запис", 92)
+        .await;
 
     let meta_schema = serde_json::json!({
         "type": "object",
@@ -2033,8 +2483,8 @@ async fn handle_research_person(
     });
 
     let meta_req = leadfinder_core::LlmJsonRequest {
-        system_prompt: "Extract structured metadata from the provided OSINT investigative dossier in Bulgarian. Output valid JSON.".to_string(),
-        user_prompt: format!("Субект: {}\n\nДосие:\n{}", name, report_md.chars().take(8000).collect::<String>()),
+        system_prompt: "Извлечи структурирани данни на български език от подадената аналитична справка. Използвай само конкретни факти (имена на дружества, ЕИК, длъжности, решения, дати) в полетата на 'profile', без общи фрази или шпионска терминология. Върни валиден JSON.".to_string(),
+        user_prompt: format!("Обект: {} (Тип: {})\n\nСправка:\n{}", name, entity_type, report_md.chars().take(10000).collect::<String>()),
         json_schema: Some(meta_schema),
         max_tokens: 2048,
         temperature: 0.0,
@@ -2045,39 +2495,181 @@ async fn handle_research_person(
     let mut res_pub = false;
     let mut res_tags: Vec<String> = Vec::new();
     let mut res_category: Option<String> = existing_cat;
-    let res_entity_type = entity_type;
+    let res_entity_type = entity_type.clone();
     let mut profile_obj = serde_json::Value::Null;
 
-    if let Ok(Ok(val)) = tokio::time::timeout(std::time::Duration::from_secs(10), runner.complete_validated(&meta_req, &ctx.db)).await {
-        res_role = val.response.parsed_json.get("role").and_then(|v| v.as_str()).map(|s| s.to_string());
-        res_summary = val.response.parsed_json.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
-        res_pub = val.response.parsed_json.get("public_figure").and_then(|v| v.as_bool()).unwrap_or(false);
-        if let Some(cat) = val.response.parsed_json.get("category").and_then(|v| v.as_str()) {
-            res_category = Some(cat.to_string());
-        }
-        if let Some(arr) = val.response.parsed_json.get("tags").and_then(|v| v.as_array()) {
-            for item in arr {
-                if let Some(t) = item.as_str() {
-                    let clean = t.trim();
-                    if !clean.is_empty() && !res_tags.iter().any(|x| x.eq_ignore_ascii_case(clean)) {
-                        res_tags.push(clean.to_string());
+    if primary_prov != "heuristics" {
+        if let Ok(Ok(val)) = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            runner.complete_validated(&meta_req, &ctx.db),
+        )
+        .await
+        {
+            res_role = val
+                .response
+                .parsed_json
+                .get("role")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            res_summary = val
+                .response
+                .parsed_json
+                .get("summary")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            res_pub = val
+                .response
+                .parsed_json
+                .get("public_figure")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if let Some(cat) = val
+                .response
+                .parsed_json
+                .get("category")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+            {
+                res_category = Some(cat.to_string());
+            }
+            if let Some(arr) = val.response.parsed_json.get("tags").and_then(|v| v.as_array()) {
+                for item in arr {
+                    if let Some(t) = item.as_str() {
+                        let clean = t.trim();
+                        if !clean.is_empty() && !res_tags.iter().any(|x| x.eq_ignore_ascii_case(clean)) {
+                            res_tags.push(clean.to_string());
+                        }
                     }
                 }
             }
+            if let Some(p) = val.response.parsed_json.get("profile") {
+                profile_obj = p.clone();
+            }
         }
-        if let Some(p) = val.response.parsed_json.get("profile") {
-            profile_obj = p.clone();
+    }
+
+    let fin_concrete_summary = if !fin_extracted.is_empty() {
+        fin_extracted
+            .iter()
+            .take(3)
+            .map(|f| f.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else if !entity_pivots.is_empty() {
+        entity_pivots
+            .iter()
+            .map(|p| {
+                if let Some(ref st) = p.registry_status {
+                    format!("{} ({}, {})", p.entity_name, p.entity_kind, st)
+                } else {
+                    format!("{} ({})", p.entity_name, p.entity_kind)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        "Не са установени преки дружествени вписвания в проверените публични източници.".to_string()
+    };
+
+    let leg_concrete_summary = if !legal_extracted.is_empty() {
+        legal_extracted
+            .iter()
+            .take(3)
+            .map(|f| f.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        sanctions_context_block.clone()
+    };
+
+    let net_concrete_summary = if !net_extracted.is_empty() {
+        net_extracted
+            .iter()
+            .take(3)
+            .map(|f| f.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else if !entity_pivots.is_empty() {
+        entity_pivots
+            .iter()
+            .map(|p| format!("{} ({})", p.entity_name, p.entity_kind))
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        "Виж Глава 3 от пълния доклад.".to_string()
+    };
+
+    if profile_obj.is_null() || !profile_obj.is_object() {
+        let bio_intro = wiki_sections
+            .first()
+            .map(|(_, b)| b.chars().take(450).collect::<String>())
+            .unwrap_or_else(|| format!("{} ({})", name, entity_type_bg_label(&entity_type)));
+        profile_obj = serde_json::json!({
+            "identity": bio_intro,
+            "financial_assets": fin_concrete_summary,
+            "network_associates": net_concrete_summary,
+            "legal_regulatory": leg_concrete_summary,
+            "digital_media_presence": format!("Проверени {} публични източника и {} медийни публикации.", scraped_docs.len(), live_events.len()),
+        });
+    } else if let Some(map) = profile_obj.as_object_mut() {
+        let needs_fin = map
+            .get("financial_assets")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().chars().count() < 25 || has_generic_boilerplate(s))
+            .unwrap_or(true);
+        if needs_fin {
+            map.insert(
+                "financial_assets".to_string(),
+                serde_json::Value::String(fin_concrete_summary),
+            );
+        }
+        let needs_net = map
+            .get("network_associates")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().chars().count() < 25 || has_generic_boilerplate(s))
+            .unwrap_or(true);
+        if needs_net {
+            map.insert(
+                "network_associates".to_string(),
+                serde_json::Value::String(net_concrete_summary),
+            );
+        }
+        let needs_leg = map
+            .get("legal_regulatory")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().chars().count() < 25 || has_generic_boilerplate(s))
+            .unwrap_or(true);
+        if needs_leg {
+            map.insert(
+                "legal_regulatory".to_string(),
+                serde_json::Value::String(leg_concrete_summary),
+            );
         }
     }
 
     if res_summary.is_none() {
-        res_summary = Some(format!("Пълно OSINT разузнавателно досие за '{}' с изчерпателни глави за идентичност, корпоративни активи, съдебен статус и AEGIS deepfake анализ.", name));
+        if let Some((_, intro)) = wiki_sections.first() {
+            let short: String = intro.chars().take(340).collect();
+            res_summary = Some(short);
+        } else {
+            res_summary = Some(format!(
+                "Аналитична справка за {} на базата на {} публични източника, регистри и архивни записи.",
+                name,
+                scraped_docs.len()
+            ));
+        }
     }
     if res_role.is_none() {
-        res_role = Some("Публична личност / Обект на разузнаване".to_string());
+        res_role = Some(entity_type_bg_label(&entity_type).to_string());
     }
     if res_tags.is_empty() {
-        res_tags = vec!["OSINT".to_string(), "Due Diligence".to_string(), "AEGIS Verified".to_string()];
+        res_tags = vec![entity_type_bg_label(&entity_type).to_string()];
+        if !entity_pivots.is_empty() {
+            res_tags.push("Търговски регистър".to_string());
+        }
     }
 
     let full_obj = serde_json::json!({
@@ -2092,22 +2684,29 @@ async fn handle_research_person(
 
     let osint_dir = std::path::PathBuf::from("data/osint");
     let _ = std::fs::create_dir_all(&osint_dir);
-    let safe_name: String = name.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+    let safe_name: String = name
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
     let report_filename = format!("{}_{}_dossier.md", id, safe_name);
     let report_path = osint_dir.join(&report_filename);
     let _ = std::fs::write(&report_path, &report_md);
 
-    let _ = ctx.db.update_person_research_data(
-        id,
-        res_role.as_deref(),
-        res_summary.as_deref(),
-        &res_tags,
-        res_detailed_json.as_deref(),
-        res_pub,
-        res_category.as_deref(),
-        Some(&res_entity_type),
-    ).await;
-    let (total_claims, contradicted, supported) = ctx.db.get_person_claims_stats(id).await.unwrap_or((0, 0, 0));
+    let _ = ctx
+        .db
+        .update_person_research_data(
+            id,
+            res_role.as_deref(),
+            res_summary.as_deref(),
+            &res_tags,
+            res_detailed_json.as_deref(),
+            res_pub,
+            res_category.as_deref(),
+            Some(&res_entity_type),
+        )
+        .await;
+    let (total_claims, contradicted, supported) =
+        ctx.db.get_person_claims_stats(id).await.unwrap_or((0, 0, 0));
 
     Json(serde_json::json!({
         "id": id,
@@ -2128,7 +2727,105 @@ async fn handle_research_person(
         "sanctions_matches": sanctions_matches,
         "entity_pivots": entity_pivots,
         "temporal_audit": temporal_audit
-    })).into_response()
+    }))
+    .into_response()
+}
+
+fn ensure_concrete_facts_preserved_block1(
+    base_md: String,
+    entity_pivots: &[leadfinder_core::EntityPivotRef],
+    eik_numbers: &[String],
+    fin_extracted: &[String],
+    net_extracted: &[String],
+) -> String {
+    let low = base_md.to_lowercase();
+    let mut missing_lines: Vec<String> = Vec::new();
+
+    let missing_eiks: Vec<&str> = eik_numbers
+        .iter()
+        .map(|e| e.as_str())
+        .filter(|e| !base_md.contains(*e))
+        .collect();
+    if !missing_eiks.is_empty() {
+        missing_lines.push(format!(
+            "- **Установени ЕИК / БУЛСТАТ номера в проверените документи**: {}",
+            missing_eiks.join(", ")
+        ));
+    }
+
+    for piv in entity_pivots.iter().take(12) {
+        if !low.contains(&piv.entity_name.to_lowercase()) {
+            let status_note = piv
+                .registry_status
+                .as_deref()
+                .unwrap_or("споменато в публични източници");
+            missing_lines.push(format!(
+                "- **Свързано дружество / организация**: **{}** ({}) — {}",
+                piv.entity_name, piv.entity_kind, status_note
+            ));
+        }
+    }
+
+    for fact in fin_extracted.iter().take(8) {
+        let probe: String = fact.chars().take(42).collect::<String>().to_lowercase();
+        if !probe.is_empty() && !low.contains(&probe) {
+            missing_lines.push(format!("- {}", fact));
+        }
+    }
+
+    for fact in net_extracted.iter().take(5) {
+        let probe: String = fact.chars().take(42).collect::<String>().to_lowercase();
+        if !probe.is_empty() && !low.contains(&probe) && !missing_lines.iter().any(|l| l.to_lowercase().contains(&probe)) {
+            missing_lines.push(format!("- {}", fact));
+        }
+    }
+
+    if missing_lines.is_empty() {
+        base_md
+    } else {
+        format!(
+            "{}\n\n### Потвърдени конкретни вписвания и факти от проверените източници\n{}",
+            base_md.trim_end(),
+            missing_lines.join("\n")
+        )
+    }
+}
+
+fn ensure_concrete_facts_preserved_block2(
+    base_md: String,
+    sanctions_matches: &[leadfinder_core::SanctionsMatch],
+    legal_extracted: &[String],
+) -> String {
+    let low = base_md.to_lowercase();
+    let mut missing_lines: Vec<String> = Vec::new();
+
+    for sm in sanctions_matches.iter().take(8) {
+        if !low.contains(&sm.dataset.to_lowercase()) && !low.contains(&sm.caption.to_lowercase()) {
+            missing_lines.push(format!(
+                "- **Санкционен / PEP регистър [{}]**: **{}** (съвпадение {:.0}%)",
+                sm.dataset,
+                sm.caption,
+                sm.match_score * 100.0
+            ));
+        }
+    }
+
+    for fact in legal_extracted.iter().take(8) {
+        let probe: String = fact.chars().take(42).collect::<String>().to_lowercase();
+        if !probe.is_empty() && !low.contains(&probe) {
+            missing_lines.push(format!("- {}", fact));
+        }
+    }
+
+    if missing_lines.is_empty() {
+        base_md
+    } else {
+        format!(
+            "{}\n\n### Потвърдени конкретни съдебни, регулаторни и санкционни данни от източниците\n{}",
+            base_md.trim_end(),
+            missing_lines.join("\n")
+        )
+    }
 }
 
 fn parse_wiki_sections(raw_text: &str) -> Vec<(String, String)> {
@@ -2156,204 +2853,409 @@ fn parse_wiki_sections(raw_text: &str) -> Vec<(String, String)> {
     sections
 }
 
+#[derive(Debug, Clone)]
+struct ScrapedOsintDoc {
+    bucket: String,
+    title: String,
+    url: String,
+    text: String,
+}
+
+fn entity_type_bg_label(entity_type: &str) -> &'static str {
+    match entity_type {
+        "institution" => "Институция",
+        "channel" => "Медия / Канал",
+        "country" => "Държава",
+        "group" => "Организация / Партия",
+        "event" => "Събитие",
+        "infrastructure" => "Инфраструктурен обект",
+        "building" => "Сграда / Обект",
+        _ => "Личност",
+    }
+}
+
+fn chapter_headings_for_type(entity_type: &str) -> [&'static str; 9] {
+    match entity_type {
+        "infrastructure" | "building" => [
+            "ГЛАВА 1: ОПИСАНИЕ НА ОБЕКТА, МЕСТОПОЛОЖЕНИЕ И ХРОНОЛОГИЯ",
+            "ГЛАВА 2: ФИНАНСИРАНЕ, ОБЩЕСТВЕНИ ПОРЪЧКИ, ДОГОВОРИ И СТОЙНОСТ",
+            "ГЛАВА 3: ВЪЗЛОЖИТЕЛИ, ИЗПЪЛНИТЕЛИ, КОНСОРЦИУМИ И НАДЗОР",
+            "ГЛАВА 4: СТРОИТЕЛНИ ЕТАПИ, РАЗРЕШИТЕЛНИ РЕЖИМИ И ЕКСПЛОАТАЦИЯ",
+            "ГЛАВА 5: КОНТРОЛНИ ПРОВЕРКИ, СЪДЕБНИ СПОРОВЕ И САНКЦИИ",
+            "ГЛАВА 6: ЖУРНАЛИСТИЧЕСКИ РАЗСЛЕДВАНИЯ, ИНЦИДЕНТИ И ОБЩЕСТВЕН ОТЗВУК",
+            "ГЛАВА 7: ПРОВЕРКА ЗА МАНИПУЛИРАНИ ЗАПИСИ И ДЕЗИНФОРМАЦИЯ",
+            "ГЛАВА 8: АРХИВНИ УЕБ ВЕРСИИ И ИСТОРИЯ НА ПУБЛИКАЦИИТЕ",
+            "ГЛАВА 9: ОБОБЩЕНА ОЦЕНКА И СПИСЪК НА ПРОВЕРЕНИТЕ ИЗТОЧНИЦИ",
+        ],
+        "institution" | "group" => [
+            "ГЛАВА 1: ПРАВЕН СТАТУТ, СТРУКТУРА, РЪКОВОДСТВО И ИСТОРИЯ",
+            "ГЛАВА 2: БЮДЖЕТ, ФИНАНСИРАНЕ, ДОГОВОРИ И ИМУЩЕСТВЕНИ ДАННИ",
+            "ГЛАВА 3: СВЪРЗАНИ ЛИЦА, ОРГАНИЗАЦИИ И ПАРТНЬОРСКИ СТРУКТУРИ",
+            "ГЛАВА 4: УПРАВЛЕНСКА ДЕЙНОСТ, ПУБЛИЧНИ ПРОГРАМИ И РЕШЕНИЯ",
+            "ГЛАВА 5: СЪДЕБНИ ПРОИЗВОДСТВА, ОДИТИ, ПРОВЕРКИ И САНКЦИИ",
+            "ГЛАВА 6: МЕДИЙНИ ПУБЛИКАЦИИ, РАЗСЛЕДВАНИЯ И ПУБЛИЧНИ ПОЗИЦИИ",
+            "ГЛАВА 7: ПРОВЕРКА ЗА МАНИПУЛИРАНИ ЗАПИСИ И ДЕЗИНФОРМАЦИЯ",
+            "ГЛАВА 8: АРХИВНИ УЕБ ВЕРСИИ И ИСТОРИЯ НА ПУБЛИКАЦИИТЕ",
+            "ГЛАВА 9: ОБОБЩЕНА ОЦЕНКА И СПИСЪК НА ПРОВЕРЕНИТЕ ИЗТОЧНИЦИ",
+        ],
+        _ => [
+            "ГЛАВА 1: БИОГРАФИЧНИ ДАННИ, ОБРАЗОВАНИЕ И ПРОФЕСИОНАЛЕН ПЪТ",
+            "ГЛАВА 2: ТЪРГОВСКИ РЕГИСТЪР, ФИРМЕНИ УЧАСТИЯ И ИМУЩЕСТВЕНИ ДЕКЛАРАЦИИ",
+            "ГЛАВА 3: СВЪРЗАНИ ЛИЦА, СЪДРУЖНИЦИ И ОРГАНИЗАЦИОННА СРЕДА",
+            "ГЛАВА 4: ПУБЛИЧНИ ДЛЪЖНОСТИ, УПРАВЛЕНСКА ДЕЙНОСТ И ОБЩЕСТВЕНИ ПОРЪЧКИ",
+            "ГЛАВА 5: СЪДЕБНИ ПРОИЗВОДСТВА, АКТОВЕ НА КПКОНПИ И САНКЦИОННИ СПИСЪЦИ",
+            "ГЛАВА 6: МЕДИЙНИ РАЗСЛЕДВАНИЯ, ПУБЛИЧНИ ПОЗИЦИИ И ПОЛЕМИКИ",
+            "ГЛАВА 7: ПРОВЕРКА ЗА СИНТЕТИЧНО СЪДЪРЖАНИЕ И МАНИПУЛИРАНИ ЗАПИСИ",
+            "ГЛАВА 8: АРХИВНИ УЕБ ВЕРСИИ И ИСТОРИЯ НА ПУБЛИКАЦИИТЕ",
+            "ГЛАВА 9: ОБОБЩЕНА ОЦЕНКА И СПИСЪК НА ПРОВЕРЕНИТЕ ИЗТОЧНИЦИ",
+        ],
+    }
+}
+
+fn split_factual_sentences(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for para in text.lines() {
+        let p = para.trim();
+        if p.chars().count() < 35 {
+            continue;
+        }
+        let mut cur = String::new();
+        let chars: Vec<char> = p.chars().collect();
+        for i in 0..chars.len() {
+            let c = chars[i];
+            cur.push(c);
+            let is_end = (c == '.' || c == '!' || c == '?')
+                && (i + 1 == chars.len() || chars[i + 1].is_whitespace());
+            if is_end {
+                let prev_word: String = cur
+                    .trim_end_matches(|ch: char| ch == '.' || ch == '!' || ch == '?')
+                    .split_whitespace()
+                    .last()
+                    .unwrap_or("")
+                    .to_lowercase();
+                let abbrev = matches!(
+                    prev_word.as_str(),
+                    "г" | "гр" | "с" | "ул" | "бул" | "ал" | "чл" | "т" | "параграф"
+                        | "проф" | "доц" | "д-р" | "инж" | "адв" | "ген" | "млн" | "млрд" | "хил" | "лв"
+                );
+                if !abbrev && cur.chars().count() >= 40 {
+                    out.push(cur.trim().to_string());
+                    cur.clear();
+                }
+            }
+        }
+        if cur.trim().chars().count() >= 40 {
+            out.push(cur.trim().to_string());
+        }
+    }
+    out
+}
+
+fn extract_matching_factual_passages(
+    docs: &[ScrapedOsintDoc],
+    preferred_buckets: &[&str],
+    wiki_text: &str,
+    keywords: &[&str],
+    max_items: usize,
+) -> Vec<String> {
+    let mut scored: Vec<(usize, String)> = Vec::new();
+    let mut seen_prefixes: Vec<String> = Vec::new();
+
+    let mut ordered_docs: Vec<&ScrapedOsintDoc> = docs
+        .iter()
+        .filter(|d| preferred_buckets.contains(&d.bucket.as_str()))
+        .collect();
+    for d in docs {
+        if !preferred_buckets.contains(&d.bucket.as_str()) {
+            ordered_docs.push(d);
+        }
+    }
+
+    for doc in ordered_docs {
+        let bucket_bonus = if preferred_buckets.contains(&doc.bucket.as_str()) { 3 } else { 0 };
+        for sent in split_factual_sentences(&doc.text) {
+            let low = sent.to_lowercase();
+            if low.contains("бисквитки") || low.contains("cookies") || low.contains("всички права запазени") || low.contains("абонирайте се") {
+                continue;
+            }
+            let kw_hits = keywords.iter().filter(|kw| low.contains(**kw)).count();
+            if kw_hits == 0 {
+                continue;
+            }
+            let has_digit = sent.chars().any(|c| c.is_ascii_digit());
+            let has_quote = sent.contains('„') || sent.contains('"');
+            let score = kw_hits * 2 + bucket_bonus + if has_digit { 2 } else { 0 } + if has_quote { 1 } else { 0 };
+            let prefix_key: String = low.chars().take(55).collect();
+            if seen_prefixes.iter().any(|p| p == &prefix_key) {
+                continue;
+            }
+            seen_prefixes.push(prefix_key);
+            let clean_title = if doc.title.trim().is_empty() { "Публичен източник" } else { doc.title.trim() };
+            let formatted = if doc.url.starts_with("http") {
+                format!("{} ([{}]({}))", sent, clean_title, doc.url)
+            } else {
+                format!("{} ({})", sent, clean_title)
+            };
+            scored.push((score, formatted));
+        }
+    }
+
+    if scored.len() < max_items && !wiki_text.is_empty() {
+        for sent in split_factual_sentences(wiki_text) {
+            let low = sent.to_lowercase();
+            let kw_hits = keywords.iter().filter(|kw| low.contains(**kw)).count();
+            if kw_hits == 0 {
+                continue;
+            }
+            let prefix_key: String = low.chars().take(55).collect();
+            if seen_prefixes.iter().any(|p| p == &prefix_key) {
+                continue;
+            }
+            seen_prefixes.push(prefix_key);
+            let has_digit = sent.chars().any(|c| c.is_ascii_digit());
+            let score = kw_hits * 2 + if has_digit { 2 } else { 0 };
+            scored.push((score, format!("{} (Уикипедия)", sent)));
+        }
+    }
+
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.into_iter().take(max_items).map(|(_, s)| s).collect()
+}
+
 fn generate_fallback_block1(
     name: &str,
     entity_type: &str,
     temporal_audit: &leadfinder_providers::AegisTemporalAudit,
     entity_pivots: &[leadfinder_core::EntityPivotRef],
-    hits: &[String],
+    eik_numbers: &[String],
+    docs: &[ScrapedOsintDoc],
 ) -> String {
+    let headings = chapter_headings_for_type(entity_type);
+    let wiki_full = temporal_audit.wiki_bio.as_ref().map(|w| w.extract.as_str()).unwrap_or_default();
     let mut out = String::new();
-    out.push_str(&format!(
-        "# ГЛАВА 1: ПЪЛНА ИДЕНТИЧНОСТ, ПРОИЗХОД И БИОГРАФИЧНА ХРОНОЛОГИЯ\n\n\
-        Обектът на настоящото разузнавателно разследване е **{}**, класифициран от аналитичната система като субект от тип **{}**.\n\n",
-        name, entity_type
-    ));
 
+    out.push_str(&format!("# {}\n\n", headings[0]));
     if let Some(ref wb) = temporal_audit.wiki_bio {
         let sections = parse_wiki_sections(&wb.extract);
-        let mut early_found = false;
+        let mut added = 0usize;
         for (stitle, sbody) in &sections {
             let slow = stitle.to_lowercase();
-            if slow.contains("въведение") || slow.contains("биография") || slow.contains("детство")
-                || slow.contains("образование") || slow.contains("военна") || slow.contains("ввс")
-                || slow.contains("генерал") || slow.contains("звания") || slow.contains("длъжности")
-                || slow.contains("награди") || slow.contains("семейство")
+            if slow.contains("въведение") || slow.contains("биография") || slow.contains("ранен")
+                || slow.contains("образование") || slow.contains("кариера") || slow.contains("професионал")
+                || slow.contains("история") || slow.contains("описание") || slow.contains("строителство")
             {
                 out.push_str(&format!("### {}\n{}\n\n", stitle, sbody));
-                early_found = true;
+                added += 1;
             }
         }
-        if !early_found {
-            out.push_str(&format!("### 1.1. Гражданска и енциклопедична идентификация\n{}\n\n", wb.extract.chars().take(3000).collect::<String>()));
+        if added == 0 {
+            out.push_str(&format!("### Основни данни ({})\n{}\n\n", wb.title, wb.extract.chars().take(3500).collect::<String>()));
         }
     } else {
-        out.push_str(&format!(
-            "### 1.1. Гражданска и биографична идентификация\n\
-            Според наличните официални и медийни бази данни, субектът присъства в публичното пространство с канонично име '{}'. \
-            Анализът на откритите източници показва трайно установен цифров и институционален отпечатък в Република България.\n\n\
-            ### 1.2. Образователен ценз и ранно кариерно развитие\n\
-            Хронологията на публичните изяви и професионалните назначения очертава профил с дългогодишна активност в съответния сектор. \
-            Проверените публични източници отразяват институционални и професионални позиции, свързани с вземането на решения или публично влияние.\n\n",
-            name
-        ));
+        let bio_facts = extract_matching_factual_passages(
+            docs,
+            &["bio", "gov"],
+            wiki_full,
+            &["роден", "завършва", "университет", "образование", "кариера", "директор", "председател", "министър", "кмет", "изграден", "открит", "местоположение", "площ", "км"],
+            8,
+        );
+        if !bio_facts.is_empty() {
+            out.push_str("### 1.1. Установени хронологични и основни данни от проверените източници\n");
+            for f in bio_facts {
+                out.push_str(&format!("- {}\n", f));
+            }
+            out.push('\n');
+        } else {
+            out.push_str(&format!(
+                "В проверените публични източници за **{}** (тип: {}) не беше открита самостоятелна биографична статия в Уикипедия; наличните сведения са отразени в тематичните раздели по-долу.\n\n",
+                name,
+                entity_type_bg_label(entity_type)
+            ));
+        }
     }
 
-    out.push_str(&format!(
-        "# ГЛАВА 2: ТЪРГОВСКИ РЕГИСТЪР, КОРПОРАТИВНИ АКТИВИ И СОБСТВЕНОСТ\n\n\
-        ### 2.1. Справка по Търговския регистър на Агенция по вписванията (Brra.bg / Papagal.bg)\n\
-        При автоматизирания мониторинг на откритите регистри се установяват следните данни относно корпоративни участия, дружествени дялове и управителни органи за **{}**:\n\
-        - **Правен статус на свързаните дружества**: Проверка в Търговския регистър за преки и непреки участия в търговски дружества (ООД, ЕООД, АД, холдинги).\n\
-        - **Разпределение на капитала**: Наличие на индивидуална собственост, съдружия или участия в надзорни и управителни съвети.\n\
-        - **Декларирано имущество (КПКОНПИ / Сметна палата)**: За лица на висши държавни длъжности се анализират задължителните годишни декларации за недвижими имоти, банкови влогове и моторни превозни средства.\n\n\
-        ### 2.2. Финансови активи и корпоративен мащаб\n\
-        Анализът на годишните финансови отчети и декларираните търговски обороти отразява свързаност с институционалния или частния сектор.\n\n\
-        # ГЛАВА 3: МРЕЖА ОТ СВЪРЗАНИ ЛИЦА, СЪДРУЖНИЦИ И ВЛИЯТЕЛНИ КРЪГОВЕ\n\n\
-        ### 3.1. Картографиране на икономическата и семейна мрежа\n\
-        Субектът функционира в координация с идентифицирана мрежа от институционални сътрудници, съветници и формални пълномощници. Връзките се проследяват чрез съвместни държавни и корпоративни участия.\n\n\
-        ### 3.2. Неформални и политически покровителства\n\
-        Наблюдава се взаимодействие с институционални фактори и политически формации в рамките на публичните дебати и законодателни инициативи.\n\n",
-        name
-    ));
+    out.push_str(&format!("# {}\n\n", headings[1]));
+    let fin_keywords: &[&str] = if entity_type == "infrastructure" || entity_type == "building" {
+        &["поръчка", "договор", "стойност", "бюджет", "лв", "лева", "евро", "долар", "$", "млн", "млрд", "милион", "милиард", "финансиране", "аоп", "цаис", "изпълнител", "индексация", "аванс", "сметна палата", "еик"]
+    } else {
+        &["оод", "еоод", "ад", "еад", "дззд", "еик", "търговски регистър", "дял", "дялове", "капитал", "съдружник", "управител", "собственик", "декларация", "кпконпи", "кпк", "имот", "влог", "лв", "лева", "евро", "долар", "$", "млн", "млрд", "милион", "милиард", "богатств", "актив", "доход", "печалб", "компани", "корпорац", "организейшън", "холдинг", "сделк", "оборот", "поръчка", "договор"]
+    };
+    let fin_facts = extract_matching_factual_passages(docs, &["fin", "pivot", "legal"], wiki_full, fin_keywords, 12);
 
-    if !entity_pivots.is_empty() {
-        out.push_str("### 3.3. Картографирани свързани корпоративни пивоти (2-ра степен на свързаност):\n");
+    if !entity_pivots.is_empty() || !eik_numbers.is_empty() {
+        out.push_str("### 2.1. Идентифицирани юридически лица, консорциуми и регистрови идентификатори\n");
         for p in entity_pivots {
-            out.push_str(&format!("- **{}** (Тип: {}, Статус: {})\n", p.entity_name, p.entity_kind, p.registry_status.as_deref().unwrap_or("активен")));
+            out.push_str(&format!(
+                "- **{}** — вид: {}, бележка: {}\n",
+                p.entity_name,
+                p.entity_kind,
+                p.registry_status.as_deref().unwrap_or("открито в източниците")
+            ));
+        }
+        if !eik_numbers.is_empty() {
+            out.push_str(&format!("- **Открити ЕИК / БУЛСТАТ номера в документите**: {}\n", eik_numbers.join(", ")));
         }
         out.push('\n');
     }
 
-    if !hits.is_empty() {
-        out.push_str("### 3.4. Извлечени първични регистрови данни и публикации:\n");
-        for (i, h) in hits.iter().take(4).enumerate() {
-            let first_few_lines: String = h.lines().take(4).collect::<Vec<_>>().join("\n");
-            out.push_str(&format!("\n> **Източник [{}]**:\n{}\n", i + 1, first_few_lines));
+    out.push_str("### 2.2. Конкретни констатации за участия, имущество, договори и финансиране\n");
+    if !fin_facts.is_empty() {
+        for f in &fin_facts {
+            out.push_str(&format!("- {}\n", f));
         }
+        out.push('\n');
+    } else {
+        out.push_str(&format!(
+            "В извлечените публични публикации и регистрови извадки не се съдържат данни за преки дружествени дялове, вписани ЕИК номера или имуществени несъответствия за **{}**.\n\n",
+            name
+        ));
     }
+
+    out.push_str(&format!("# {}\n\n", headings[2]));
+    let net_keywords: &[&str] = if entity_type == "infrastructure" || entity_type == "building" {
+        &["възложител", "изпълнител", "консорциум", "дззд", "надзор", "проектант", "архитект", "апи", "мррб", "община", "подизпълнител", "фирма", "дружество"]
+    } else {
+        &["съдружник", "партньор", "сдружение", "фондация", "управителен съвет", "съвет на директорите", "директор", "основател", "коалиция", "партия", "екип", "заместник", "вицепрезидент", "назначен", "предложен", "семейств", "близък", "свързан"]
+    };
+    let net_facts = extract_matching_factual_passages(docs, &["net", "pivot", "fin", "gov"], wiki_full, net_keywords, 10);
+
+    out.push_str("### 3.1. Установени свързани лица, организации и партньорства\n");
+    if !net_facts.is_empty() {
+        for f in &net_facts {
+            out.push_str(&format!("- {}\n", f));
+        }
+        out.push('\n');
+    } else if !entity_pivots.is_empty() {
+        for p in entity_pivots {
+            out.push_str(&format!("- В проверените материали **{}** се споменава във връзка със субекта **{}** ({}).\n", name, p.entity_name, p.entity_kind));
+        }
+        out.push('\n');
+    } else {
+        out.push_str(&format!(
+            "В проверените публични източници не са установени данни за неформални корпоративни съдружия или свързани търговски групи около **{}**.\n\n",
+            name
+        ));
+    }
+
     out
 }
 
 fn generate_fallback_block2(
     name: &str,
-    _entity_type: &str,
+    entity_type: &str,
     temporal_audit: &leadfinder_providers::AegisTemporalAudit,
     sanctions_matches: &[leadfinder_core::SanctionsMatch],
-    hits: &[String],
+    docs: &[ScrapedOsintDoc],
 ) -> String {
+    let headings = chapter_headings_for_type(entity_type);
+    let wiki_full = temporal_audit.wiki_bio.as_ref().map(|w| w.extract.as_str()).unwrap_or_default();
     let mut out = String::new();
-    out.push_str(&format!(
-        "# ГЛАВА 4: ДЪРЖАВНО УПРАВЛЕНИЕ, ПРЕЗИДЕНТСТВО И ОБЩЕСТВЕНИ РЕСУРСИ\n\n\
-        Анализ на политическата дейност, държавните постове и управлението на публични ресурси от **{}**:\n\n",
-        name
-    ));
 
-    if let Some(ref wb) = temporal_audit.wiki_bio {
+    out.push_str(&format!("# {}\n\n", headings[3]));
+    let gov_keywords: &[&str] = if entity_type == "infrastructure" || entity_type == "building" {
+        &["строеж", "разрешение", "акт 16", "акт 15", "днск", "мррб", "апи", "пусков", "лот", "участък", "ремонт", "реконструкция", "експлоатация", "проект"]
+    } else {
+        &["мандат", "правителство", "кабинет", "министър", "парламент", "народно събрание", "депутат", "бнб", "подуправител", "председател", "комисия", "кмет", "президент", "указ", "бюджет", "решение"]
+    };
+    let gov_facts = extract_matching_factual_passages(docs, &["gov", "bio"], wiki_full, gov_keywords, 10);
+    if !gov_facts.is_empty() {
+        out.push_str("### 4.1. Данни за публични правомощия, управленски решения и етапи\n");
+        for f in &gov_facts {
+            out.push_str(&format!("- {}\n", f));
+        }
+        out.push('\n');
+    } else if let Some(ref wb) = temporal_audit.wiki_bio {
         let sections = parse_wiki_sections(&wb.extract);
-        for (stitle, sbody) in &sections {
-            let slow = stitle.to_lowercase();
-            if slow.contains("президент") || slow.contains("мандат") || slow.contains("правителство")
-                || slow.contains("кабинет") || slow.contains("донев") || slow.contains("денков")
-                || slow.contains("главчев") || slow.contains("желязков") || slow.contains("петков")
-                || slow.contains("кампания") || slow.contains("парламент") || slow.contains("премиер")
-                || slow.contains("политика") || slow.contains("фискална") || slow.contains("отбрана")
-                || slow.contains("република")
-            {
-                out.push_str(&format!("### {}\n{}\n\n", stitle, sbody));
-            }
+        let mut any_sec = false;
+        for (stitle, sbody) in sections.iter().skip(1).take(3) {
+            out.push_str(&format!("### {}\n{}\n\n", stitle, sbody));
+            any_sec = true;
+        }
+        if !any_sec {
+            out.push_str(&format!("Няма регистрирани отделни данни за държавни мандати или строителни разрешения за **{}** в проверените източници.\n\n", name));
         }
     } else {
+        out.push_str(&format!("В проверените източници не са установени допълнителни данни за държавни постове или обществени поръчки, пряко управлявани от **{}**.\n\n", name));
+    }
+
+    out.push_str(&format!("# {}\n\n", headings[4]));
+    let legal_keywords: &[&str] = &[
+        "съд", "вас", "вкс", "сгс", "административен съд", "сес", "люксембург", "дело", "решение",
+        "присъд", "осъден", "оправдан", "импийчмънт", "иск", "оспор", "определение", "жалба",
+        "прокуратура", "прокурор", "разследване", "обвинение", "обвинения", "кпконпи", "кпк",
+        "несъвместимост", "конфликт на интереси", "отстраняване", "отстранен", "кзк", "сметна палата",
+        "нарушение", "глоба", "санкция", "санкции", "магнитски", "ofac", "проверка", "акт",
+    ];
+    let legal_facts = extract_matching_factual_passages(docs, &["legal", "fin", "media"], wiki_full, legal_keywords, 12);
+
+    out.push_str("### 5.1. Съдебни дела, производства пред регулаторни органи и проверки\n");
+    if !legal_facts.is_empty() {
+        for f in &legal_facts {
+            out.push_str(&format!("- {}\n", f));
+        }
+        out.push('\n');
+    } else {
         out.push_str(&format!(
-            "### 4.1. Анализ по регистъра на Агенция по обществени поръчки (АОП)\n\
-            Справката за свързани с **{}** лица и корпоративни структури проследява участието в държавни и общински процедури по ЗОП. \
-            Възложителите обхващат държавни агенции, министерства и общински администрации в страната.\n\n\
-            ### 4.2. Бенефициент на европейски структурни и инвестиционни фондове (ЕСИФ)\n\
-            Проверката за усвояване на публични средства и субсидии показва мониторинг от страна на управляващите органи относно спазването на критериите за допустимост и отсъствие на двойно финансиране.\n\n",
+            "В проверените публични източници не са открити данни за влезли в сила осъдителни присъди, висящи съдебни производства или установени нарушения от КПКОНПИ/контролни органи срещу **{}**.\n\n",
             name
         ));
     }
 
-    out.push_str(&format!(
-        "# ГЛАВА 5: СЪДЕБЕН СТАТУС, КПКОНПИ, САНКЦИИ И ИНСТИТУЦИОНАЛНИ СБЛЪСЪЦИ\n\n\
-        ### 5.1. Политически изложена личност (PEP) и регулаторен контрол\n\
-        В съответствие с Закона за мерките срещу изпирането на пари (ЗМИП), **{}** подлежи на засилена комплексна проверка (Enhanced Due Diligence). \
-        Декларациите за имущество и конфликт на интереси пред КПКОНПИ и Сметната палата отразяват декларираните авоари и задължения.\n\n\
-        ### 5.2. Проверка в регистрите за международни санкции\n",
-        name
-    ));
-
+    out.push_str("### 5.2. Справка в международни санкционни списъци\n");
     if sanctions_matches.is_empty() {
-        out.push_str("При автоматизираната справка в регистрите на ООН, US OFAC SDN (Закон 'Магнитски'), ЕС, UK OFSI, Швейцария SECO, НАЗК и Интерпол **НЕ са открити активни санкционни съвпадения**.\n\n");
+        out.push_str("Проверени регистри: ООН, САЩ (OFAC SDN / Закон „Магнитски“), Европейски съюз, Великобритания (OFSI), Швейцария (SECO), Украйна (НАЗК) и Интерпол — **няма открити санкционни вписвания**.\n\n");
     } else {
-        out.push_str("ВНИМАНИЕ: Открити съвпадения в международните санкционни списъци:\n");
         for sm in sanctions_matches {
-            out.push_str(&format!("- [{}] {} (Увереност: {:.0}%, Програма: {})\n", sm.dataset, sm.caption, sm.match_score * 100.0, sm.program.as_deref().unwrap_or("неуточнена")));
+            out.push_str(&format!(
+                "- **[{}]** {} — съвпадение {:.0}%, програма: {}\n",
+                sm.dataset,
+                sm.caption,
+                sm.match_score * 100.0,
+                sm.program.as_deref().unwrap_or("неуточнена")
+            ));
         }
         out.push('\n');
     }
 
-    out.push_str(&format!(
-        "# ГЛАВА 6: МЕДИЙНИ СКАНДАЛИ, РАЗСЛЕДВАЩА ЖУРНАЛИСТИКА И ПОЗИЦИИ\n\n\
-        ### 6.1. Обзор на публикациите в разследващите медии (Bird.bg, Bivol.bg, Капитал, Медиапул)\n\
-        Журналистическите разследвания акцентират върху пресечните точки между публичната власт, институционалните конфликти и геополитическите позиции на **{}**.\n\n",
-        name
-    ));
-
-    if let Some(ref wb) = temporal_audit.wiki_bio {
-        let sections = parse_wiki_sections(&wb.extract);
-        for (stitle, sbody) in &sections {
-            let slow = stitle.to_lowercase();
-            let is_block1 = slow.contains("въведение") || slow.contains("биография") || slow.contains("детство")
-                || slow.contains("образование") || slow.contains("военна") || slow.contains("ввс")
-                || slow.contains("генерал") || slow.contains("звания") || slow.contains("длъжности")
-                || slow.contains("награди") || slow.contains("семейство");
-            let is_ch4 = slow.contains("президент") || slow.contains("мандат") || slow.contains("правителство")
-                || slow.contains("кабинет") || slow.contains("донев") || slow.contains("денков")
-                || slow.contains("главчев") || slow.contains("желязков") || slow.contains("петков")
-                || slow.contains("кампания") || slow.contains("парламент") || slow.contains("премиер")
-                || slow.contains("политика") || slow.contains("фискална") || slow.contains("отбрана")
-                || slow.contains("република");
-            if !is_block1 && !is_ch4 && !slow.contains("източници") && !slow.contains("външни препратки") {
-                out.push_str(&format!("### {}\n{}\n\n", stitle, sbody));
-            }
+    out.push_str(&format!("# {}\n\n", headings[5]));
+    let media_facts = extract_matching_factual_passages(
+        docs,
+        &["media", "news", "legal"],
+        wiki_full,
+        &["разследване", "публикация", "позиция", "заяви", "коментира", "критика", "спор", "скандал", "казус", "интервю", "инцидент", "протест"],
+        10,
+    );
+    out.push_str("### 6.1. Основни теми в медийните публикации и журналистически анализи\n");
+    if !media_facts.is_empty() {
+        for f in &media_facts {
+            out.push_str(&format!("- {}\n", f));
         }
+        out.push('\n');
+    } else {
+        out.push_str("Не са установени допълнителни медийни полемики извън описаните в предходните глави.\n\n");
     }
 
-    if hits.len() > 4 {
-        out.push_str("### 6.4. Журналистически извлечения и медиен мониторинг:\n");
-        for (i, h) in hits.iter().skip(4).take(5).enumerate() {
-            let first_few_lines: String = h.lines().take(4).collect::<Vec<_>>().join("\n");
-            out.push_str(&format!("\n> **Медиен източник [{}]**:\n{}\n", i + 5, first_few_lines));
-        }
-    }
     out
 }
 
 fn generate_fallback_block3(
     name: &str,
-    _entity_type: &str,
+    entity_type: &str,
     aegis_summary: &str,
     temporal_audit: &leadfinder_providers::AegisTemporalAudit,
     video_contexts: &[String],
-    hits: &[String],
+    docs: &[ScrapedOsintDoc],
 ) -> String {
+    let headings = chapter_headings_for_type(entity_type);
     let mut out = String::new();
+
     out.push_str(&format!(
-        "# ГЛАВА 7: AEGIS АНАЛИЗ НА ДИГИТАЛНА ИМИТАЦИЯ, DEEPFAKE И ДЕЗИНФОРМАЦИЯ\n\n\
-        ### 7.1. Форензичен доклад от системата AEGIS\n\
-        Модулът за мултимодален анализ на изкуствен интелект (AEGIS) извърши форензична проверка на аудио-визуалните записи, свързани с **{}**:\n\n\
-        {}\n\n\
-        ### 7.2. Форензични методи за установяване на синтетично съдържание\n\
-        AEGIS анализира следните физични и спектрални маркери:\n\
-        - **F0 микротремор и хармонична плавност**: Синтетичните гласови клонинги (напр. ElevenLabs, RVC, VITS) показват липса на естествен ларингеален микротремор и неестествено равномерна интонация.\n\
-        - **Вокодерен спектрален срез (12 kHz - 16 kHz)**: Невронните вокодери (HiFi-GAN, BigVGAN) често имат рязък енергиен срез над 12–14 kHz или артефакти от квантуване.\n\
-        - **2D FFT фазови деконволюционни аномалии**: При лицева замяна (DeepFaceLab, SimSwap, RoOP) се откриват пространствени гранични фазови скокове около овалните зони на лицето.\n\
-        - **Аудио-визуална синхронизация (AV-Sync)**: Разминаване във фонемно-виземната корелация между звуците и движението на устните.\n\n",
-        name, aegis_summary
+        "# {}\n\n### 7.1. Резултати от аудио-визуалната проверка на свързаните видеа\n{}\n\n",
+        headings[6], aegis_summary
     ));
 
     if !video_contexts.is_empty() {
-        out.push_str("### 7.3. Анализирани TikTok видеозаписи в базата на Lead Finder:\n");
+        out.push_str("### 7.2. Свързани видеозаписи в локалната база\n");
         for v in video_contexts {
             out.push_str(&format!("- {}\n", v));
         }
@@ -2361,73 +3263,69 @@ fn generate_fallback_block3(
     }
 
     out.push_str(&format!(
-        "# ГЛАВА 8: ВРЕМЕВИ АРХИВ, WAYBACK MACHINE И ИСТОРИЧЕСКИ КРОС-РЕФЕРЕНС\n\n\
-        ### 8.1. Хронологичен архив на Wayback Machine (Internet Archive)\n\
-        Системата за дигитална памет и времеви крос-референс провери историческите архиви за **{}**:\n\
-        - **Най-ранна регистрирана архивна снимка**: {}\n\
-        - **Най-нова регистрирана архивна снимка**: {}\n\
-        - **Оценка на риска от заличаване/редакция**: {}\n\n",
-        name,
-        temporal_audit.oldest_capture.as_deref().unwrap_or("няма регистриран архив"),
-        temporal_audit.newest_capture.as_deref().unwrap_or("няма регистриран архив"),
+        "# {}\n\n### 8.1. Справка в Wayback Machine и Internet Archive\n\
+        - **Най-ранно архивно копие**: {}\n\
+        - **Най-ново архивно копие**: {}\n\
+        - **Състояние на архивната следа**: {}\n\n",
+        headings[7],
+        temporal_audit.oldest_capture.as_deref().unwrap_or("няма данни"),
+        temporal_audit.newest_capture.as_deref().unwrap_or("няма данни"),
         temporal_audit.scrubbed_or_altered_risk
     ));
 
     if !temporal_audit.historical_snapshots.is_empty() {
-        out.push_str("#### Регистрирани Wayback Machine снимки:\n");
+        out.push_str("### 8.2. Архивирани уеб страници\n");
         for s in &temporal_audit.historical_snapshots {
-            out.push_str(&format!("- [{}] [{}]({}) (Оригинален адрес: {}, Статус: {})\n", s.service, s.timestamp, s.url, s.original_url, s.status));
+            out.push_str(&format!("- [{}] [{}]({}) (Оригинален адрес: {}, HTTP {})\n", s.service, s.timestamp, s.url, s.original_url, s.status));
         }
         out.push('\n');
     }
 
     if !temporal_audit.internet_archive_docs.is_empty() {
-        out.push_str("### 8.2. Архивирани документи, книги и аудиозаписи в Internet Archive:\n");
+        out.push_str("### 8.3. Документи и записи в Internet Archive\n");
         for doc in &temporal_audit.internet_archive_docs {
-            out.push_str(&format!("- **[{}]({})** (Дата: {}, Тип: {})\n", doc.title, doc.detail_url, doc.date.as_deref().unwrap_or("без дата"), doc.mediatype.as_deref().unwrap_or("неуточнен")));
+            out.push_str(&format!("- **[{}]({})** (Дата: {}, Вид: {})\n", doc.title, doc.detail_url, doc.date.as_deref().unwrap_or("без дата"), doc.mediatype.as_deref().unwrap_or("документ")));
         }
         out.push('\n');
     }
 
     if let Some(ref wb) = temporal_audit.wiki_bio {
         if !wb.revisions.is_empty() {
-            out.push_str("### 8.3. Уикимедия хронология на редакциите и редакционни спорове:\n");
+            out.push_str("### 8.4. Последни редакции в Уикипедия\n");
             for r in &wb.revisions {
-                let comm = if r.comment.is_empty() { "без коментар".to_string() } else { r.comment.clone() };
-                out.push_str(&format!("- **{}** от потребител `{}`: *{}*\n", r.timestamp, r.user, comm));
+                let comm = if r.comment.is_empty() { "без бележка".to_string() } else { r.comment.clone() };
+                out.push_str(&format!("- **{}** — `{}`: *{}*\n", r.timestamp, r.user, comm));
             }
             out.push('\n');
         }
     }
 
     out.push_str(&format!(
-        "# ГЛАВА 9: КОМПЛЕКСНА ОЦЕНКА НА РИСКА (PEP/AML), ЗАКЛЮЧЕНИЯ И ИЗТОЧНИЦИ\n\n\
-        ### 9.1. Индекс на риска и препоръки за фактчекъри\n\
-        - **Обща оценка на риска**: Субект с висок институционален и медиен профил. Налага се постоянна бдителност за дигитална имитация и изкривяване на изказванията в социалните мрежи.\n\
-        - **AML / Финансов надзор**: Периодична справка в Агенция по вписванията за промяна в крайни действителни собственици (UBO) на свързани юридически лица.\n\
-        - **Фактологична верификация**: Задължително сравнение на всяко сензационно аудио/видео изказване с официалните видеостенограми и форензичните маркери на AEGIS.\n\n\
-        ### 9.2. Психографски, реторичен и наративен профил\n\
-        Публичното говорене на **{}** се отличава с прецизна военна и институционална терминология, подчертаване на суверенитета и конституционния ред, и системно оспорване на политическите опоненти.\n\n\
-        ### 9.3. Изчерпателна библиография на първичните източници и регистри:\n",
-        name
+        "# {}\n\n### 9.1. Аналитично обобщение\n\
+        Настоящата справка за **{}** ({}) обединява проверени данни от публични регистри, официални институционални източници, медийни публикации и уеб архиви. Всички посочени факти следва да се разглеждат във връзка с цитираните първични документи.\n\n\
+        ### 9.2. Списък на проверените източници\n",
+        headings[8],
+        name,
+        entity_type_bg_label(entity_type)
     ));
 
+    let mut item_no = 1usize;
     if let Some(ref wb) = temporal_audit.wiki_bio {
-        out.push_str(&format!("1. Официална енциклопедична страница в Уикипедия ({}) - https://{}.wikipedia.org/wiki/{}\n", wb.title, wb.language, urlencoding::encode(&wb.title)));
+        out.push_str(&format!("{}. Уикипедия ({}) — https://{}.wikipedia.org/wiki/{}\n", item_no, wb.title, wb.language, urlencoding::encode(&wb.title)));
+        item_no += 1;
     }
-
-    let mut item_no = 2;
+    for d in docs {
+        if d.url.starts_with("http") {
+            out.push_str(&format!("{}. {} — {}\n", item_no, d.title, d.url));
+            item_no += 1;
+        }
+    }
     for snap in &temporal_audit.historical_snapshots {
-        out.push_str(&format!("{}. Дигитален архив Wayback Machine ({}) - {}\n", item_no, snap.original_url, snap.url));
+        out.push_str(&format!("{}. Wayback Machine ({}) — {}\n", item_no, snap.original_url, snap.url));
         item_no += 1;
     }
     for doc in &temporal_audit.internet_archive_docs {
-        out.push_str(&format!("{}. Internet Archive запис '{}' - {}\n", item_no, doc.title, doc.detail_url));
-        item_no += 1;
-    }
-    for h in hits {
-        let first_line = h.lines().next().unwrap_or("Източник");
-        out.push_str(&format!("{}. {}\n", item_no, first_line));
+        out.push_str(&format!("{}. Internet Archive: {} — {}\n", item_no, doc.title, doc.detail_url));
         item_no += 1;
     }
 
@@ -2452,7 +3350,7 @@ async fn handle_get_person_dossier(
         if let Some(sum) = p.summary {
             return (
                 [(axum::http::header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
-                format!("# Досие: {}\n\n{}", p.canonical_name, sum),
+                format!("# Аналитична справка: {}\n\n{}", p.canonical_name, sum),
             ).into_response();
         }
     }
@@ -2766,15 +3664,19 @@ async fn handle_auto_classify_people(
             "country" => Some("държава"),
             "group" => Some("политическа партия"),
             "event" => Some("събитие"),
+            "infrastructure" => Some("инфраструктура"),
+            "building" => Some("сграда"),
             _ => None,
         };
 
         let cat_to_set = match detected {
-            "institution" => Some("институция"),
-            "channel" => Some("медия"),
-            "country" => Some("държава"),
-            "group" => Some("политика"),
-            "event" => Some("събития"),
+            "institution" => Some("Институция"),
+            "channel" => Some("Медийна личност"),
+            "country" => Some("Държава"),
+            "group" => Some("Общественик"),
+            "event" => Some("Събитие"),
+            "infrastructure" => Some("Инфраструктурен обект"),
+            "building" => Some("Сграда / Обект"),
             _ => None,
         };
 
@@ -3041,31 +3943,81 @@ async fn handle_get_notifications(
 
     let mut notifications = Vec::new();
 
+    let mut active_list: Vec<crate::engine::ActiveResearchTask> = {
+        let map = ctx.active_tasks.read().await;
+        map.values().cloned().collect()
+    };
+    active_list.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    let ongoing_count = active_list.len();
+
+    for task in active_list {
+        notifications.push(serde_json::json!({
+            "id": format!("ongoing_{}", task.id),
+            "type": "ongoing",
+            "title": task.title,
+            "message": task.stage,
+            "timestamp": task.started_at,
+            "progress_pct": task.progress_pct,
+            "subject_id": task.subject_id,
+            "video_id": task.video_id,
+            "subject_name": task.subject_name,
+        }));
+    }
+
+    if let Ok(qval) = ctx.db.queue_counts().await {
+        let queued = qval
+            .get("queued")
+            .or_else(|| qval.get("pending"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let running = qval.get("running").and_then(|v| v.as_i64()).unwrap_or(0);
+        if running > 0 || queued > 0 {
+            notifications.push(serde_json::json!({
+                "id": "pipeline_queue_active",
+                "type": "ongoing",
+                "title": format!("Обработка на видео опашка ({} в ход, {} чакащи)", running, queued),
+                "message": "Изпълнява се транскрибиране, извличане на твърдения и проверка по източници.",
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "progress_pct": if running > 0 { 60 } else { 20 },
+            }));
+        }
+    }
+
     if dedup_questions_count > 0 {
         notifications.push(serde_json::json!({
             "id": "pending_dedup",
             "type": "question",
-            "title": format!("Открити са {} дублирани или съставни записа (Google Contacts стил)", dedup_questions_count),
-            "message": "Системата откри дублирани профили, съставни имена или излишни тагове в имената на субектите. Отворете раздела с въпроси за потвърждение.",
+            "title": format!("Открити са {} дублирани или съставни записа", dedup_questions_count),
+            "message": "Открити са повтарящи се профили или съставни имена. Прегледайте предложенията в раздела за дубликати.",
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "count": dedup_questions_count
         }));
     }
 
-    let researched_people: Vec<_> = all.iter().filter(|p| p.researched_at.is_some()).take(5).collect();
-    for rp in researched_people {
+    let mut researched_people: Vec<_> = all.iter().filter(|p| p.researched_at.is_some()).collect();
+    researched_people.sort_by(|a, b| b.researched_at.cmp(&a.researched_at));
+    for rp in researched_people.into_iter().take(8) {
+        let short_summary = rp
+            .summary
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.chars().take(160).collect::<String>())
+            .unwrap_or_else(|| "Справката съдържа данни от публични регистри, медийни публикации, санкционни списъци и уеб архиви.".to_string());
         notifications.push(serde_json::json!({
             "id": format!("dossier_{}", rp.id),
-            "type": "info",
-            "title": format!("Генерирано 10k OSINT досие: {}", rp.canonical_name),
-            "message": format!("Пълен оперативен профил със справка от Wayback Machine, санкционни регистри и AEGIS форензика."),
+            "type": "success",
+            "title": format!("Изготвена аналитична справка: {}", rp.canonical_name),
+            "message": short_summary,
             "timestamp": rp.researched_at.clone().unwrap_or_default(),
+            "subject_id": rp.id,
+            "subject_name": rp.canonical_name,
         }));
     }
 
     Json(serde_json::json!({
         "ok": true,
-        "unread_count": dedup_questions_count + notifications.len().min(3),
+        "unread_count": ongoing_count + dedup_questions_count + notifications.len().min(3),
+        "ongoing_count": ongoing_count,
         "questions_count": dedup_questions_count,
         "notifications": notifications
     })).into_response()
@@ -3208,6 +4160,19 @@ async fn handle_assess_creator_risk(
 ) -> Response {
     let req = body.map(|Json(b)| b).unwrap_or_default();
     let force = req.force_web.unwrap_or(true);
+    let task_id = format!("creator_risk:{}", handle);
+    ctx.upsert_active_task(crate::engine::ActiveResearchTask {
+        id: task_id.clone(),
+        kind: "creator_risk".to_string(),
+        subject_id: None,
+        video_id: None,
+        subject_name: format!("@{}", handle),
+        title: format!("Проверка на профила: @{}", handle),
+        stage: "Търсене на опровержения и публикации за автора...".to_string(),
+        progress_pct: 50,
+        started_at: chrono::Utc::now().to_rfc3339(),
+    }).await;
+    let _cleanup = ActiveTaskCleanup { ctx: Arc::clone(&ctx), task_id };
     match crate::creator_risk::assess_creator_risk(&ctx, &handle, req.display_name.as_deref(), force).await {
         Ok(assessment) => Json(assessment).into_response(),
         Err(e) => (
@@ -4697,6 +5662,153 @@ async fn handle_test_model(
             })
             .into_response()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fallback_blocks_use_exact_financial_and_legal_facts_without_boilerplate() {
+        let audit = leadfinder_providers::AegisTemporalAudit {
+            target: "Андрей Гюров".to_string(),
+            snapshots_checked: 5,
+            oldest_capture: Some("2021-11-14".to_string()),
+            newest_capture: Some("2024-06-27".to_string()),
+            historical_snapshots: Vec::new(),
+            internet_archive_docs: Vec::new(),
+            wiki_bio: Some(leadfinder_providers::WikiBioExtract {
+                title: "Андрей Гюров".to_string(),
+                language: "bg".to_string(),
+                extract: "Андрей Атанасов Гюров е български икономист и политик, роден на 31 декември 1975 г. в Гоце Делчев. На 26 юли 2023 г. Народното събрание го избира за подуправител на БНБ.\n== Казус с КПКОНПИ и ВАС ==\nПрез юни 2024 г. КПК (бивша КПКОНПИ) постановява решение за несъвместимост заради дялово участие в Йонтех Инженеринг ООД (ЕИК 201567890). По казуса е образувано дело пред ВАС, който отправя преюдициално запитване до Съда на Европейския съюз (СЕС).".to_string(),
+                revisions: Vec::new(),
+            }),
+            scrubbed_or_altered_risk: "Ниска вероятност за заличаване".to_string(),
+            provenance_notes: Vec::new(),
+        };
+
+        let docs = vec![
+            ScrapedOsintDoc {
+                bucket: "fin".to_string(),
+                title: "Справка за Йонтех Инженеринг ООД".to_string(),
+                url: "https://papagal.bg/eik/201567890/abc".to_string(),
+                text: "Андрей Гюров фигурира като съдружник в Йонтех Инженеринг ООД с ЕИК 201567890 и капитал 5000 лв., подадена е имуществена декларация пред КПКОНПИ.".to_string(),
+            },
+            ScrapedOsintDoc {
+                bucket: "legal".to_string(),
+                title: "ВАС спря производството по делото на Андрей Гюров и сезира СЕС".to_string(),
+                url: "https://news.lex.bg/vas-gyurov-ses/".to_string(),
+                text: "Върховният административен съд (ВАС) образува адм. дело № 7812/2024 г. срещу решението на Управителния съвет на БНБ и акта на КПКОНПИ и отправи запитване до СЕС.".to_string(),
+            },
+        ];
+
+        let corpus = format!(
+            "{}\n{}\n{}",
+            audit.wiki_bio.as_ref().unwrap().extract,
+            docs[0].text,
+            docs[1].text
+        );
+        let pivots = leadfinder_providers::extract_entity_pivots(&corpus, "Андрей Гюров");
+        let eiks = leadfinder_providers::extract_eik_numbers(&corpus);
+
+        let b1 = generate_fallback_block1("Андрей Гюров", "person", &audit, &pivots, &eiks, &docs);
+        let b2 = generate_fallback_block2("Андрей Гюров", "person", &audit, &[], &docs);
+
+        assert!(b1.contains("Йонтех Инженеринг ООД"), "Expected company name in Block 1: {}", b1);
+        assert!(b1.contains("201567890"), "Expected EIK in Block 1: {}", b1);
+        assert!(!b1.contains("При автоматизирания мониторинг"), "Must not contain generic boilerplate");
+        assert!(!b1.contains("военна"), "Must not contain Rumen Radev hardcoded military text");
+
+        assert!(b2.contains("ВАС"), "Expected court reference in Block 2: {}", b2);
+        assert!(b2.contains("СЕС"), "Expected ECJ reference in Block 2: {}", b2);
+        assert!(b2.contains("7812/2024"), "Expected exact case number in Block 2: {}", b2);
+    }
+
+    #[test]
+    fn test_fallback_blocks_support_infrastructure_and_building_types() {
+        let audit = leadfinder_providers::AegisTemporalAudit {
+            target: "Автомагистрала Хемус".to_string(),
+            snapshots_checked: 0,
+            oldest_capture: None,
+            newest_capture: None,
+            historical_snapshots: Vec::new(),
+            internet_archive_docs: Vec::new(),
+            wiki_bio: None,
+            scrubbed_or_altered_risk: "Не са установени данни за целенасочено премахване.".to_string(),
+            provenance_notes: Vec::new(),
+        };
+        let docs = vec![ScrapedOsintDoc {
+            bucket: "fin".to_string(),
+            title: "Договори за строителство на АМ Хемус".to_string(),
+            url: "https://api.bg/hemus-contracts".to_string(),
+            text: "Агенция Пътна инфраструктура възложи инхаус договори на Автомагистрали ЕАД на стойност 1.3 млрд. лв. с надзор от ДНСК.".to_string(),
+        }];
+        let pivots = leadfinder_providers::extract_entity_pivots(&docs[0].text, "Автомагистрала Хемус");
+        let b1 = generate_fallback_block1("Автомагистрала Хемус", "infrastructure", &audit, &pivots, &[], &docs);
+        assert!(b1.contains("ГЛАВА 2: ФИНАНСИРАНЕ, ОБЩЕСТВЕНИ ПОРЪЧКИ, ДОГОВОРИ И СТОЙНОСТ"));
+        assert!(b1.contains("Автомагистрали ЕАД"));
+        assert!(b1.contains("1.3 млрд. лв."));
+    }
+
+    #[test]
+    fn test_ensure_concrete_facts_preserved_appends_omitted_facts_to_llm_prose() {
+        let llm_summary_prose = "# ГЛАВА 1: БИОГРАФИЧНИ ДАННИ\nАндрей Гюров е български икономист и народен представител.\n\n# ГЛАВА 2: ТЪРГОВСКИ РЕГИСТЪР\nУчаствал е в частния сектор преди влизането си в политиката.".to_string();
+        let pivots = vec![leadfinder_core::EntityPivotRef {
+            entity_name: "Йонтех Инженеринг ООД".to_string(),
+            entity_kind: "ООД".to_string(),
+            relevance: 0.9,
+            registry_status: Some("ЕИК 201567890".to_string()),
+        }];
+        let eiks = vec!["201567890".to_string()];
+        let fin_facts = vec![
+            "Според Търговския регистър е вписан като съдружник в Йонтех Инженеринг ООД с ЕИК 201567890. ([Справка](https://papagal.bg/eik/201567890/b2c1))".to_string()
+        ];
+        let enriched_b1 = ensure_concrete_facts_preserved_block1(
+            llm_summary_prose,
+            &pivots,
+            &eiks,
+            &fin_facts,
+            &[],
+        );
+        assert!(enriched_b1.contains("201567890"));
+        assert!(enriched_b1.contains("Йонтех Инженеринг ООД"));
+        assert!(enriched_b1.contains("papagal.bg/eik/201567890"));
+
+        let llm_legal_prose = "# ГЛАВА 5: СЪДЕБНИ ПРОИЗВОДСТВА\nРазглеждани са административни спорове.".to_string();
+        let legal_facts = vec![
+            "Върховният административен съд образува адм. дело № 7812/2024 г. и отправи преюдициално запитване до СЕС. ([ВАС](https://www.sac.government.bg/news))".to_string()
+        ];
+        let enriched_b2 = ensure_concrete_facts_preserved_block2(llm_legal_prose, &[], &legal_facts);
+        assert!(enriched_b2.contains("7812/2024"));
+        assert!(enriched_b2.contains("СЕС"));
+    }
+
+    #[test]
+    fn test_international_subject_extracts_eponymous_companies_dollars_and_impeachment_facts() {
+        let wiki_txt = "== Въведение ==\nДоналд Джон Тръмп е американски бизнесмен и 45-и и 47-и президент на САЩ.\n\n== Бизнес кариера ==\nТръмп е президент и главен изпълнителен директор на „Тръмп Организейшън“ и основател на „Тръмп Ентертеймънт Ризортс“. Към 2007 г. годишният доход на Тръмп възлиза на 32 милиона долара, а нетната стойност на богатството му към 2017 г. възлиза на $3,7 милиарда. На 13 януари 2021 г., с обвинение за подбуждане на метеж, Камарата на представителите гласува за втори път негов импийчмънт, след което е оправдан от Сената.";
+        let audit = leadfinder_providers::AegisTemporalAudit {
+            target: "Доналд Тръмп".to_string(),
+            snapshots_checked: 0,
+            oldest_capture: None,
+            newest_capture: None,
+            historical_snapshots: Vec::new(),
+            internet_archive_docs: Vec::new(),
+            wiki_bio: Some(leadfinder_providers::WikiBioExtract {
+                title: "Доналд Тръмп".to_string(),
+                language: "bg".to_string(),
+                extract: wiki_txt.to_string(),
+                revisions: Vec::new(),
+            }),
+            scrubbed_or_altered_risk: "Не са установени данни за премахване.".to_string(),
+            provenance_notes: Vec::new(),
+        };
+        let pivots = leadfinder_providers::extract_entity_pivots(wiki_txt, "Доналд Тръмп");
+        let b1 = generate_fallback_block1("Доналд Тръмп", "person", &audit, &pivots, &[], &[]);
+        let b2 = generate_fallback_block2("Доналд Тръмп", "person", &audit, &[], &[]);
+        assert!(b1.contains("Тръмп Организейшън"), "Expected eponymous company in Chapter 2: {}", b1);
+        assert!(b1.contains("32 милиона долара") || b1.contains("$3,7 милиарда"), "Expected USD financial figures in Chapter 2: {}", b1);
+        assert!(b2.contains("импийчмънт"), "Expected impeachment ruling in Chapter 5: {}", b2);
     }
 }
 

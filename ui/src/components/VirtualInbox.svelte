@@ -10,6 +10,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { Lane, LeadCard } from '../lib/types';
+  import { widescreen } from '../lib/widescreen.svelte';
   import LeadCardComponent from './LeadCard.svelte';
 
   let {
@@ -113,8 +114,8 @@
   let scrollTop = $state(0);
   let containerHeight = $state(600);
 
-  const ITEM_HEIGHT = 92;
-  const BUFFER_COUNT = 6;
+  const itemHeight = $derived(widescreen.inboxRowHeight);
+  const BUFFER_COUNT = 7;
 
   export function focusSearch() {
     if (searchInputRef) {
@@ -191,11 +192,11 @@
     filteredCards.find((c: LeadCard) => c.id === selectedId) || filteredCards[0] || null
   );
 
-  const totalHeight = $derived(filteredCards.length * ITEM_HEIGHT);
+  const totalHeight = $derived(filteredCards.length * itemHeight);
 
   const visibleRange = $derived.by(() => {
-    const startIdx = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER_COUNT);
-    const visibleCount = Math.ceil(containerHeight / ITEM_HEIGHT) + 2 * BUFFER_COUNT;
+    const startIdx = Math.max(0, Math.floor(scrollTop / itemHeight) - BUFFER_COUNT);
+    const visibleCount = Math.ceil(containerHeight / itemHeight) + 2 * BUFFER_COUNT;
     const endIdx = Math.min(filteredCards.length, startIdx + visibleCount);
     return { startIdx, endIdx };
   });
@@ -204,7 +205,7 @@
     const { startIdx, endIdx } = visibleRange;
     return filteredCards.slice(startIdx, endIdx).map((item: LeadCard, idx: number) => ({
       item,
-      top: (startIdx + idx) * ITEM_HEIGHT,
+      top: (startIdx + idx) * itemHeight,
     }));
   });
 
@@ -539,10 +540,26 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.65rem 1.25rem;
+    gap: 0.85rem;
+    padding: var(--subbar-pad-y, 0.6rem) 1.15rem;
     background: var(--surface-bg);
     border-bottom: 1px solid var(--border-color);
+  }
+
+  :global([data-display-profile='18']) .has-right-column .inbox-subbar {
+    padding: 0.42rem 0.7rem;
+    gap: 0.35rem;
+  }
+
+  :global([data-display-profile='18']) .has-right-column .lane-tab {
+    padding: 0.3rem 0.58rem;
+    font-size: 0.76rem;
+  }
+
+  :global([data-display-profile='13']) .lane-tab,
+  :global([data-display-profile='14']) .lane-tab {
+    padding: 0.32rem 0.6rem;
+    font-size: 0.77rem;
   }
 
   .lane-tabs {
@@ -609,6 +626,14 @@
     border: 1px solid var(--border-color);
     background: var(--input-bg);
     color: var(--text-body);
+  }
+
+  :global([data-widescreen='true']) .search-box input {
+    width: 240px;
+  }
+
+  :global([data-widescreen='true']) .has-right-column .search-box input {
+    width: 190px;
   }
 
   .select-filter {
@@ -709,9 +734,9 @@
   }
 
   .feed-sidebar {
-    width: 380px;
-    min-width: 340px;
-    max-width: 420px;
+    width: var(--inbox-feed-width, 380px);
+    min-width: 300px;
+    max-width: 450px;
     border-left: 1px solid var(--border-color);
     background: var(--surface-bg);
     display: flex;
@@ -747,7 +772,7 @@
   .feed-media-box {
     width: 100%;
     aspect-ratio: 9 / 16;
-    max-height: 420px;
+    max-height: var(--video-stage-height, 420px);
     background: #000;
     border-radius: 8px;
     overflow: hidden;

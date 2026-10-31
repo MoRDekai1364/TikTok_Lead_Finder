@@ -485,6 +485,7 @@ impl WhisperCppTranscriber {
                         end_ms,
                         text: txt,
                         confidence: seg_conf,
+                        speaker: None,
                     });
                 }
             }
@@ -676,6 +677,7 @@ pub fn parse_vtt_or_srt(content: &str) -> Vec<TranscriptSegment> {
                     end_ms,
                     text: clean,
                     confidence: Some(0.90),
+                    speaker: None,
                 });
             }
         }

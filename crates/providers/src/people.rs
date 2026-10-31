@@ -147,6 +147,81 @@ pub fn detect_entity_type(name: &str, role_hint: Option<&str>) -> &'static str {
         return "event";
     }
 
+    if lower.contains("автомагистрала")
+        || lower.contains("магистрала")
+        || lower.contains("мост")
+        || lower.contains("тунел")
+        || lower.contains("язовир")
+        || lower.starts_with("аец ")
+        || lower.contains(" аец")
+        || lower.starts_with("тец ")
+        || lower.contains(" тец")
+        || lower.starts_with("вец ")
+        || lower.contains(" вец")
+        || lower.starts_with("павец")
+        || lower.contains("газопровод")
+        || lower.contains("интерконектор")
+        || lower.contains("петролопровод")
+        || lower.contains("водопровод")
+        || lower.contains("електропровод")
+        || lower.contains("подстанция")
+        || lower.contains("пречиствателна")
+        || lower.contains("пристанище")
+        || lower.contains("летище")
+        || lower.contains("жп линия")
+        || lower.contains("железопът")
+        || lower.contains("метростанция")
+        || lower.contains("метролиния")
+        || lower.contains("околовръстен път")
+        || lower.contains("граничен пункт")
+        || lower.starts_with("гкпп")
+        || lower.contains(" гкпп")
+        || (!is_human_role
+            && (r_lower.contains("инфраструктур")
+                || r_lower.contains("съоръжение")
+                || r_lower.contains("магистрала")
+                || r_lower.contains("централа")
+                || r_lower.contains("язовир")
+                || r_lower.contains("газопровод")))
+    {
+        return "infrastructure";
+    }
+
+    if lower.contains("сграда")
+        || lower.contains("болница")
+        || lower.starts_with("умбал")
+        || lower.starts_with("мбал")
+        || lower.contains("стадион")
+        || lower.contains("спортна зала")
+        || lower.starts_with("зала ")
+        || lower.contains("хотел")
+        || lower.starts_with("мол ")
+        || lower.contains(" мол")
+        || lower.contains("резиденция")
+        || lower.contains("паметник")
+        || lower.contains("храм")
+        || lower.contains("манастир")
+        || lower.contains("катедрала")
+        || lower.contains("музей")
+        || lower.contains("театър")
+        || lower.contains("училище")
+        || lower.contains("гимназия")
+        || lower.contains("детска градина")
+        || lower.contains("общежитие")
+        || lower.contains("небостъргач")
+        || lower.contains("жилищен комплекс")
+        || lower.contains("търговски център")
+        || lower.contains("съдебна палата")
+        || (!is_human_role
+            && (r_lower.contains("сграда")
+                || r_lower.contains("строеж")
+                || r_lower.contains("архитектурен")
+                || r_lower.contains("имот")
+                || r_lower.contains("болничен обект")))
+    {
+        return "building";
+    }
+
     if lower.contains("община")
         || lower.contains("съд")
         || lower.contains("прокуратура")
@@ -1210,28 +1285,66 @@ pub fn transliterate_to_canonical_latin_key(input: &str) -> String {
     clean
 }
 
+pub fn extract_eik_numbers(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let lower = text.to_lowercase();
+    for marker in ["еик", "булстат"] {
+        let mut offset = 0;
+        while offset < lower.len() {
+            let Some(pos) = lower[offset..].find(marker) else {
+                break;
+            };
+            let after = &lower[offset + pos + marker.len()..];
+            let digits: String = after
+                .chars()
+                .skip_while(|c| !c.is_ascii_digit() && !c.is_alphabetic())
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            if (digits.len() == 9 || digits.len() == 13) && !out.contains(&digits) {
+                out.push(digits);
+            }
+            offset += pos + marker.len();
+        }
+    }
+    out
+}
+
 pub fn extract_entity_pivots(text: &str, exclude_name: &str) -> Vec<EntityPivotRef> {
     let mut pivots = Vec::new();
-    let exc_lower = exclude_name.to_lowercase();
-    let exc_tokens: Vec<&str> = exc_lower.split_whitespace().collect();
+    let exc_lower = exclude_name.trim().to_lowercase();
 
     let corp_suffixes = [
-        ("ЕООД", "company"),
-        ("ООД", "company"),
-        ("ЕАД", "company"),
-        ("АД", "company"),
-        ("Холдинг", "holding"),
-        ("Консорциум", "consortium"),
-        ("Фондация", "foundation"),
-        ("Сдружение", "ngo"),
-        ("Партия", "political_party"),
-        ("LLC", "foreign_entity"),
-        ("Ltd", "foreign_entity"),
-        ("GmbH", "foreign_entity"),
-        ("Inc", "foreign_entity"),
+        ("ЕООД", "дружество (ЕООД)"),
+        ("ООД", "дружество (ООД)"),
+        ("ЕАД", "дружество (ЕАД)"),
+        ("АД", "дружество (АД)"),
+        ("ДЗЗД", "консорциум (ДЗЗД)"),
+        ("Холдинг", "холдинг"),
+        ("Консорциум", "консорциум"),
+        ("Фондация", "фондация"),
+        ("Сдружение", "сдружение"),
+        ("Груп", "корпоративна група"),
+        ("Организейшън", "корпорация"),
+        ("Корпорейшън", "корпорация"),
+        ("Ризортс", "корпорация"),
+        ("LLC", "чуждестранно дружество"),
+        ("Ltd", "чуждестранно дружество"),
+        ("GmbH", "чуждестранно дружество"),
+        ("Inc", "чуждестранно дружество"),
+        ("Corp", "чуждестранно дружество"),
+        ("Organization", "чуждестранно дружество"),
+        ("Group", "чуждестранно дружество"),
+    ];
+
+    let leading_noise = [
+        "в", "на", "от", "за", "към", "при", "с", "със", "чрез", "между", "около", "като",
+        "дружество", "дружеството", "фирма", "фирмата", "компания", "компанията",
+        "консорциум", "консорциума", "обединение", "обединението", "участие", "съдружник",
+        "управител", "собственик", "акционер", "член", "сдружението", "фондацията",
     ];
 
     for line in text.lines() {
+        let line_eiks = extract_eik_numbers(line);
         for &(suffix, kind) in &corp_suffixes {
             let mut offset = 0;
             while offset < line.len() {
@@ -1239,9 +1352,17 @@ pub fn extract_entity_pivots(text: &str, exclude_name: &str) -> Vec<EntityPivotR
                     break;
                 };
                 let abs_pos = offset + pos;
+                let after_idx = abs_pos + suffix.len();
+                let valid_left = abs_pos == 0 || !line[..abs_pos].chars().last().map(|c| c.is_alphabetic()).unwrap_or(false);
+                let valid_right = after_idx >= line.len() || !line[after_idx..].chars().next().map(|c| c.is_alphabetic()).unwrap_or(false);
+                if !valid_left || !valid_right {
+                    offset = after_idx;
+                    continue;
+                }
+
                 let prefix = &line[..abs_pos];
                 let chars: Vec<char> = prefix.chars().collect();
-                let take_count = chars.len().min(40);
+                let take_count = chars.len().min(48);
                 let window_chars: String = chars[chars.len() - take_count..].iter().collect();
 
                 let extracted_name = if let Some(q_start) = window_chars.rfind(|c| c == '"' || c == '„' || c == '«') {
@@ -1253,48 +1374,67 @@ pub fn extract_entity_pivots(text: &str, exclude_name: &str) -> Vec<EntityPivotR
                         let inner = rest[..end_idx].trim();
                         format!("{} {}", inner, suffix)
                     } else {
-                        let last_words = window_chars.split_whitespace().rev().take(3).collect::<Vec<_>>();
-                        let mut words = last_words.into_iter().rev().collect::<Vec<_>>();
-                        words.push(suffix);
-                        words.join(" ")
+                        let inner = rest.trim();
+                        format!("{} {}", inner, suffix)
                     }
                 } else {
-                    let last_words = window_chars.split_whitespace().rev().take(3).collect::<Vec<_>>();
-                    let mut words = last_words.into_iter().rev().collect::<Vec<_>>();
+                    let last_words = window_chars.split_whitespace().rev().take(4).collect::<Vec<_>>();
+                    let mut words: Vec<&str> = last_words.into_iter().rev().collect();
+                    while let Some(first) = words.first() {
+                        let clean_w = first.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase();
+                        if clean_w.is_empty() || leading_noise.contains(&clean_w.as_str()) {
+                            words.remove(0);
+                        } else {
+                            break;
+                        }
+                    }
+                    if words.is_empty() {
+                        offset = after_idx;
+                        continue;
+                    }
                     words.push(suffix);
                     words.join(" ")
                 };
 
-                let norm_cand = extracted_name.trim().trim_matches(|c: char| c.is_ascii_punctuation() || c == '„' || c == '“' || c == '»');
+                let norm_cand = extracted_name
+                    .trim()
+                    .trim_matches(|c: char| c.is_ascii_punctuation() || c == '„' || c == '“' || c == '»' || c == '«');
                 let cand_lower = norm_cand.to_lowercase();
 
-                let is_excluded = exc_tokens.iter().any(|t| cand_lower.contains(t) && t.len() > 3);
-                let is_too_short = norm_cand.len() < 4;
+                let is_excluded = !exc_lower.is_empty() && cand_lower == exc_lower;
+                let has_capital_or_quote = norm_cand.chars().next().map(|c| c.is_uppercase()).unwrap_or(false);
+                let word_count = norm_cand.split_whitespace().count();
+                let is_too_short = norm_cand.chars().count() < 5 || word_count < 2 || !has_capital_or_quote;
 
                 if !is_excluded && !is_too_short && !pivots.iter().any(|p: &EntityPivotRef| p.entity_name.eq_ignore_ascii_case(norm_cand)) {
+                    let status_note = if let Some(eik) = line_eiks.first() {
+                        format!("ЕИК {}", eik)
+                    } else {
+                        "Открито в публични източници".to_string()
+                    };
                     pivots.push(EntityPivotRef {
                         entity_name: norm_cand.to_string(),
                         entity_kind: kind.to_string(),
                         relevance: 0.85,
-                        registry_status: Some("Активно / Проучено в регистър".to_string()),
+                        registry_status: Some(status_note),
                     });
                 }
 
-                offset = abs_pos + suffix.len();
-                if pivots.len() >= 8 {
+                offset = after_idx;
+                if pivots.len() >= 10 {
                     break;
                 }
             }
-            if pivots.len() >= 8 {
+            if pivots.len() >= 10 {
                 break;
             }
         }
-        if pivots.len() >= 8 {
+        if pivots.len() >= 10 {
             break;
         }
     }
 
-    pivots.truncate(6);
+    pivots.truncate(8);
     pivots
 }
 
@@ -1304,9 +1444,29 @@ mod tests {
 
     #[test]
     fn test_extract_entity_pivots_cyrillic_boundary_safe() {
-        let text = "Според последните данни от търговския регистър, дружеството „Булгартабак Холдинг“ АД и компанията „Интръст“ ЕАД са свързани лица.";
+        let text = "Според последните данни от търговския регистър, дружеството „Булгартабак Холдинг“ АД и компанията „Йонтех Инженеринг“ ООД (ЕИК 201567890) са свързани лица.";
         let pivots = extract_entity_pivots(text, "Румен Радев");
         assert!(!pivots.is_empty());
-        assert!(pivots.iter().any(|p| p.entity_name.contains("Холдинг") || p.entity_name.contains("АД") || p.entity_name.contains("ЕАД")));
+        assert!(pivots.iter().any(|p| p.entity_name.contains("Йонтех Инженеринг ООД")));
+        assert!(pivots.iter().any(|p| p.registry_status.as_deref() == Some("ЕИК 201567890")));
+    }
+
+    #[test]
+    fn test_detect_entity_type_infrastructure_and_building() {
+        assert_eq!(detect_entity_type("Автомагистрала Хемус", None), "infrastructure");
+        assert_eq!(detect_entity_type("АЕЦ Козлодуй", None), "infrastructure");
+        assert_eq!(detect_entity_type("Дунав мост 2", None), "infrastructure");
+        assert_eq!(detect_entity_type("Национална детска болница", None), "building");
+        assert_eq!(detect_entity_type("Съдебна палата София", None), "building");
+        assert_eq!(detect_entity_type("Върховен административен съд", None), "institution");
+        assert_eq!(detect_entity_type("Андрей Гюров", Some("Подуправител на БНБ")), "person");
+    }
+
+    #[test]
+    fn test_extract_entity_pivots_preserves_eponymous_companies() {
+        let text = "Тръмп е президент и главен изпълнителен директор на „Тръмп Организейшън“ и основател на „Тръмп Ентертеймънт Ризортс“.";
+        let pivots = extract_entity_pivots(text, "Доналд Тръмп");
+        assert!(pivots.iter().any(|p| p.entity_name.contains("Тръмп Организейшън")));
+        assert!(pivots.iter().any(|p| p.entity_name.contains("Тръмп Ентертеймънт Ризортс")));
     }
 }

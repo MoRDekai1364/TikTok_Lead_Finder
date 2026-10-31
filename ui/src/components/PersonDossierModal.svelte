@@ -2,6 +2,9 @@
   import type { Language } from '../lib/i18n';
   import type { Person, DetailedPersonProfile, EntityIntelEvent, SanctionsMatch, EntityPivotRef, AegisTemporalAudit } from '../lib/types';
   import { researchPerson, fetchPersonIntelStream, refreshPersonIntelStream, fetchPersonSanctions, fetchPersonWayback, refreshPersonWayback } from '../lib/api';
+  import { startAiJob, finishAiJob } from '../lib/aiTasks.svelte';
+  import { highlightInlineMarkdown, highlightPlainTextToHtml, escapeHtml } from '../lib/reportHighlighter';
+  import BookReaderToc, { type TocItem } from './BookReaderToc.svelte';
 
   let {
     person,
@@ -19,6 +22,8 @@
   let isResearching = $state(false);
   let toastMsg = $state<string | null>(null);
   let searchFilter = $state('');
+  let enableKeywordHighlights = $state(true);
+  let reportScrollEl = $state<HTMLElement | null>(null);
   let intelEvents = $state<EntityIntelEvent[]>([]);
   let isRefreshingIntel = $state(false);
   let liveSanctions = $state<SanctionsMatch[]>([]);
@@ -113,6 +118,10 @@
         return { label: currentLang === 'bg' ? 'Група / Партия' : 'Group / Party', icon: '👥', cssClass: 'type-group' };
       case 'event':
         return { label: currentLang === 'bg' ? 'Събитие' : 'Event', icon: '📅', cssClass: 'type-event' };
+      case 'infrastructure':
+        return { label: currentLang === 'bg' ? 'Инфраструктура' : 'Infrastructure', icon: '🛤️', cssClass: 'type-infrastructure' };
+      case 'building':
+        return { label: currentLang === 'bg' ? 'Сграда / Обект' : 'Building', icon: '🏢', cssClass: 'type-building' };
       default:
         return { label: currentLang === 'bg' ? 'Личност' : 'Person', icon: '👤', cssClass: 'type-person' };
     }
@@ -150,23 +159,22 @@
       return parsedData.report_markdown;
     }
     if (!person) return '';
-    let md = `# OSINT РАЗУЗНАВАТЕЛНО ДОСИЕ: ${person.canonical_name}\n\n`;
-    if (person.role) md += `**Длъжност:** ${person.role}\n`;
+    let md = `# АНАЛИТИЧНА СПРАВКА: ${person.canonical_name}\n\n`;
+    if (person.role) md += `**Длъжност / Статут:** ${person.role}\n`;
     if (person.category) md += `**Категория:** ${person.category}\n`;
-    if (person.rating) md += `**Рейтинг на интерес:** ${person.rating}/100\n`;
-    if (person.tags && person.tags.length > 0) md += `**Тагове:** ${person.tags.map((t) => `[${t}]`).join(' ')}\n`;
-    if (person.summary) md += `\n## Обобщение на личността\n${person.summary}\n`;
+    if (person.tags && person.tags.length > 0) md += `**Етикети:** ${person.tags.map((t) => `[${t}]`).join(' ')}\n`;
+    if (person.summary) md += `\n## Обобщение\n${person.summary}\n`;
     if (parsedData?.profile) {
       const prof = parsedData.profile;
-      if (prof.identity) md += `\n## 1. Идентичност и лични данни\n${prof.identity}\n`;
-      if (prof.contact_locations) md += `\n## 2. Локации и комуникационни канали\n${prof.contact_locations}\n`;
-      if (prof.network_associates) md += `\n## 3. Мрежа от контакти и съдружници\n${prof.network_associates}\n`;
-      if (prof.education_career) md += `\n## 4. Образование и кариерно развитие\n${prof.education_career}\n`;
-      if (prof.financial_assets) md += `\n## 5. Финансов профил и корпоративни интереси\n${prof.financial_assets}\n`;
-      if (prof.legal_regulatory) md += `\n## 6. Правен и регулаторен статус\n${prof.legal_regulatory}\n`;
-      if (prof.digital_media_presence) md += `\n## 7. Медийно и дигитално присъствие\n${prof.digital_media_presence}\n`;
-      if (prof.affiliations_beliefs) md += `\n## 8. Политически и обществени принадлежности\n${prof.affiliations_beliefs}\n`;
-      if (prof.psychographic_behavioral) md += `\n## 9. Психографски и поведенчески профил\n${prof.psychographic_behavioral}\n`;
+      if (prof.identity) md += `\n## 1. Основни данни и биография\n${prof.identity}\n`;
+      if (prof.contact_locations) md += `\n## 2. Седалище и местоположения\n${prof.contact_locations}\n`;
+      if (prof.network_associates) md += `\n## 3. Свързани лица и организации\n${prof.network_associates}\n`;
+      if (prof.education_career) md += `\n## 4. Образование и длъжности\n${prof.education_career}\n`;
+      if (prof.financial_assets) md += `\n## 5. Търговски регистър, дружества и активи\n${prof.financial_assets}\n`;
+      if (prof.legal_regulatory) md += `\n## 6. Съдебни производства, КПКОНПИ и санкции\n${prof.legal_regulatory}\n`;
+      if (prof.digital_media_presence) md += `\n## 7. Медийни публикации и архиви\n${prof.digital_media_presence}\n`;
+      if (prof.affiliations_beliefs) md += `\n## 8. Членства и публични позиции\n${prof.affiliations_beliefs}\n`;
+      if (prof.psychographic_behavioral) md += `\n## 9. Комуникационен профил и тези\n${prof.psychographic_behavioral}\n`;
     }
     return md;
   });
@@ -181,7 +189,7 @@
   const hasAegisDeepfakeMention = $derived.by(() => {
     if (!fullMarkdown) return false;
     const low = fullMarkdown.toLowerCase();
-    return low.includes('deepfake') || low.includes('aegis') || low.includes('клониран') || low.includes('face-swap');
+    return low.includes('deepfake') || low.includes('клониран') || low.includes('face-swap');
   });
 
   type Block =
@@ -199,6 +207,7 @@
     const blocks: Block[] = [];
     let currentList: string[] = [];
     let chapterIndex = 0;
+    let subsecIndex = 0;
 
     function flushList() {
       if (currentList.length > 0) {
@@ -215,7 +224,8 @@
       }
       if (line.startsWith('### ')) {
         flushList();
-        blocks.push({ type: 'h3', text: line.slice(4).trim() });
+        subsecIndex += 1;
+        blocks.push({ type: 'h3', text: line.slice(4).trim(), id: `subsec-${subsecIndex}` });
       } else if (line.startsWith('## ')) {
         flushList();
         chapterIndex += 1;
@@ -229,7 +239,10 @@
         blocks.push({ type: 'hr' });
       } else if (line.startsWith('> ')) {
         flushList();
-        blocks.push({ type: 'quote', text: line.slice(2).trim() });
+        const qTxt = line.slice(2).trim();
+        if (qTxt !== '[!NOTE]' && qTxt !== '[!IMPORTANT]' && qTxt !== '[!WARNING]') {
+          blocks.push({ type: 'quote', text: qTxt });
+        }
       } else if (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('• ')) {
         currentList.push(line.replace(/^[-*•]\s+/, ''));
       } else {
@@ -241,31 +254,35 @@
     return blocks;
   });
 
-  const chapters = $derived.by(() => {
+  const tocItems = $derived.by<TocItem[]>(() => {
     if (!parsedBlocks) return [];
-    return parsedBlocks
-      .filter((b) => (b.type === 'h1' || b.type === 'h2') && b.id)
-      .map((b) => ({
-        id: b.id!,
-        text: (b as any).text,
-        isMain: b.type === 'h1',
-      }));
+    const list: TocItem[] = [];
+    for (const b of parsedBlocks) {
+      if ((b.type === 'h1' || b.type === 'h2' || b.type === 'h3') && b.id) {
+        const cleanLabel = b.text.replace(/^#+\s*/, '').replace(/\*\*/g, '');
+        if (/^(АНАЛИТИЧНА СПРАВКА|OSINT РАЗУЗНАВАТЕЛНО ДОСИЕ)/i.test(cleanLabel) && list.length === 0) {
+          list.push({ id: b.id, label: currentLang === 'bg' ? 'Начало на справката' : 'Overview', level: 1 });
+          continue;
+        }
+        const level: 1 | 2 | 3 = b.type === 'h1' ? 1 : b.type === 'h2' ? 2 : 2;
+        list.push({ id: b.id, label: cleanLabel, level: b.type === 'h3' ? 2 : 1 });
+      }
+    }
+    return list;
   });
 
-  function escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
   function formatInline(str: string): string {
-    const escaped = escapeHtml(str);
-    let formatted = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    let formatted = highlightInlineMarkdown(str, enableKeywordHighlights);
     if (searchFilter.trim().length >= 2) {
       const filterEsc = escapeHtml(searchFilter.trim()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const re = new RegExp(`(${filterEsc})`, 'gi');
-      formatted = formatted.replace(re, '<mark class="dossier-search-hit">$1</mark>');
+      const parts = formatted.split(/(<[^>]+>)/g);
+      for (let i = 0; i < parts.length; i += 2) {
+        if (parts[i]) {
+          parts[i] = parts[i].replace(re, '<mark class="dossier-search-hit">$1</mark>');
+        }
+      }
+      formatted = parts.join('');
     }
     return formatted;
   }
@@ -277,7 +294,7 @@
   function downloadFile() {
     if (!person || !fullMarkdown) return;
     const safeName = person.canonical_name.replace(/[^a-zA-Z0-9\u0400-\u04FF_-]/g, '_');
-    const filename = `${person.id}_${safeName}_OSINT_dossier.md`;
+    const filename = `${person.id}_${safeName}_spravka.md`;
     const blob = new Blob([fullMarkdown], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -287,14 +304,14 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast(currentLang === 'bg' ? '✓ Докладът е изтеглен като .md файл!' : '✓ Dossier file downloaded!');
+    showToast(currentLang === 'bg' ? '✓ Справката е изтеглена (.md)' : '✓ Report downloaded');
   }
 
   async function copyContent() {
     if (!fullMarkdown) return;
     try {
       await navigator.clipboard.writeText(fullMarkdown);
-      showToast(currentLang === 'bg' ? '✓ Пълният доклад е копиран!' : '✓ Full report copied!');
+      showToast(currentLang === 'bg' ? '✓ Справката е копирана' : '✓ Full report copied');
     } catch {
       showToast(currentLang === 'bg' ? 'Грешка при копиране' : 'Copy error');
     }
@@ -303,12 +320,15 @@
   async function triggerResearch() {
     if (!person || isResearching) return;
     isResearching = true;
-    showToast(currentLang === 'bg' ? '⚡ Извършва се дълбоко OSINT разузнаване (5k-10k думи)...' : '⚡ Running full deep 10k-word OSINT investigation...');
+    const subjectId = person.id;
+    const subjectName = person.canonical_name;
+    startAiJob('person-research', subjectId, subjectName);
+    showToast(currentLang === 'bg' ? '⏳ Изготвяне на аналитична справка...' : '⏳ Generating analytical report...');
     try {
       if (onResearchTrigger) {
         await onResearchTrigger(person);
       }
-      const updated = await researchPerson(person.id, person.canonical_name);
+      const updated = await researchPerson(subjectId, subjectName);
       Object.assign(person, updated);
       if (updated.detailed_profile_json) {
         try {
@@ -317,9 +337,11 @@
         } catch {}
       }
       activeTab = 'report';
-      showToast(currentLang === 'bg' ? '✓ Досието е успешно генерирано!' : '✓ Full dossier successfully generated!');
+      finishAiJob('person-research', subjectId, currentLang === 'bg' ? `✓ Справката за ${subjectName} е готова` : `✓ Report for ${subjectName} ready`, true);
+      showToast(currentLang === 'bg' ? '✓ Справката е обновена' : '✓ Report updated');
     } catch {
-      showToast(currentLang === 'bg' ? 'Грешка при генериране на доклада' : 'Dossier generation error');
+      finishAiJob('person-research', subjectId, currentLang === 'bg' ? `Грешка при проучване на ${subjectName}` : `Research error for ${subjectName}`, false);
+      showToast(currentLang === 'bg' ? 'Грешка при изготвяне на справката' : 'Report generation error');
     } finally {
       isResearching = false;
     }
@@ -338,7 +360,7 @@
       <div class="modal-head">
         <div class="modal-title-col">
           <div class="title-row">
-            <h3>📖 {currentLang === 'bg' ? 'OSINT Разузнавателно Досие:' : 'OSINT Dossier:'} {person.canonical_name}</h3>
+            <h3>📖 {currentLang === 'bg' ? 'Аналитична справка:' : 'Analytical Report:'} {person.canonical_name}</h3>
             <span class="person-entity-badge {getEntityTypeInfo(person.entity_type).cssClass}">
               {getEntityTypeInfo(person.entity_type).icon} {getEntityTypeInfo(person.entity_type).label}
             </span>
@@ -347,11 +369,11 @@
                 📄 {wordCount.toLocaleString()} {currentLang === 'bg' ? 'думи' : 'words'}
               </span>
               <span class="dossier-time-badge">
-                ⏱️ ~{readingTimeMinutes} {currentLang === 'bg' ? 'мин четене' : 'min read'}
+                ⏱️ ~{readingTimeMinutes} {currentLang === 'bg' ? 'мин' : 'min'}
               </span>
             {/if}
           </div>
-          <span class="dossier-sub">{person.role || person.category || 'Публична личност'}</span>
+          <span class="dossier-sub">{person.role || person.category || getEntityTypeInfo(person.entity_type).label}</span>
         </div>
 
         <div class="modal-actions-col">
@@ -362,7 +384,7 @@
           <button
             class="btn btn-secondary btn-sm"
             onclick={downloadFile}
-            title={currentLang === 'bg' ? 'Изтегли пълния файл с доклада (.md)' : 'Download full markdown dossier file'}
+            title={currentLang === 'bg' ? 'Изтегли справката като .md файл' : 'Download report file (.md)'}
           >
             💾 {currentLang === 'bg' ? 'Изтегли .md' : 'Download .md'}
           </button>
@@ -370,7 +392,7 @@
           <button
             class="btn btn-secondary btn-sm"
             onclick={copyContent}
-            title={currentLang === 'bg' ? 'Копирай целия доклад в клипборда' : 'Copy dossier markdown'}
+            title={currentLang === 'bg' ? 'Копирай цялата справка' : 'Copy full report'}
           >
             📋 {currentLang === 'bg' ? 'Копирай' : 'Copy'}
           </button>
@@ -378,7 +400,7 @@
           <button
             class="btn btn-secondary btn-sm"
             onclick={printDossier}
-            title={currentLang === 'bg' ? 'Принтирай или запази като PDF' : 'Print or save as PDF'}
+            title={currentLang === 'bg' ? 'Печат или запис като PDF' : 'Print or save as PDF'}
           >
             🖨️ {currentLang === 'bg' ? 'Печат' : 'Print'}
           </button>
@@ -387,9 +409,11 @@
             class="btn btn-primary btn-sm"
             onclick={triggerResearch}
             disabled={isResearching}
-            title={currentLang === 'bg' ? 'Стартирай пълно дълбоко OSINT разузнаване с AI (5000-10000+ думи)' : 'Run 10,000-word deep OSINT research'}
+            title={currentLang === 'bg' ? 'Обнови справката по публични регистри, дела и архиви' : 'Refresh report from public registries and archives'}
           >
-            {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Генерирай 10k OSINT досие' : 'Re-run 10k OSINT')}
+            {isResearching
+              ? '⏳ ' + (currentLang === 'bg' ? 'Проучване...' : 'Running...')
+              : '🔄 ' + (currentLang === 'bg' ? 'Обнови справката' : 'Refresh Report')}
           </button>
 
           <button class="close-btn" onclick={onClose}>✕</button>
@@ -402,14 +426,14 @@
           class:active={activeTab === 'report'}
           onclick={() => (activeTab = 'report')}
         >
-          📄 {currentLang === 'bg' ? 'Пълен разузнавателен доклад (5k - 10k думи)' : 'Exhaustive Dossier Report (5k - 10k words)'}
+          📄 {currentLang === 'bg' ? 'Пълен доклад' : 'Full Report'}
         </button>
         <button
           class="dossier-tab-btn"
           class:active={activeTab === 'wayback_archive'}
           onclick={() => (activeTab = 'wayback_archive')}
         >
-          🏛️ {currentLang === 'bg' ? 'Wayback & Дигитална Памет' : 'Wayback & Archives'}
+          🏛️ {currentLang === 'bg' ? 'Архивни версии' : 'Web Archives'}
           {#if (temporalAudit?.historical_snapshots?.length || 0) + (temporalAudit?.internet_archive_docs?.length || 0) > 0}
             <span class="tab-badge">{(temporalAudit?.historical_snapshots?.length || 0) + (temporalAudit?.internet_archive_docs?.length || 0)}</span>
           {/if}
@@ -419,7 +443,7 @@
           class:active={activeTab === 'intel_stream'}
           onclick={() => (activeTab = 'intel_stream')}
         >
-          ⚡ {currentLang === 'bg' ? 'Динамичен новинарски поток' : 'Live Intel Stream'}
+          📰 {currentLang === 'bg' ? 'Новинарски публикации' : 'News Feed'}
           {#if intelEvents.length > 0}
             <span class="tab-badge">{intelEvents.length}</span>
           {/if}
@@ -429,7 +453,7 @@
           class:active={activeTab === 'sanctions'}
           onclick={() => (activeTab = 'sanctions')}
         >
-          🛡️ {currentLang === 'bg' ? 'Санкции & PEP радар' : 'Sanctions & PEP Radar'}
+          ⚖️ {currentLang === 'bg' ? 'Санкционни списъци' : 'Sanctions Lists'}
           {#if displaySanctions.length > 0}
             <span class="tab-badge tab-badge-alert">{displaySanctions.length}</span>
           {/if}
@@ -439,127 +463,144 @@
           class:active={activeTab === 'categories'}
           onclick={() => (activeTab = 'categories')}
         >
-          📊 {currentLang === 'bg' ? '9-категорийна OSINT матрица' : '9-Point OSINT Matrix'}
+          📊 {currentLang === 'bg' ? 'Обобщени данни по теми' : 'Topic Summary'}
         </button>
       </div>
 
-      <div class="modal-body dossier-body">
+      <div class="modal-body dossier-body" class:report-reader-mode={activeTab === 'report' && wordCount > 0}>
         {#if activeTab === 'report'}
           {#if wordCount > 0}
-            <div class="report-meta-box">
-              <span class="meta-item">📁 <strong>{currentLang === 'bg' ? 'Локален файл:' : 'Local file:'}</strong> <code>data/osint/{person.id}_{person.canonical_name.replace(/[^a-zA-Z0-9\u0400-\u04FF_-]/g, '_')}_dossier.md</code></span>
-              <span class="meta-item">🔍 <strong>{currentLang === 'bg' ? 'Обхват:' : 'Scope:'}</strong> {currentLang === 'bg' ? 'Многоизмерен анализ, биографични факти, фирми, съдебни дела, AEGIS deepfake мониторинг и мрежа' : 'Multi-dimensional background, corporate holdings, court records, AEGIS deepfakes & network'}</span>
-            </div>
+            <div class="dossier-book-layout">
+              <BookReaderToc
+                items={tocItems}
+                scrollContainer={reportScrollEl}
+                title={currentLang === 'bg' ? 'Съдържание' : 'Contents'}
+                variant="sidebar"
+              />
 
-            {#if parsedData?.delta_summary}
-              <div class="dossier-delta-banner">
-                <span class="delta-badge-icon">🔄</span>
-                <div class="delta-body">
-                  <strong>{currentLang === 'bg' ? 'Динамичен делта мониторинг (Какво се промени от предходния скан):' : 'Living Dossier Delta:'}</strong>
-                  <span>{parsedData.delta_summary}</span>
+              <div class="dossier-book-page" bind:this={reportScrollEl}>
+                <div class="report-meta-box">
+                  <span class="meta-item">📁 <strong>{currentLang === 'bg' ? 'Файл:' : 'File:'}</strong> <code>data/osint/{person.id}_{person.canonical_name.replace(/[^a-zA-Z0-9\u0400-\u04FF_-]/g, '_')}_dossier.md</code></span>
+                  <span class="meta-item">🔍 <strong>{currentLang === 'bg' ? 'Обхват:' : 'Scope:'}</strong> {currentLang === 'bg' ? 'Публични регистри, търговски участия, съдебни актове, обществени поръчки и архиви' : 'Public registries, corporate records, judicial filings, procurement & archives'}</span>
                 </div>
-              </div>
-            {/if}
 
-            {#if displaySanctions.length > 0}
-              <div class="dossier-sanctions-alert">
-                <span class="sanctions-badge-icon">⚠️</span>
-                <div class="sanctions-body">
-                  <strong>{currentLang === 'bg' ? 'ВНИМАНИЕ: Открити международни санкционни съответствия / PEP статус' : 'WARNING: International Sanctions / PEP Matches Detected'}</strong>
-                  <div class="sanctions-badges-row">
-                    {#each displaySanctions as sm}
-                      <span class="sanctions-pill">
-                        <strong>[{sm.dataset}]</strong> {sm.caption} ({(sm.match_score * 100).toFixed(0)}%)
-                      </span>
-                    {/each}
+                {#if parsedData?.delta_summary}
+                  <div class="dossier-delta-banner">
+                    <span class="delta-badge-icon">🔄</span>
+                    <div class="delta-body">
+                      <strong>{currentLang === 'bg' ? 'Промени спрямо предходната проверка:' : 'Changes Since Previous Check:'}</strong>
+                      <span>{@html formatInline(parsedData.delta_summary)}</span>
+                    </div>
+                  </div>
+                {/if}
+
+                {#if displaySanctions.length > 0}
+                  <div class="dossier-sanctions-alert">
+                    <span class="sanctions-badge-icon">⚠️</span>
+                    <div class="sanctions-body">
+                      <strong>{currentLang === 'bg' ? 'Вписвания в международни санкционни или PEP списъци' : 'International Sanctions / PEP Records'}</strong>
+                      <div class="sanctions-badges-row">
+                        {#each displaySanctions as sm}
+                          <span class="sanctions-pill">
+                            <strong>[{sm.dataset}]</strong> {sm.caption} ({(sm.match_score * 100).toFixed(0)}%)
+                          </span>
+                        {/each}
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+
+                {#if parsedData?.entity_pivots && parsedData.entity_pivots.length > 0}
+                  <div class="dossier-pivots-box">
+                    <span class="pivots-title">🏢 {currentLang === 'bg' ? 'Свързани дружества и организации:' : 'Linked Entities & Companies:'}</span>
+                    <div class="pivots-row">
+                      {#each parsedData.entity_pivots as pv}
+                        <span class="pivot-badge">
+                          <strong>{pv.entity_name}</strong>
+                          <small>({pv.entity_kind}{pv.registry_status ? ` • ${pv.registry_status}` : ''})</small>
+                        </span>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+
+                <div class="dossier-toolbar">
+                  <div class="dossier-search-bar">
+                    <span class="search-icon">🔍</span>
+                    <input
+                      type="text"
+                      bind:value={searchFilter}
+                      placeholder={currentLang === 'bg' ? 'Търси в справката (дружество, ЕИК, дело, дата, институция)...' : 'Search in report (company, ID, case, date, institution)...'}
+                    />
+                    {#if searchFilter}
+                      <button class="clear-search-btn" onclick={() => (searchFilter = '')}>✕</button>
+                    {/if}
+                  </div>
+
+                  <div class="highlight-toolbar-group">
+                    <button
+                      type="button"
+                      class="highlight-toggle-btn"
+                      class:active={enableKeywordHighlights}
+                      onclick={() => (enableKeywordHighlights = !enableKeywordHighlights)}
+                    >
+                      🎨 {currentLang === 'bg' ? 'Маркиране' : 'Highlights'}
+                    </button>
+                    {#if enableKeywordHighlights}
+                      <div class="highlight-legend">
+                        <span class="leg-chip leg-date">{currentLang === 'bg' ? 'Дати' : 'Dates'}</span>
+                        <span class="leg-chip leg-id">{currentLang === 'bg' ? 'ЕИК / Дела' : 'IDs / Cases'}</span>
+                        <span class="leg-chip leg-money">{currentLang === 'bg' ? 'Суми / %' : 'Amounts'}</span>
+                        <span class="leg-chip leg-entity">{currentLang === 'bg' ? 'Дружества / Органи' : 'Entities'}</span>
+                      </div>
+                    {/if}
                   </div>
                 </div>
-              </div>
-            {/if}
 
-            {#if parsedData?.entity_pivots && parsedData.entity_pivots.length > 0}
-              <div class="dossier-pivots-box">
-                <span class="pivots-title">🏢 {currentLang === 'bg' ? 'Картографирани бизнес пивоти:' : 'Discovered Corporate Pivots:'}</span>
-                <div class="pivots-row">
-                  {#each parsedData.entity_pivots as pv}
-                    <span class="pivot-badge">
-                      <strong>{pv.entity_name}</strong>
-                      <small>({pv.entity_kind})</small>
-                    </span>
+                {#if hasAegisDeepfakeMention}
+                  <div class="dossier-aegis-banner">
+                    <span class="aegis-badge-icon">🎞️</span>
+                    <div>
+                      <strong>{currentLang === 'bg' ? 'Проверка на аудио-визуални записи:' : 'Media Authenticity Note:'}</strong>
+                      <span>{currentLang === 'bg' ? 'Справката съдържа данни от проверка за синтетичен глас или видео манипулации.' : 'Report includes synthetic audio/video inspection findings.'}</span>
+                    </div>
+                  </div>
+                {/if}
+
+                <div class="dossier-report-prose">
+                  {#each parsedBlocks as block}
+                    {#if block.type === 'h1'}
+                      <h1 class="prose-h1" id={block.id}>{@html formatInline(block.text)}</h1>
+                    {:else if block.type === 'h2'}
+                      <h2 class="prose-h2" id={block.id}>{@html formatInline(block.text)}</h2>
+                    {:else if block.type === 'h3'}
+                      <h3 class="prose-h3" id={block.id}>{@html formatInline(block.text)}</h3>
+                    {:else if block.type === 'quote'}
+                      <blockquote class="prose-quote">{@html formatInline(block.text)}</blockquote>
+                    {:else if block.type === 'hr'}
+                      <hr class="prose-hr" />
+                    {:else if block.type === 'ul'}
+                      <ul class="prose-ul">
+                        {#each block.items as itm}
+                          <li>{@html formatInline(itm)}</li>
+                        {/each}
+                      </ul>
+                    {:else}
+                      <p class="prose-p">{@html formatInline(block.text)}</p>
+                    {/if}
                   {/each}
                 </div>
               </div>
-            {/if}
-
-            <div class="dossier-toolbar">
-              <div class="dossier-search-bar">
-                <span class="search-icon">🔍</span>
-                <input
-                  type="text"
-                  bind:value={searchFilter}
-                  placeholder={currentLang === 'bg' ? 'Търси в 10k-досието (фирма, име, дело, дата, deepfake)...' : 'Search in dossier (company, name, case, date, deepfake)...'}
-                />
-                {#if searchFilter}
-                  <button class="clear-search-btn" onclick={() => (searchFilter = '')}>✕</button>
-                {/if}
-              </div>
-            </div>
-
-            {#if chapters.length > 0}
-              <div class="chapters-quick-nav">
-                <span class="chapters-nav-title">📑 {currentLang === 'bg' ? 'Глави на досието:' : 'Chapters:'}</span>
-                <div class="chapters-pill-row">
-                  {#each chapters as ch}
-                    <a href={`#${ch.id}`} class="chapter-nav-pill" class:pill-main={ch.isMain}>
-                      {ch.text.replace(/^#+\s*/, '').slice(0, 34)}
-                    </a>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-
-            {#if hasAegisDeepfakeMention}
-              <div class="dossier-aegis-banner">
-                <span class="aegis-badge-icon">🛡️</span>
-                <div>
-                  <strong>{currentLang === 'bg' ? 'AEGIS Форензичен мониторинг:' : 'AEGIS Forensic Monitoring:'}</strong>
-                  <span>{currentLang === 'bg' ? 'В досието са включени данни за цифрова синтетика, клонирани гласове или deepfake атаки срещу субекта.' : 'Dossier includes synthetic media records, cloned voices or deepfake impersonations targeting this figure.'}</span>
-                </div>
-              </div>
-            {/if}
-
-            <div class="dossier-report-prose">
-              {#each parsedBlocks as block}
-                {#if block.type === 'h1'}
-                  <h1 class="prose-h1" id={block.id}>{@html formatInline(block.text)}</h1>
-                {:else if block.type === 'h2'}
-                  <h2 class="prose-h2" id={block.id}>{@html formatInline(block.text)}</h2>
-                {:else if block.type === 'h3'}
-                  <h3 class="prose-h3">{@html formatInline(block.text)}</h3>
-                {:else if block.type === 'quote'}
-                  <blockquote class="prose-quote">{@html formatInline(block.text)}</blockquote>
-                {:else if block.type === 'hr'}
-                  <hr class="prose-hr" />
-                {:else if block.type === 'ul'}
-                  <ul class="prose-ul">
-                    {#each block.items as itm}
-                      <li>{@html formatInline(itm)}</li>
-                    {/each}
-                  </ul>
-                {:else}
-                  <p class="prose-p">{@html formatInline(block.text)}</p>
-                {/if}
-              {/each}
             </div>
           {:else}
             <div class="empty-dossier">
-              <p>{currentLang === 'bg' ? 'Все още няма генериран пълен разузнавателен доклад за това лице.' : 'No complete OSINT report generated yet for this figure.'}</p>
+              <p>{currentLang === 'bg' ? 'Все още няма изготвена справка за този обект.' : 'No analytical report generated yet for this subject.'}</p>
               <button
                 class="btn btn-primary btn-sm"
                 onclick={triggerResearch}
                 disabled={isResearching}
               >
-                {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Генерирай пълно 10k OSINT досие сега' : 'Generate Full 10k OSINT Dossier Now')}
+                {isResearching ? '⏳ ...' : '🔄 ' + (currentLang === 'bg' ? 'Изготви справка' : 'Generate Report')}
               </button>
             </div>
           {/if}
@@ -567,8 +608,8 @@
           <div class="wayback-archive-container">
             <div class="wayback-header">
               <div class="wayback-info">
-                <h4>🏛️ {currentLang === 'bg' ? 'AEGIS Времеви Архив & Wayback Машина' : 'AEGIS Temporal Archive & Wayback Machine'}</h4>
-                <p>{currentLang === 'bg' ? 'Исторически крос-референс чрез Wayback Machine (archive.org), дигитални документи, ревизионна история на Уикипедия и детекция на заличаване на дигиталната памет.' : 'Historical cross-referencing via Wayback Machine (archive.org), Internet Archive documents, Wikipedia edit revisions, and scrubbed provenance tracking.'}</p>
+                <h4>🏛️ {currentLang === 'bg' ? 'Архивни уеб версии и история на публикациите' : 'Web Archives & Revision History'}</h4>
+                <p>{currentLang === 'bg' ? 'Проверка на запазени страници в Wayback Machine (archive.org), документи в Internet Archive и история на редакциите в Уикипедия.' : 'Saved snapshots from Wayback Machine (archive.org), Internet Archive documents, and Wikipedia edit revisions.'}</p>
                 {#if temporalAudit}
                   <span class="wayback-stats-summary">
                     🕒 {currentLang === 'bg' ? 'Проверени архивни снимки:' : 'Snapshots checked:'} <strong>{temporalAudit.snapshots_checked}</strong>
@@ -594,7 +635,7 @@
               <div class="wayback-provenance-banner">
                 <span class="provenance-icon">🛡️</span>
                 <div class="provenance-body">
-                  <strong>{currentLang === 'bg' ? 'Оценка на риска от заличаване (Scrubbing / Retraction):' : 'Scrubbing & Alteration Risk Verdict:'}</strong>
+                  <strong>{currentLang === 'bg' ? 'Състояние на архивната следа:' : 'Archive Continuity:'}</strong>
                   <span class="risk-pill">{temporalAudit.scrubbed_or_altered_risk}</span>
                   {#if temporalAudit.provenance_notes && temporalAudit.provenance_notes.length > 0}
                     <ul class="provenance-notes-list">
@@ -675,15 +716,15 @@
           <div class="intel-stream-container">
             <div class="intel-stream-header">
               <div class="stream-info">
-                <h4>⚡ {currentLang === 'bg' ? 'Постоянен динамичен новинарски поток' : 'Live Intelligence Feed'}</h4>
-                <p>{currentLang === 'bg' ? 'Автоматизирано извличане от Google News RSS, БТА, БНР и независими медийни агенции в реално време.' : 'Real-time multi-source feed from Google News RSS, BTA, BNR & national agencies.'}</p>
+                <h4>📰 {currentLang === 'bg' ? 'Новинарски публикации и медиен мониторинг' : 'News Feed & Media Coverage'}</h4>
+                <p>{currentLang === 'bg' ? 'Актуални публикации от Google News, БТА, БНР и национални медии.' : 'Recent coverage from Google News, BTA, BNR & national outlets.'}</p>
               </div>
               <button
                 class="btn btn-primary btn-sm"
                 onclick={triggerRefreshIntel}
                 disabled={isRefreshingIntel}
               >
-                {isRefreshingIntel ? '⏳ ' + (currentLang === 'bg' ? 'Обновяване...' : 'Refreshing...') : '🔄 ' + (currentLang === 'bg' ? 'Обнови новинарски поток' : 'Refresh Intel Stream')}
+                {isRefreshingIntel ? '⏳ ' + (currentLang === 'bg' ? 'Обновяване...' : 'Refreshing...') : '🔄 ' + (currentLang === 'bg' ? 'Обнови новините' : 'Refresh News')}
               </button>
             </div>
 
@@ -700,19 +741,19 @@
                         {ev.title} ↗
                       </a>
                     </h5>
-                    <p class="event-snippet">{ev.snippet}</p>
+                    <p class="event-snippet">{@html highlightPlainTextToHtml(ev.snippet, enableKeywordHighlights)}</p>
                   </div>
                 {/each}
               </div>
             {:else}
               <div class="empty-dossier">
-                <p>{currentLang === 'bg' ? 'Все още няма записани новинарски събития за това лице. Натиснете "Обнови новинарски поток", за да извлечете актуални публикации.' : 'No live intel events recorded yet. Click "Refresh Intel Stream" to query live news feeds.'}</p>
+                <p>{currentLang === 'bg' ? 'Все още няма заредени новинарски публикации за този обект.' : 'No news articles recorded yet.'}</p>
                 <button
                   class="btn btn-primary btn-sm"
                   onclick={triggerRefreshIntel}
                   disabled={isRefreshingIntel}
                 >
-                  {isRefreshingIntel ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Сканирай живия новинарски поток' : 'Scan Live News Feeds')}
+                  {isRefreshingIntel ? '...' : '🔄 ' + (currentLang === 'bg' ? 'Зареди новини' : 'Fetch News')}
                 </button>
               </div>
             {/if}
@@ -721,8 +762,8 @@
           <div class="sanctions-radar-container">
             <div class="sanctions-radar-header">
               <div>
-                <h4>🛡️ {currentLang === 'bg' ? 'Глобален санкционен & PEP радар' : 'Global Sanctions & PEP Radar'}</h4>
-                <p>{currentLang === 'bg' ? 'Кръстосана проверка срещу OpenSanctions, ООН, US OFAC SDN (Закон Магнитски), ЕС, Великобритания (OFSI), Швейцария (SECO), НАЗК (Украйна) и Интерпол.' : 'Live cross-reference against OpenSanctions, UN, US OFAC SDN (Magnitsky), EU Consolidated, UK OFSI, Swiss SECO, Ukraine NAZK & Interpol.'}</p>
+                <h4>⚖️ {currentLang === 'bg' ? 'Международни санкционни и PEP регистри' : 'International Sanctions & PEP Registries'}</h4>
+                <p>{currentLang === 'bg' ? 'Проверка в OpenSanctions, ООН, US OFAC SDN (Магнитски), ЕС, Великобритания (OFSI), Швейцария (SECO), НАЗК и Интерпол.' : 'Cross-reference against OpenSanctions, UN, US OFAC SDN (Magnitsky), EU Consolidated, UK OFSI, Swiss SECO, Ukraine NAZK & Interpol.'}</p>
                 {#if sanctionsCheckedAt}
                   <span class="sanctions-checked-time">🕒 {currentLang === 'bg' ? 'Последна проверка:' : 'Last checked:'} {new Date(sanctionsCheckedAt).toLocaleString(currentLang === 'bg' ? 'bg-BG' : 'en-US')}</span>
                 {/if}
@@ -763,7 +804,7 @@
                       </div>
                     {/if}
                     {#if sm.summary}
-                      <p class="sanctions-summary">{sm.summary}</p>
+                      <p class="sanctions-summary">{@html highlightPlainTextToHtml(sm.summary, enableKeywordHighlights)}</p>
                     {/if}
                     {#if sm.source_url}
                       <a href={sm.source_url} target="_blank" rel="noopener noreferrer" class="sanctions-link">
@@ -776,16 +817,16 @@
             {:else}
               <div class="clean-sanctions-box">
                 <span class="clean-icon">✓</span>
-                <h5>{currentLang === 'bg' ? 'Няма открити санкции или активни мерки' : 'No Sanctions or Enforcement Measures Found'}</h5>
-                <p>{currentLang === 'bg' ? 'Субектът не фигурира в активните санкционни бази на САЩ (OFAC), ЕС, Обединеното кралство, Швейцария или Интерпол.' : 'Subject does not appear on active US OFAC, EU, UK OFSI, Swiss SECO or Interpol red notice lists.'}</p>
+                <h5>{currentLang === 'bg' ? 'Няма открити вписвания в санкционни списъци' : 'No Sanctions Records Found'}</h5>
+                <p>{currentLang === 'bg' ? 'Не са установени активни санкционни мерки в проверените бази на ООН, САЩ (OFAC), ЕС, Великобритания, Швейцария и Интерпол.' : 'No active records on UN, US OFAC, EU, UK OFSI, Swiss SECO or Interpol lists.'}</p>
               </div>
             {/if}
           </div>
         {:else}
           {#if person.summary}
             <div class="summary-box">
-              <h4>{currentLang === 'bg' ? 'Резюме на лицето' : 'Executive Summary'}</h4>
-              <p>{person.summary}</p>
+              <h4>{currentLang === 'bg' ? 'Резюме' : 'Summary'}</h4>
+              <p>{@html highlightPlainTextToHtml(person.summary, enableKeywordHighlights)}</p>
             </div>
           {/if}
 
@@ -794,76 +835,76 @@
             <div class="osint-categories-grid">
               {#if prof.identity}
                 <div class="osint-card">
-                  <h5>1. {currentLang === 'bg' ? 'Идентичност и лични данни' : 'Identity & Core Data'}</h5>
-                  <p>{prof.identity}</p>
+                  <h5>1. {currentLang === 'bg' ? 'Основни данни и биография' : 'Identity & Core Data'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.identity, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.contact_locations}
                 <div class="osint-card">
-                  <h5>2. {currentLang === 'bg' ? 'Локации и дигитални адреси' : 'Locational History & Channels'}</h5>
-                  <p>{prof.contact_locations}</p>
+                  <h5>2. {currentLang === 'bg' ? 'Седалище и местоположения' : 'Locations & Addresses'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.contact_locations, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.network_associates}
                 <div class="osint-card">
-                  <h5>3. {currentLang === 'bg' ? 'Мрежа от контакти и съдружници' : 'Network & Associates'}</h5>
-                  <p>{prof.network_associates}</p>
+                  <h5>3. {currentLang === 'bg' ? 'Свързани лица и организации' : 'Network & Associates'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.network_associates, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.education_career}
                 <div class="osint-card">
-                  <h5>4. {currentLang === 'bg' ? 'Образование и кариерно развитие' : 'Education & Career Timeline'}</h5>
-                  <p>{prof.education_career}</p>
+                  <h5>4. {currentLang === 'bg' ? 'Образование и длъжности' : 'Education & Career'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.education_career, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.financial_assets}
                 <div class="osint-card">
-                  <h5>5. {currentLang === 'bg' ? 'Финансов профил и корпоративни интереси' : 'Financial & Wealth Profile'}</h5>
-                  <p>{prof.financial_assets}</p>
+                  <h5>5. {currentLang === 'bg' ? 'Търговски регистър, дружества и активи' : 'Corporate & Financial Records'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.financial_assets, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.legal_regulatory}
                 <div class="osint-card">
-                  <h5>6. {currentLang === 'bg' ? 'Правен и регулаторен статус (PEP)' : 'Legal, Criminal & PEP Status'}</h5>
-                  <p>{prof.legal_regulatory}</p>
+                  <h5>6. {currentLang === 'bg' ? 'Съдебни производства, КПКОНПИ и регулатори' : 'Judicial & Regulatory Records'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.legal_regulatory, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.digital_media_presence}
                 <div class="osint-card">
-                  <h5>7. {currentLang === 'bg' ? 'Медийно присъствие и отзвук' : 'Digital & Media Footprint'}</h5>
-                  <p>{prof.digital_media_presence}</p>
+                  <h5>7. {currentLang === 'bg' ? 'Медийно присъствие и публикации' : 'Media Coverage'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.digital_media_presence, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.affiliations_beliefs}
                 <div class="osint-card">
-                  <h5>8. {currentLang === 'bg' ? 'Политически принадлежности и каузи' : 'Affiliations & Beliefs'}</h5>
-                  <p>{prof.affiliations_beliefs}</p>
+                  <h5>8. {currentLang === 'bg' ? 'Членства и публични позиции' : 'Affiliations & Positions'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.affiliations_beliefs, enableKeywordHighlights)}</p>
                 </div>
               {/if}
 
               {#if prof.psychographic_behavioral}
                 <div class="osint-card">
-                  <h5>9. {currentLang === 'bg' ? 'Комуникационен стил и наративи' : 'Behavioral & Narrative Traits'}</h5>
-                  <p>{prof.psychographic_behavioral}</p>
+                  <h5>9. {currentLang === 'bg' ? 'Комуникационен стил и теми' : 'Communication & Themes'}</h5>
+                  <p>{@html highlightPlainTextToHtml(prof.psychographic_behavioral, enableKeywordHighlights)}</p>
                 </div>
               {/if}
             </div>
           {:else}
             <div class="empty-dossier">
-              <p>{currentLang === 'bg' ? 'Няма въведени 9-категорийни данни.' : 'No 9-point matrix data yet.'}</p>
+              <p>{currentLang === 'bg' ? 'Няма налични обобщени данни по теми.' : 'No structured topic summary yet.'}</p>
               <button
                 class="btn btn-primary btn-sm"
                 onclick={triggerResearch}
                 disabled={isResearching}
               >
-                {isResearching ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Стартирай разузнаване' : 'Start Research')}
+                {isResearching ? '⏳ ...' : '🔄 ' + (currentLang === 'bg' ? 'Изготви справка' : 'Generate Report')}
               </button>
             </div>
           {/if}
@@ -898,13 +939,150 @@
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
     border-radius: 10px;
-    width: 92%;
-    max-width: 960px;
-    max-height: 90vh;
+    width: 95%;
+    max-width: var(--dossier-max-w, 1260px);
+    max-height: var(--dossier-max-h, 92vh);
     display: flex;
     flex-direction: column;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
     overflow: hidden;
+  }
+
+  :global([data-widescreen='true']) .dossier-modal {
+    width: 96%;
+    max-width: var(--dossier-max-w, min(95vw, 1780px));
+    max-height: var(--dossier-max-h, 93.5vh);
+  }
+
+  :global([data-display-profile='18']) .dossier-modal {
+    width: 96.5%;
+    border-radius: 12px;
+    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.58);
+  }
+
+  :global([data-display-profile='18']) .dossier-book-layout {
+    gap: 1.25rem;
+  }
+
+  :global([data-display-profile='18']) .dossier-book-page {
+    padding: 0.25rem 0.65rem 0.75rem 0.25rem;
+    line-height: 1.62;
+  }
+
+  :global([data-display-profile='13']) .modal-head,
+  :global([data-display-profile='15']) .modal-head {
+    padding: 0.65rem 0.95rem;
+  }
+
+  :global([data-display-profile='18']) .modal-head {
+    padding: 0.75rem 1.25rem;
+  }
+
+  .dossier-body.report-reader-mode {
+    overflow: hidden;
+    padding: 0.9rem 1.1rem;
+  }
+
+  .dossier-book-layout {
+    display: flex;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .dossier-book-page {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding-right: 0.35rem;
+  }
+
+  .highlight-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.45rem;
+  }
+
+  .highlight-toggle-btn {
+    padding: 3px 9px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .highlight-toggle-btn.active {
+    border-color: rgba(16, 185, 129, 0.45);
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .highlight-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .leg-chip {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .leg-date {
+    background: rgba(16, 185, 129, 0.16);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.32);
+  }
+
+  .leg-id {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+
+  .leg-money {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .leg-entity {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+  }
+
+  .person-entity-badge.type-infrastructure {
+    background: rgba(14, 165, 233, 0.14);
+    color: #0ea5e9;
+    border: 1px solid rgba(14, 165, 233, 0.32);
+  }
+
+  .person-entity-badge.type-building {
+    background: rgba(20, 184, 166, 0.14);
+    color: #14b8a6;
+    border: 1px solid rgba(20, 184, 166, 0.32);
+  }
+
+  @media (max-width: 900px) {
+    .dossier-book-layout {
+      flex-direction: column;
+    }
+    .dossier-body.report-reader-mode {
+      overflow-y: auto;
+    }
   }
 
   .modal-head {

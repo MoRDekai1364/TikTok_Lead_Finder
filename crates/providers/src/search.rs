@@ -28,7 +28,7 @@ impl WebAndPrimarySearch {
         guard: PolitenessGuard,
     ) -> Self {
         let client = Client::builder()
-            .user_agent("TikTokLeadFinder/0.1 (local fact-checking research assistant)")
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .timeout(std::time::Duration::from_secs(15))
             .build()
             .unwrap_or_else(|_| Client::new());
@@ -86,7 +86,8 @@ impl WebAndPrimarySearch {
             "dw.com", "euronewsbulgaria.com", "banker.bg", "economic.bg", "investor.bg",
             "pariteni.bg", "bg.wikipedia.org", "wikipedia.org", "bntnews.bg", "bnr.bg",
             "bta.bg", "btvnovinite.bg", "nova.bg", "dnevnik.bg", "capital.bg", "mediapool.bg",
-            "segabg.com", "offnews.bg", "dir.bg", "24chasa.bg", "trud.bg", "clubz.bg"
+            "segabg.com", "offnews.bg", "dir.bg", "24chasa.bg", "trud.bg", "clubz.bg",
+            "bird.bg", "bivol.bg", "lex.bg", "defakto.bg", "boulevardbulgaria.bg", "news.google.com"
         ];
         for d in EXPANDED_NEWS {
             if domain_matches(clean_host, d) {
@@ -154,7 +155,7 @@ impl WebAndPrimarySearch {
         }
     }
 
-    async fn execute_single_search(&self, q: &str) -> Vec<(String, String, String, Option<String>)> {
+    async fn execute_single_search_once(&self, q: &str) -> Vec<(String, String, String, Option<String>)> {
         if !self.searxng_url.is_empty() {
             let sx_url = format!(
                 "{}/search?q={}&format=json",
@@ -202,9 +203,36 @@ impl WebAndPrimarySearch {
             urlencoding::encode(q)
         );
         if let Some(html) = self.fetch_cached(&ddg_url, false).await {
-            return parse_ddg_html(&html);
+            let hits = parse_ddg_html(&html);
+            if !hits.is_empty() {
+                return hits;
+            }
         }
 
+        let gnews_url = format!(
+            "https://news.google.com/rss/search?q={}&hl=bg&gl=BG&ceid=BG:bg",
+            urlencoding::encode(q)
+        );
+        if let Some(rss) = self.fetch_cached(&gnews_url, false).await {
+            let hits = parse_bing_rss(&rss);
+            if !hits.is_empty() {
+                return hits;
+            }
+        }
+
+        Vec::new()
+    }
+
+    async fn execute_single_search(&self, q: &str) -> Vec<(String, String, String, Option<String>)> {
+        let primary = self.execute_single_search_once(q).await;
+        if !primary.is_empty() {
+            return primary;
+        }
+        if let Some(simplified) = simplify_search_query(q) {
+            if simplified != q {
+                return self.execute_single_search_once(&simplified).await;
+            }
+        }
         Vec::new()
     }
 }
@@ -527,6 +555,46 @@ fn parse_ddg_html(html: &str) -> Vec<(String, String, String, Option<String>)> {
     out
 }
 
+fn simplify_search_query(q: &str) -> Option<String> {
+    let trimmed = q.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let mut quoted = String::new();
+    let mut rest_str = trimmed.to_string();
+    if let Some(start) = trimmed.find('"') {
+        if let Some(end_rel) = trimmed[start + 1..].find('"') {
+            let end = start + 1 + end_rel;
+            quoted = trimmed[start..=end].to_string();
+            rest_str = format!("{} {}", &trimmed[..start], &trimmed[end + 1..]);
+        }
+    }
+    let terms: Vec<&str> = rest_str
+        .split_whitespace()
+        .filter(|w| {
+            let clean = w.trim_matches(|c: char| c == '(' || c == ')');
+            !clean.is_empty()
+                && !clean.eq_ignore_ascii_case("OR")
+                && !clean.eq_ignore_ascii_case("AND")
+                && !clean.starts_with("site:")
+        })
+        .take(2)
+        .map(|w| w.trim_matches(|c: char| c == '(' || c == ')'))
+        .collect();
+    let mut parts = Vec::new();
+    if !quoted.is_empty() {
+        parts.push(quoted);
+    }
+    for t in terms {
+        parts.push(t.to_string());
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" "))
+    }
+}
+
 fn unwrap_ddg_redirect(href: &str) -> String {
     if let Some(idx) = href.find("uddg=") {
         let rest = &href[idx + 5..];
@@ -614,5 +682,12 @@ mod tests {
         let (kind_en, name_en) = search.classify_url("https://en.wikipedia.org/wiki/Paris");
         assert_eq!(kind_en, "reference");
         assert_eq!(name_en.as_deref(), Some("Уикипедия"));
+    }
+
+    #[test]
+    fn simplify_search_query_preserves_quoted_entity_and_core_terms() {
+        let q = "\"Андрей Гюров\" търговски регистър OR ЕИК OR управител съдружник дружество";
+        let s = simplify_search_query(q).unwrap();
+        assert_eq!(s, "\"Андрей Гюров\" търговски регистър");
     }
 }

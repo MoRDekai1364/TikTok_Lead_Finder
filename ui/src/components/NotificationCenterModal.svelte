@@ -14,6 +14,7 @@
     setPlaybackVolume,
     togglePlaybackMute,
   } from '../lib/playback.svelte';
+  import { getActiveAiJobs } from '../lib/aiTasks.svelte';
   import type { Language } from '../lib/i18n';
   import type { DedupProposal, SystemNotification, DedupSummary } from '../lib/types';
 
@@ -22,11 +23,15 @@
     currentLang,
     onClose,
     onRefreshPeople,
+    onOpenSubject,
+    onJumpToVideo,
   }: {
     isOpen: boolean;
     currentLang: Language;
     onClose: () => void;
     onRefreshPeople?: () => void;
+    onOpenSubject?: (subjectId: number) => void;
+    onJumpToVideo?: (videoId: string) => void;
   } = $props();
 
   let activeTab = $state<'questions' | 'media' | 'notifications'>('questions');
@@ -36,23 +41,74 @@
   let isApplying = $state(false);
   let isAutoDeduping = $state(false);
   let actionToast = $state<string | null>(null);
+  let nowTick = $state(Date.now());
+  let initialTabChosen = $state(false);
 
   const playback = $derived(getPlaybackState());
+  const clientJobs = $derived(getActiveAiJobs());
+
+  const ongoingItems = $derived.by<SystemNotification[]>(() => {
+    const serverOngoing = notifications.filter((n) => n.type === 'ongoing');
+    const merged: SystemNotification[] = [...serverOngoing];
+    for (const cj of clientJobs) {
+      const alreadyCovered = serverOngoing.some(
+        (s) =>
+          (cj.type === 'person-research' && s.subject_id != null && String(s.subject_id) === String(cj.targetId)) ||
+          (cj.type === 'video-research' && s.video_id != null && String(s.video_id) === String(cj.targetId)) ||
+          (cj.type === 'aegis-scan' && s.video_id != null && String(s.video_id) === String(cj.targetId))
+      );
+      if (!alreadyCovered) {
+        const elapsedSec = Math.max(1, Math.floor((nowTick - cj.startedAt) / 1000));
+        const kindTitle =
+          cj.type === 'person-research'
+            ? `Проучване на обект: ${cj.label}`
+            : cj.type === 'creator-risk'
+              ? `Проверка на автор: ${cj.label}`
+              : cj.type === 'video-research'
+                ? `Допълнителна проверка на видео: ${cj.label}`
+                : `Обработка в ход: ${cj.label}`;
+        merged.push({
+          id: `client_${cj.id}`,
+          type: 'ongoing',
+          title: kindTitle,
+          message: cj.stage || `Изпълнява се (${elapsedSec} сек.)`,
+          timestamp: new Date(cj.startedAt).toISOString(),
+          progress_pct: Math.min(92, 18 + elapsedSec * 3),
+          subject_id: cj.type === 'person-research' ? Number(cj.targetId) : null,
+          video_id: cj.type === 'video-research' || cj.type === 'aegis-scan' ? String(cj.targetId) : null,
+        });
+      }
+    }
+    return merged;
+  });
+
+  const regularNotifications = $derived(notifications.filter((n) => n.type !== 'ongoing'));
+  const totalNotifBadge = $derived(ongoingItems.length + regularNotifications.length);
 
   onMount(() => {
     if (isOpen) {
-      loadData();
+      void loadData(true);
     }
   });
 
   $effect(() => {
-    if (isOpen) {
-      loadData();
+    if (!isOpen) {
+      initialTabChosen = false;
+      return;
     }
+    void loadData(!initialTabChosen);
+    initialTabChosen = true;
+    const poll = setInterval(() => {
+      nowTick = Date.now();
+      void loadData(false);
+    }, 2200);
+    return () => clearInterval(poll);
   });
 
-  async function loadData() {
-    isLoadingProposals = true;
+  async function loadData(selectDefaultTab = false) {
+    if (selectDefaultTab) {
+      isLoadingProposals = true;
+    }
     try {
       const [pList, nRes] = await Promise.all([
         fetchDedupProposals().catch(() => []),
@@ -60,12 +116,34 @@
       ]);
       proposals = pList;
       notifications = nRes.notifications || [];
-      if (proposals.length > 0) {
-        activeTab = 'questions';
+      if (selectDefaultTab) {
+        const hasOngoing =
+          (nRes.notifications || []).some((x) => x.type === 'ongoing') || clientJobs.length > 0;
+        if (hasOngoing) {
+          activeTab = 'notifications';
+        } else if (proposals.length > 0) {
+          activeTab = 'questions';
+        } else {
+          activeTab = 'notifications';
+        }
       }
     } finally {
       isLoadingProposals = false;
     }
+  }
+
+  function formatElapsedOrClock(ts: string): string {
+    const parsed = Date.parse(ts);
+    if (!isNaN(parsed)) {
+      const diffSec = Math.max(0, Math.floor((nowTick - parsed) / 1000));
+      if (diffSec < 3600) {
+        const m = Math.floor(diffSec / 60);
+        const s = diffSec % 60;
+        return m > 0 ? `${m}м ${s}с` : `${s}с`;
+      }
+      return new Date(parsed).toLocaleString(currentLang === 'bg' ? 'bg-BG' : 'en-US');
+    }
+    return ts;
   }
 
   function showToast(msg: string) {
@@ -195,12 +273,30 @@
           class:active={activeTab === 'notifications'}
           onclick={() => (activeTab = 'notifications')}
         >
-          <span>📢 {currentLang === 'bg' ? 'Известия' : 'Notifications'}</span>
-          {#if notifications.length > 0}
-            <span class="tab-badge info">{notifications.length}</span>
+          <span>📢 {currentLang === 'bg' ? 'Известия и проучвания' : 'Activity & Reports'}</span>
+          {#if ongoingItems.length > 0}
+            <span class="tab-pulse-dot ongoing-dot"></span>
+          {/if}
+          {#if totalNotifBadge > 0}
+            <span class="tab-badge info">{totalNotifBadge}</span>
           {/if}
         </button>
       </div>
+
+      {#if ongoingItems.length > 0 && activeTab !== 'notifications'}
+        <button
+          type="button"
+          class="ongoing-top-strip"
+          onclick={() => (activeTab = 'notifications')}
+        >
+          <span class="ongoing-spin">⏳</span>
+          <span>
+            {currentLang === 'bg'
+              ? `${ongoingItems.length} проучване в ход: ${ongoingItems[0].title} — натиснете за преглед`
+              : `${ongoingItems.length} active research job: ${ongoingItems[0].title}`}
+          </span>
+        </button>
+      {/if}
 
       <div class="modal-body">
         {#if activeTab === 'questions'}
@@ -443,25 +539,57 @@
           </div>
         {:else if activeTab === 'notifications'}
           <div class="notifications-section">
-            {#if notifications.length === 0}
+            {#if ongoingItems.length > 0}
+              <div class="ongoing-group">
+                <div class="ongoing-group-head">
+                  <span class="ongoing-live-dot"></span>
+                  <h5>{currentLang === 'bg' ? 'Проучвания в ход' : 'Ongoing Research'} ({ongoingItems.length})</h5>
+                </div>
+                <div class="notifications-list">
+                  {#each ongoingItems as task (task.id)}
+                    <div class="notif-item ongoing">
+                      <div class="notif-icon ongoing-spin">🔄</div>
+                      <div class="notif-content">
+                        <div class="notif-top">
+                          <span class="notif-title">{task.title}</span>
+                          <span class="notif-time">{formatElapsedOrClock(task.timestamp)}</span>
+                        </div>
+                        <p class="notif-msg">{task.message}</p>
+                        <div class="ongoing-progress-track">
+                          <div
+                            class="ongoing-progress-fill"
+                            style="width: {Math.max(12, Math.min(98, task.progress_pct ?? 45))}%"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if ongoingItems.length === 0 && regularNotifications.length === 0}
               <div class="empty-box">
                 <span class="empty-icon">🔔</span>
                 <h4>{currentLang === 'bg' ? 'Няма нови известия' : 'No notifications'}</h4>
                 <p>
                   {currentLang === 'bg'
-                    ? 'Всички фонови задачи, OSINT синтези и AEGIS сканирания са актуални.'
-                    : 'All background jobs and investigations are up to date.'}
+                    ? 'Всички фонови проверки и аналитични справки са завършени.'
+                    : 'All background checks and analytical reports are complete.'}
                 </p>
               </div>
-            {:else}
+            {:else if regularNotifications.length > 0}
+              {#if ongoingItems.length > 0}
+                <h5 class="completed-group-title">{currentLang === 'bg' ? 'Завършени справки и известия' : 'Completed Reports & Alerts'}</h5>
+              {/if}
               <div class="notifications-list">
-                {#each notifications as item (item.id)}
+                {#each regularNotifications as item (item.id)}
                   <div class="notif-item {item.type}">
                     <div class="notif-icon">
                       {#if item.type === 'question'}
                         ❓
                       {:else if item.type === 'success'}
-                        ✅
+                        📄
                       {:else if item.type === 'warning'}
                         ⚠️
                       {:else}
@@ -474,6 +602,33 @@
                         <span class="notif-time">{item.timestamp}</span>
                       </div>
                       <p class="notif-msg">{item.message}</p>
+                      {#if item.subject_id && onOpenSubject}
+                        <div class="notif-item-actions">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-open-report"
+                            onclick={() => {
+                              onOpenSubject?.(Number(item.subject_id));
+                              onClose();
+                            }}
+                          >
+                            📖 {currentLang === 'bg' ? 'Отвори справката' : 'Open Report'} ↗
+                          </button>
+                        </div>
+                      {:else if item.video_id && onJumpToVideo}
+                        <div class="notif-item-actions">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-open-report"
+                            onclick={() => {
+                              onJumpToVideo?.(String(item.video_id));
+                              onClose();
+                            }}
+                          >
+                            🎬 {currentLang === 'bg' ? 'Към видеото' : 'Open Video'} ↗
+                          </button>
+                        </div>
+                      {/if}
                     </div>
                   </div>
                 {/each}
@@ -1085,6 +1240,109 @@
 
   .notif-item.info {
     border-left: 4px solid #3b82f6;
+  }
+
+  .notif-item.ongoing {
+    border-left: 4px solid #06b6d4;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.12), rgba(37, 43, 54, 0.95));
+  }
+
+  .ongoing-group {
+    margin-bottom: 1.1rem;
+  }
+
+  .ongoing-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .ongoing-group-head h5,
+  .completed-group-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary, #9ca3af);
+  }
+
+  .ongoing-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #06b6d4;
+    box-shadow: 0 0 8px #06b6d4;
+    animation: pulse 1.2s infinite;
+  }
+
+  .ongoing-dot {
+    background: #06b6d4 !important;
+  }
+
+  .ongoing-spin {
+    display: inline-block;
+    animation: spin360 1.8s linear infinite;
+  }
+
+  @keyframes spin360 {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .ongoing-progress-track {
+    margin-top: 0.5rem;
+    height: 5px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .ongoing-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #06b6d4, #10b981);
+    border-radius: 999px;
+    transition: width 0.35s ease;
+  }
+
+  .ongoing-top-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.5rem 1.25rem;
+    background: rgba(6, 182, 212, 0.14);
+    border: none;
+    border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+    color: #67e8f9;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .notif-item-actions {
+    margin-top: 0.5rem;
+  }
+
+  .btn-open-report {
+    padding: 0.25rem 0.65rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.38);
+    color: #34d399;
+    cursor: pointer;
+  }
+
+  .btn-open-report:hover {
+    background: rgba(16, 185, 129, 0.26);
   }
 
   .notif-icon {

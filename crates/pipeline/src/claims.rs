@@ -2,15 +2,15 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use leadfinder_core::{
-    AppConfig, AttributionAct, Claim, ClaimInput, ClaimQualityConfig, ClaimsOutput, CoreEvent, LlmJsonRequest,
-    RankingConfig, Transcript, Video, VideoState,
+    AppConfig, AttributionAct, Claim, ClaimInput, ClaimQualityConfig, ClaimType, ClaimsOutput, CoreEvent,
+    LlmJsonRequest, RankingConfig, Transcript, Video, VideoState,
 };
 use leadfinder_providers::{
     global_lexicon, LlmChainRunner, PeopleResolver, ResolvedPersonRecord, VideoTextSources,
 };
 use crate::engine::PipelineContext;
 
-const DEFAULT_SYSTEM_INSTRUCTION: &str = "Extract verifiable claims and named entities from the provided video transcript, OCR text, caption, and hashtags. Classify each entity's entity_type as 'person' (individual human), 'institution' (government body, commission, agency), 'channel' (media channel, YouTube/TikTok creator), 'country' (nation or state), 'group' (party, coalition, community), or 'event' (protest, incident, election, conference, disaster, summit). Return strictly valid JSON with claims and people arrays.";
+const DEFAULT_SYSTEM_INSTRUCTION: &str = "Extract verifiable claims and named entities from the provided video transcript, OCR text, caption, and hashtags. Classify each entity's entity_type as 'person' (individual human), 'institution' (government body, commission, agency, court), 'channel' (media channel, YouTube/TikTok creator), 'country' (nation or state), 'group' (party, coalition, community), 'event' (protest, incident, election, conference, disaster, summit), 'infrastructure' (highway, bridge, tunnel, dam, power plant, pipeline, airport, railway), or 'building' (hospital facility, stadium, monument, hall, school, courthouse building, residential/commercial complex). Return strictly valid JSON with claims and people arrays.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaimsStageReport {
@@ -85,7 +85,7 @@ pub fn claims_output_json_schema() -> Value {
                         "role_hint": { "type": ["string", "null"] },
                         "entity_type": {
                             "type": ["string", "null"],
-                            "enum": ["person", "institution", "channel", "country", "group", "event", null]
+                            "enum": ["person", "institution", "channel", "country", "group", "event", "infrastructure", "building", null]
                         }
                     }
                 }
@@ -523,6 +523,262 @@ pub fn build_claims_user_prompt(
     sections.join("\n\n")
 }
 
+pub fn extract_concrete_claims_fallback<F>(
+    transcript: Option<&Transcript>,
+    ocr_lines: &[(i64, String)],
+    caption: Option<&str>,
+    max_video_ms: i64,
+    quality_cfg: &ClaimQualityConfig,
+    is_known_word: &F,
+) -> Vec<ClaimInput>
+where
+    F: Fn(&str) -> bool,
+{
+    fn strip_hashtags(input: &str) -> String {
+        input
+            .split_whitespace()
+            .filter(|tok| !tok.starts_with('#'))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn split_sentences(text: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut buf = String::new();
+        let chars: Vec<char> = text.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+        while i < len {
+            let ch = chars[i];
+            buf.push(ch);
+            if ch == '.' || ch == '!' || ch == '?' {
+                let prev_digit = i > 0 && chars[i - 1].is_ascii_digit();
+                let next_digit = i + 1 < len && chars[i + 1].is_ascii_digit();
+                if !(ch == '.' && prev_digit && next_digit) {
+                    let cleaned = strip_hashtags(buf.trim());
+                    if !cleaned.is_empty() {
+                        out.push(cleaned);
+                    }
+                    buf.clear();
+                }
+            }
+            i += 1;
+        }
+        let tail = strip_hashtags(buf.trim());
+        if !tail.is_empty() {
+            out.push(tail);
+        }
+        out
+    }
+
+    fn classify_concrete_sentence(sentence: &str) -> Option<(f64, ClaimType)> {
+        let trimmed = sentence.trim();
+        if trimmed.contains('?') {
+            return None;
+        }
+        let low = trimmed.to_lowercase();
+        let promo_markers = [
+            "последвай",
+            "сподели",
+            "абонирай",
+            "следете ",
+            "коментирай",
+            "линк в био",
+        ];
+        if promo_markers.iter().any(|p| low.contains(p)) {
+            return None;
+        }
+
+        let has_digits = trimmed.chars().any(|c| c.is_ascii_digit());
+        let quant_markers = [
+            "милион", "милиард", "млн", "млрд", "хиляд", "процент", "%", "евро", "лева", "лв",
+            "години", "година", "месец", "седмиц",
+        ];
+        let attr_markers = [
+            "заяви", "обяви", "съобщи", "твърди", "каза", "посочи", "по данни на", "според",
+            "определи", "потвърди", "опроверга",
+        ];
+        let fact_markers = [
+            "реши", "прие", "отмени", "гласува", "внесе", "подписа", "назначи", "освободи",
+            "оставка", "арестув", "задържа", "обвини", "разследв", "проверк", "одит", "санкц",
+            "глоба", "съд", "вас", "вкс", "сес", "прокуратур", "кпконпи", "сметна палата",
+            "министерств", "правителств", "парламент", "народното събрание", "президент",
+            "премиер", "министър", "кмет", "общин", "полици", "бнб", "апи", "днск", "кзк",
+            "бюджет", "договор", "поръчк", "инфлац", "данъц", "цени", "увелич", "намал",
+            "протест", "сблъсъц", "безредиц", "пожар", "магистрал", "строителств", "болниц",
+            "училищ",
+        ];
+
+        let has_quant = has_digits || quant_markers.iter().any(|m| low.contains(m));
+        let has_attr = attr_markers.iter().any(|m| low.contains(m));
+        let fact_hits = fact_markers.iter().filter(|m| low.contains(**m)).count();
+
+        if !has_quant && !has_attr && fact_hits == 0 {
+            return None;
+        }
+
+        let mut score: f64 = 0.56;
+        if has_digits {
+            score += 0.16;
+        }
+        if has_quant {
+            score += 0.08;
+        }
+        if has_attr {
+            score += 0.08;
+        }
+        score += (fact_hits.min(3) as f64) * 0.06;
+
+        let ctype = if has_quant {
+            ClaimType::Statistical
+        } else if has_attr {
+            ClaimType::Attribution
+        } else {
+            ClaimType::Factual
+        };
+        Some((score.min(0.95), ctype))
+    }
+
+    #[derive(Clone)]
+    struct RawCandidate {
+        text: String,
+        claim_type: ClaimType,
+        start_ms: i64,
+        end_ms: i64,
+        score: f64,
+    }
+
+    let mut pool: Vec<RawCandidate> = Vec::new();
+    let clamp_end = max_video_ms.max(1000);
+
+    if let Some(tr) = transcript {
+        for seg in &tr.segments {
+            for sent in split_sentences(&seg.text) {
+                if !claim_text_passes_quality(&sent, quality_cfg, is_known_word) {
+                    continue;
+                }
+                if let Some((score, ctype)) = classify_concrete_sentence(&sent) {
+                    let s = seg.start_ms.clamp(0, clamp_end);
+                    let e = seg.end_ms.max(s).min(clamp_end);
+                    pool.push(RawCandidate {
+                        text: sent,
+                        claim_type: ctype,
+                        start_ms: s,
+                        end_ms: e,
+                        score: score + 0.04,
+                    });
+                }
+            }
+        }
+
+        let full_tr = tr
+            .edited_text
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(&tr.text);
+        for sent in split_sentences(full_tr) {
+            if !claim_text_passes_quality(&sent, quality_cfg, is_known_word) {
+                continue;
+            }
+            if let Some((score, ctype)) = classify_concrete_sentence(&sent) {
+                let sent_low = sent.to_lowercase();
+                let seg_timing = tr
+                    .segments
+                    .iter()
+                    .find(|seg| {
+                        let sl = seg.text.trim().to_lowercase();
+                        !sl.is_empty() && (sl.contains(&sent_low) || sent_low.contains(&sl))
+                    })
+                    .map(|seg| {
+                        let s = seg.start_ms.clamp(0, clamp_end);
+                        let e = seg.end_ms.max(s).min(clamp_end);
+                        (s, e)
+                    })
+                    .unwrap_or((0, 5000.min(clamp_end)));
+                pool.push(RawCandidate {
+                    text: sent,
+                    claim_type: ctype,
+                    start_ms: seg_timing.0,
+                    end_ms: seg_timing.1,
+                    score,
+                });
+            }
+        }
+    }
+
+    for (frame_ms, ocr_txt) in ocr_lines.iter().take(60) {
+        for sent in split_sentences(ocr_txt) {
+            if !claim_text_passes_quality(&sent, quality_cfg, is_known_word) {
+                continue;
+            }
+            if let Some((score, ctype)) = classify_concrete_sentence(&sent) {
+                let s = (*frame_ms).clamp(0, clamp_end);
+                let e = (s + 3000).min(clamp_end);
+                pool.push(RawCandidate {
+                    text: sent,
+                    claim_type: ctype,
+                    start_ms: s,
+                    end_ms: e,
+                    score: score - 0.02,
+                });
+            }
+        }
+    }
+
+    if let Some(cap) = caption {
+        for sent in split_sentences(cap) {
+            if !claim_text_passes_quality(&sent, quality_cfg, is_known_word) {
+                continue;
+            }
+            if let Some((score, ctype)) = classify_concrete_sentence(&sent) {
+                pool.push(RawCandidate {
+                    text: sent,
+                    claim_type: ctype,
+                    start_ms: 0,
+                    end_ms: 5000.min(clamp_end),
+                    score: score - 0.04,
+                });
+            }
+        }
+    }
+
+    pool.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut chosen: Vec<RawCandidate> = Vec::new();
+    for cand in pool {
+        let low = cand.text.to_lowercase();
+        let dup = chosen.iter().any(|ex| {
+            let ex_low = ex.text.to_lowercase();
+            ex_low == low || ex_low.contains(&low) || low.contains(&ex_low)
+        });
+        if !dup {
+            chosen.push(cand);
+            if chosen.len() >= 5 {
+                break;
+            }
+        }
+    }
+
+    chosen.sort_by_key(|c| c.start_ms);
+
+    chosen
+        .into_iter()
+        .map(|c| ClaimInput {
+            text_bg: c.text,
+            claim_type: c.claim_type,
+            speaker: None,
+            attribution: Vec::new(),
+            start_ms: c.start_ms,
+            end_ms: c.end_ms,
+            checkworthiness: c.score,
+        })
+        .collect()
+}
+
 impl PipelineContext {
     pub async fn extract_claims_for_video(&self, video_id: &str) -> Result<ClaimsStageReport> {
         let video = self
@@ -582,20 +838,33 @@ impl PipelineContext {
             max_tokens: 2560,
         };
 
-        let validated = match runner.complete_validated(&llm_req, &self.db).await {
-            Ok(v) => v,
-            Err(err) => {
-                self.db
-                    .set_video_state(&video.id, VideoState::Failed, Some(&err.to_string()))
-                    .await?;
-                return Err(anyhow::anyhow!(err));
-            }
-        };
-
-        let mut parsed_output: ClaimsOutput =
-            serde_json::from_value(validated.response.parsed_json.clone()).map_err(|e| {
-                anyhow::anyhow!("failed deserializing ClaimsOutput after validation: {e}")
-            })?;
+        let (mut parsed_output, used_provider, used_model, first_try_valid, repair_used) =
+            match runner.complete_validated(&llm_req, &self.db).await {
+                Ok(v) => {
+                    let parsed = serde_json::from_value::<ClaimsOutput>(v.response.parsed_json.clone())
+                        .unwrap_or(ClaimsOutput {
+                            claims: Vec::new(),
+                            people: Vec::new(),
+                        });
+                    (
+                        parsed,
+                        v.response.provider,
+                        v.response.model,
+                        v.first_try_valid,
+                        v.repair_used,
+                    )
+                }
+                Err(_) => (
+                    ClaimsOutput {
+                        claims: Vec::new(),
+                        people: Vec::new(),
+                    },
+                    "deterministic_fallback".to_string(),
+                    "concrete_fact_extractor".to_string(),
+                    false,
+                    false,
+                ),
+            };
 
         let sources = VideoTextSources {
             transcript: effective_transcript_text.clone(),
@@ -693,6 +962,58 @@ impl PipelineContext {
             });
         }
 
+        if claims_to_save.is_empty() {
+            let mut fallback_items = extract_concrete_claims_fallback(
+                transcript.as_ref(),
+                &ocr_pairs,
+                video.caption.as_deref(),
+                max_video_ms,
+                &cfg.claim_quality,
+                &|w: &str| lex.is_known_word(w),
+            );
+            for item in &mut fallback_items {
+                split_and_normalize_attribution(
+                    item,
+                    video.creator_handle.as_deref(),
+                    &attr_verbs,
+                );
+                prune_generic_attributions(item, &cfg.claim_quality);
+                let claim_low = item.text_bg.to_lowercase();
+                let mentions_pub_fig = resolved_people.iter().any(|p| {
+                    p.public_figure
+                        && p.variants
+                            .iter()
+                            .any(|v| v.chars().count() >= 4 && claim_low.contains(&v.to_lowercase()))
+                });
+                let ctype_str = item.claim_type.as_str().to_string();
+                let final_checkworthiness = compute_combined_checkworthiness(
+                    item.checkworthiness,
+                    &item.text_bg,
+                    &ctype_str,
+                    &full_text_blob,
+                    mentions_pub_fig,
+                    &cfg.ranking,
+                );
+                claims_to_save.push(Claim {
+                    id: 0,
+                    video_id: video.id.clone(),
+                    text_bg: item.text_bg.trim().to_string(),
+                    claim_type: ctype_str,
+                    speaker: item.speaker.clone(),
+                    attribution: item.attribution.clone(),
+                    start_ms: Some(item.start_ms),
+                    end_ms: Some(item.end_ms),
+                    checkworthiness: Some(final_checkworthiness),
+                    verdict: None,
+                    label: None,
+                    reasoning_bg: None,
+                    evidence_strength: None,
+                    verified_at: None,
+                    cluster_id: None,
+                });
+            }
+        }
+
         let keep_flags = drop_contained_duplicates(
             &claims_to_save
                 .iter()
@@ -737,10 +1058,10 @@ impl PipelineContext {
 
         Ok(ClaimsStageReport {
             video_id: video.id,
-            provider: validated.response.provider,
-            model: validated.response.model,
-            first_try_valid: validated.first_try_valid,
-            repair_used: validated.repair_used,
+            provider: used_provider,
+            model: used_model,
+            first_try_valid,
+            repair_used,
             extracted_claims_count: saved_claims.len(),
             checkworthy_claims_count: checkworthy_count,
             opinion_claims_count: opinion_count,
@@ -806,5 +1127,49 @@ mod quality_tests {
             "Съвсем различно твърдение за бюджета.".to_string(),
         ]);
         assert_eq!(keep, vec![false, true, true]);
+    }
+
+    #[test]
+    fn fallback_extracts_concrete_facts_with_timestamps_when_llm_empty() {
+        let q = quality();
+        let tr = Transcript {
+            video_id: "v1".to_string(),
+            source: "generated".to_string(),
+            engine: None,
+            model: None,
+            language: Some("bg".to_string()),
+            quality: Some(0.95),
+            text: "Цените на тока са се увеличили миналата година с 15 процента. Нормално ли е това? Последвай канала за още!".to_string(),
+            edited_text: None,
+            segments: vec![
+                leadfinder_core::TranscriptSegment {
+                    start_ms: 1200,
+                    end_ms: 7400,
+                    text: "Цените на тока са се увеличили миналата година с 15 процента.".to_string(),
+                    confidence: Some(0.95),
+                    speaker: None,
+                },
+                leadfinder_core::TranscriptSegment {
+                    start_ms: 7500,
+                    end_ms: 10000,
+                    text: "Нормално ли е това?".to_string(),
+                    confidence: Some(0.95),
+                    speaker: None,
+                },
+            ],
+        };
+        let extracted = extract_concrete_claims_fallback(
+            Some(&tr),
+            &[],
+            Some("Цените на тока са се увеличили миналата година #ток"),
+            30000,
+            &q,
+            &|_| true,
+        );
+        assert_eq!(extracted.len(), 1);
+        assert!(extracted[0].text_bg.contains("15 процента"));
+        assert_eq!(extracted[0].start_ms, 1200);
+        assert_eq!(extracted[0].end_ms, 7400);
+        assert_eq!(extracted[0].claim_type, ClaimType::Statistical);
     }
 }

@@ -1,12 +1,46 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::{Path, PathBuf};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(serde::Serialize)]
 struct CoreConnection {
     url: String,
     token: String,
+}
+
+#[derive(serde::Serialize)]
+struct DisplayHardwareInfo {
+    physical_width: u32,
+    physical_height: u32,
+    scale_factor: f64,
+    logical_width: f64,
+    logical_height: f64,
+    aspect_ratio: f64,
+    monitor_name: Option<String>,
+}
+
+#[tauri::command]
+fn get_display_hardware_info(window: tauri::Window) -> Option<DisplayHardwareInfo> {
+    let monitor = window.current_monitor().ok().flatten()?;
+    let size = monitor.size();
+    let scale = monitor.scale_factor().max(1.0);
+    let logical_w = size.width as f64 / scale;
+    let logical_h = size.height as f64 / scale;
+    let aspect = if size.height > 0 {
+        size.width as f64 / size.height as f64
+    } else {
+        1.6
+    };
+    Some(DisplayHardwareInfo {
+        physical_width: size.width,
+        physical_height: size.height,
+        scale_factor: scale,
+        logical_width: logical_w,
+        logical_height: logical_h,
+        aspect_ratio: aspect,
+        monitor_name: monitor.name().cloned(),
+    })
 }
 
 fn resolve_data_dir() -> PathBuf {
@@ -140,8 +174,27 @@ fn ensure_core_running() {
 fn main() {
     ensure_core_running();
     tauri::Builder::default()
+        .setup(|app| {
+            if let Some(win) = app.get_webview_window("main") {
+                if let Ok(Some(monitor)) = win.current_monitor() {
+                    let size = monitor.size();
+                    let scale = monitor.scale_factor().max(1.0);
+                    let logical_w = size.width as f64 / scale;
+                    let aspect = if size.height > 0 {
+                        size.width as f64 / size.height as f64
+                    } else {
+                        1.0
+                    };
+                    if aspect >= 1.55 && (size.width >= 1920 || logical_w >= 1360.0) {
+                        let _ = win.maximize();
+                    }
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             core_connection,
+            get_display_hardware_info,
             open_in_browser,
             open_in_webview,
             terminate_application,

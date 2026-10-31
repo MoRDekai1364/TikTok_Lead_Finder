@@ -1,8 +1,18 @@
 export interface ActiveAiJob {
   id: string;
-  type: 'google-audio' | 'google-fix' | 'whisper' | 'ai-check' | 'person-research' | 'auto-classify';
+  type:
+    | 'google-audio'
+    | 'google-fix'
+    | 'whisper'
+    | 'ai-check'
+    | 'person-research'
+    | 'auto-classify'
+    | 'creator-risk'
+    | 'video-research'
+    | 'aegis-scan';
   targetId: string | number;
   label: string;
+  stage?: string;
   startedAt: number;
 }
 

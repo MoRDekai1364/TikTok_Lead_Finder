@@ -48,19 +48,25 @@
   let newNotes = $state('');
 
   const ENTITY_TYPES = [
-    { id: 'all', bg: 'Всички типове субекти', en: 'All Entity Types', icon: '🌐' },
-    { id: 'person', bg: 'Личности (хора)', en: 'People (individuals)', icon: '👤' },
-    { id: 'institution', bg: 'Институции (органи, съдилища)', en: 'Institutions', icon: '🏛️' },
-    { id: 'channel', bg: 'Канали / Медии', en: 'Channels / Media', icon: '📺' },
+    { id: 'all', bg: 'Всички видове обекти', en: 'All Entity Types', icon: '🌐' },
+    { id: 'person', bg: 'Личности', en: 'People', icon: '👤' },
+    { id: 'institution', bg: 'Институции и органи', en: 'Institutions', icon: '🏛️' },
+    { id: 'infrastructure', bg: 'Инфраструктура (пътища, мостове, мрежи)', en: 'Infrastructure', icon: '🛤️' },
+    { id: 'building', bg: 'Сгради и обекти', en: 'Buildings & Facilities', icon: '🏢' },
+    { id: 'group', bg: 'Организации и партии', en: 'Groups & Parties', icon: '👥' },
+    { id: 'channel', bg: 'Канали и медии', en: 'Channels & Media', icon: '📺' },
     { id: 'country', bg: 'Държави', en: 'Countries', icon: '🌍' },
-    { id: 'group', bg: 'Групи / Партии', en: 'Groups / Parties', icon: '👥' },
-    { id: 'event', bg: 'Събития (избори, инциденти, протести)', en: 'Events', icon: '📅' },
+    { id: 'event', bg: 'Събития', en: 'Events', icon: '📅' },
   ];
 
   function getEntityTypeInfo(type?: string) {
     switch (type) {
       case 'institution':
         return { label: currentLang === 'bg' ? 'Институция' : 'Institution', icon: '🏛️', cssClass: 'type-institution' };
+      case 'infrastructure':
+        return { label: currentLang === 'bg' ? 'Инфраструктура' : 'Infrastructure', icon: '🛤️', cssClass: 'type-infrastructure' };
+      case 'building':
+        return { label: currentLang === 'bg' ? 'Сграда / Обект' : 'Building', icon: '🏢', cssClass: 'type-building' };
       case 'channel':
         return { label: currentLang === 'bg' ? 'Канал / Медия' : 'Channel / Media', icon: '📺', cssClass: 'type-channel' };
       case 'country':
@@ -77,10 +83,13 @@
   const CATEGORIES = [
     { id: 'all', bg: 'Всички категории', en: 'All Categories' },
     { id: 'Политик', bg: 'Политици', en: 'Politicians' },
-    { id: 'Медицинско лице', bg: 'Лекари и медици', en: 'Medics' },
-    { id: 'Ключова фигура', bg: 'Ключови позиции', en: 'Key Positions' },
+    { id: 'Институция', bg: 'Държавни институции', en: 'State Institutions' },
+    { id: 'Инфраструктура', bg: 'Инфраструктурни проекти', en: 'Infrastructure' },
+    { id: 'Сграда / Обект', bg: 'Сгради и имоти', en: 'Buildings & Properties' },
     { id: 'Магистрат', bg: 'Съдии и прокурори', en: 'Judiciary' },
     { id: 'Бизнесмен', bg: 'Бизнес и инвеститори', en: 'Business' },
+    { id: 'Медицинско лице', bg: 'Лекари и медици', en: 'Medics' },
+    { id: 'Ключова фигура', bg: 'Ръководни длъжности', en: 'Key Positions' },
     { id: 'Общественик', bg: 'Общественици и НПО', en: 'Public Figures' },
     { id: 'Медийна личност', bg: 'Журналисти и водещи', en: 'Media' },
   ];
@@ -158,15 +167,15 @@
   async function handleTriggerResearch(p: Person) {
     if (isJobActive('person-research', p.id)) return;
     startAiJob('person-research', p.id, p.canonical_name);
-    showToast(currentLang === 'bg' ? `⚡ Стартирано OSINT проучване за ${p.canonical_name}...` : `⚡ Researching ${p.canonical_name}...`);
+    showToast(currentLang === 'bg' ? `⏳ Изготвяне на справка за ${p.canonical_name}...` : `⏳ Researching ${p.canonical_name}...`);
     try {
       const updated = await researchPerson(p.id, p.canonical_name);
       people = people.map((item) => (item.id === p.id ? { ...item, ...updated } : item));
-      finishAiJob('person-research', p.id, currentLang === 'bg' ? `✓ Досието на ${p.canonical_name} е обновено!` : `✓ Dossier updated!`, true);
-      showToast(currentLang === 'bg' ? `✓ Досието на ${p.canonical_name} е обновено!` : `✓ Dossier updated!`);
+      finishAiJob('person-research', p.id, currentLang === 'bg' ? `✓ Справката за ${p.canonical_name} е готова` : `✓ Report updated`, true);
+      showToast(currentLang === 'bg' ? `✓ Справката за ${p.canonical_name} е обновена` : `✓ Report updated`);
     } catch {
-      finishAiJob('person-research', p.id, currentLang === 'bg' ? 'Грешка при AI проучването' : 'Research error', false);
-      showToast(currentLang === 'bg' ? 'Грешка при AI проучването' : 'Research error');
+      finishAiJob('person-research', p.id, currentLang === 'bg' ? 'Грешка при проучването' : 'Research error', false);
+      showToast(currentLang === 'bg' ? 'Грешка при проучването' : 'Research error');
     }
   }
 
@@ -304,11 +313,11 @@
 <div class="people-screen">
   <header class="screen-header">
     <div class="header-titles">
-      <h2>👥 {currentLang === 'bg' ? 'Лица, институции и събития' : 'Entities & Profiles'}</h2>
+      <h2>👥 {currentLang === 'bg' ? 'Лица, институции и обекти' : 'People, Institutions & Objects'}</h2>
       <p class="header-desc">
         {currentLang === 'bg'
-          ? 'Споменати лица, организации и теми в проверените видеа.'
-          : 'Mentioned figures, institutions, and topics across verified videos.'}
+          ? 'Споменати личности, държавни органи, инфраструктура, сгради и теми във видеата.'
+          : 'Mentioned figures, institutions, infrastructure, buildings, and topics across videos.'}
       </p>
     </div>
 
@@ -458,17 +467,19 @@
                 class="btn btn-primary btn-sm"
                 onclick={() => handleTriggerResearch(person)}
                 disabled={isJobActive('person-research', person.id)}
-                title="Стартирай пълно проучване от открити източници"
+                title="Изготви аналитична справка от публични регистри и източници"
               >
-                {isJobActive('person-research', person.id) ? '...' : '⚡ ' + (currentLang === 'bg' ? 'Проучи' : 'Research')}
+                {isJobActive('person-research', person.id)
+                  ? '⏳ ' + (currentLang === 'bg' ? 'В ход...' : 'Running...')
+                  : '🔄 ' + (currentLang === 'bg' ? 'Проучи' : 'Research')}
               </button>
 
               <button
                 class="btn btn-secondary btn-sm"
                 onclick={() => (viewingDossier = person)}
-                title="Отвори пълното досие"
+                title="Отвори пълната аналитична справка"
               >
-                📖 {currentLang === 'bg' ? 'Досие' : 'Dossier'}
+                📖 {currentLang === 'bg' ? 'Справка' : 'Report'}
               </button>
 
               <button
@@ -574,13 +585,13 @@
   <div class="modal-backdrop" onclick={() => (isCreatingNew = false)} role="presentation">
     <div class="modal-dialog" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <div class="modal-head">
-        <h3>+ {currentLang === 'bg' ? 'Добавяне на нова личност' : 'Add Person'}</h3>
+        <h3>+ {currentLang === 'bg' ? 'Добавяне на обект' : 'Add Subject'}</h3>
         <button class="close-btn" onclick={() => (isCreatingNew = false)}>✕</button>
       </div>
 
       <div class="modal-body">
         <label>
-          <span>{currentLang === 'bg' ? 'Тип на субекта' : 'Entity Type'}</span>
+          <span>{currentLang === 'bg' ? 'Вид на обекта' : 'Subject Type'}</span>
           <select bind:value={newEntityType}>
             {#each ENTITY_TYPES.filter((e) => e.id !== 'all') as e}
               <option value={e.id}>{e.icon} {currentLang === 'bg' ? e.bg : e.en}</option>
@@ -589,13 +600,13 @@
         </label>
 
         <label>
-          <span>{currentLang === 'bg' ? 'Канонично име' : 'Canonical Name'} *</span>
-          <input type="text" bind:value={newName} placeholder="напр. Бойко Борисов, Европейска комисия, The Clashers" />
+          <span>{currentLang === 'bg' ? 'Наименование / Име' : 'Canonical Name'} *</span>
+          <input type="text" bind:value={newName} placeholder="напр. Андрей Гюров, АМ Хемус, Национална детска болница" />
         </label>
 
         <label>
-          <span>{currentLang === 'bg' ? 'Длъжност / Професия' : 'Role / Occupation'}</span>
-          <input type="text" bind:value={newRole} placeholder="напр. Политик, лидер на партия, лекар-инфекционист" />
+          <span>{currentLang === 'bg' ? 'Длъжност / Описание' : 'Role / Description'}</span>
+          <input type="text" bind:value={newRole} placeholder="напр. Подуправител на БНБ, автомагистрала, обществена сграда" />
         </label>
 
         <label>
@@ -812,8 +823,23 @@
 
   .people-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--people-card-min, 350px), 1fr));
     gap: 1rem;
+  }
+
+  :global([data-display-profile='13']) .people-grid,
+  :global([data-display-profile='14']) .people-grid {
+    gap: 0.75rem;
+  }
+
+  :global([data-display-profile='18']) .people-grid {
+    gap: 0.85rem;
+  }
+
+  :global([data-display-profile='13']) .person-card,
+  :global([data-display-profile='14']) .person-card,
+  :global([data-display-profile='18']) .person-card {
+    padding: 0.85rem;
   }
 
   .person-card {
@@ -917,6 +943,18 @@
     background: rgba(236, 72, 153, 0.12);
     color: #ec4899;
     border: 1px solid rgba(236, 72, 153, 0.3);
+  }
+
+  .person-entity-badge.type-infrastructure {
+    background: rgba(14, 165, 233, 0.14);
+    color: #0ea5e9;
+    border: 1px solid rgba(14, 165, 233, 0.32);
+  }
+
+  .person-entity-badge.type-building {
+    background: rgba(20, 184, 166, 0.14);
+    color: #14b8a6;
+    border: 1px solid rgba(20, 184, 166, 0.32);
   }
 
   .person-category-badge {

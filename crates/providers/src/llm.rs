@@ -586,12 +586,14 @@ impl Llm for HeuristicLlm {
     }
 
     async fn complete_json(&self, req: &LlmJsonRequest) -> Result<LlmJsonResponse, ProviderError> {
-        let is_verification = req
+        let props = req
             .json_schema
             .as_ref()
-            .and_then(|s| s.get("properties"))
-            .and_then(|p| p.get("verdict"))
-            .is_some();
+            .and_then(|s| s.get("properties"));
+        let is_verification = props.and_then(|p| p.get("verdict")).is_some();
+        let is_chapter_block = props.and_then(|p| p.get("chapter_markdown")).is_some();
+        let is_person_meta = props.and_then(|p| p.get("public_figure")).is_some()
+            && props.and_then(|p| p.get("tags")).is_some();
 
         let parsed_json = if is_verification {
             let cid = extract_integer_after_key(&req.user_prompt, "claim_id").unwrap_or(0);
@@ -602,6 +604,17 @@ impl Llm for HeuristicLlm {
                 "evidence": [],
                 "reasoning_bg": "heuristics_only_mode",
                 "evidence_strength": 0.0
+            })
+        } else if is_chapter_block {
+            json!({
+                "chapter_markdown": ""
+            })
+        } else if is_person_meta {
+            json!({
+                "role": "",
+                "summary": "",
+                "public_figure": false,
+                "tags": []
             })
         } else {
             heuristic_extract_claims_json(&req.user_prompt)
@@ -639,7 +652,22 @@ impl LlmChainRunner {
         }
     }
 
+    pub fn primary_provider_name(&self) -> &str {
+        self.providers
+            .first()
+            .map(|p| p.name())
+            .unwrap_or("heuristics")
+    }
+
     pub async fn from_runtime(paths: &RuntimePaths, cfg: &AppConfig, db: &Database) -> Self {
+        let db_cloud_enabled = db
+            .get_setting("cloud_enabled")
+            .await
+            .ok()
+            .flatten()
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let effective_cloud_enabled = cfg.providers.cloud_enabled || db_cloud_enabled;
         let profile = db.get_profile().await.ok().flatten();
         let effective_provider = profile
             .as_ref()
@@ -714,13 +742,13 @@ impl LlmChainRunner {
                     let gem = GeminiLlm::new(
                         &cfg.providers.gemini_model,
                         gem_key,
-                        cfg.providers.cloud_enabled,
+                        effective_cloud_enabled,
                         Duration::from_secs(60),
                     );
                     providers.push(Arc::new(gem));
                 }
                 "paid" | "openai" => {
-                    if cfg.providers.cloud_enabled {
+                    if effective_cloud_enabled {
                         if let Some(paid_key) = resolve_secret("OPENAI_API_KEY") {
                             let paid_url = resolve_secret("OPENAI_BASE_URL")
                                 .unwrap_or_else(|| "https://api.openai.com".to_string());
@@ -759,6 +787,14 @@ impl LlmChainRunner {
         cfg: &AppConfig,
         db: &Database,
     ) -> Self {
+        let db_cloud_enabled = db
+            .get_setting("cloud_enabled")
+            .await
+            .ok()
+            .flatten()
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let effective_cloud_enabled = cfg.providers.cloud_enabled || db_cloud_enabled;
         let mut role_provider: Option<Arc<dyn Llm>> = None;
         if let Ok(Some(roles_val)) = db.get_setting("model_roles").await {
             if let Some(role_obj) = roles_val.get("roles").and_then(|r| r.get(role)) {
@@ -800,10 +836,11 @@ impl LlmChainRunner {
                     "gemini" => {
                         let gem_key = resolve_secret("GEMINI_API_KEY");
                         let m = if model_name.is_empty() { &cfg.providers.gemini_model } else { model_name };
+                        let allow_cloud = effective_cloud_enabled || gem_key.is_some();
                         role_provider = Some(Arc::new(GeminiLlm::new(
                             m,
                             gem_key,
-                            cfg.providers.cloud_enabled,
+                            allow_cloud,
                             Duration::from_secs(60),
                         )));
                     }
@@ -1258,33 +1295,277 @@ fn find_any_gguf(paths: &RuntimePaths) -> Option<PathBuf> {
     None
 }
 
-fn heuristic_extract_claims_json(user_prompt: &str) -> Value {
-    let mut claims = Vec::new();
-    for line in user_prompt.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.len() < 24 {
-            continue;
-        }
-        let has_digits = trimmed.chars().any(|c| c.is_ascii_digit());
-        if has_digits && claims.len() < 3 {
-            let clean_text = if let Some(idx) = trimmed.find(']') {
-                trimmed[idx + 1..].trim()
-            } else {
-                trimmed
-            };
-            if clean_text.chars().count() >= 15 {
-                claims.push(json!({
-                    "text_bg": clean_text,
-                    "claim_type": "statistical",
-                    "speaker": null,
-                    "attribution": [],
-                    "start_ms": 0,
-                    "end_ms": 5000,
-                    "checkworthiness": 0.60
-                }));
+fn parse_bracket_timestamps_ms(line: &str) -> (i64, i64, &str) {
+    let trimmed = line.trim();
+    if let Some(rest_after_open) = trimmed.strip_prefix('[') {
+        if let Some(close_idx) = rest_after_open.find(']') {
+            let inside = rest_after_open[..close_idx].trim();
+            let body = rest_after_open[close_idx + 1..].trim();
+            let clean_inside = inside.trim_end_matches("ms").trim();
+            if let Some((s_str, e_str)) = clean_inside.split_once('-') {
+                if let (Ok(s), Ok(e)) = (s_str.trim().parse::<i64>(), e_str.trim().parse::<i64>()) {
+                    return (s.max(0), e.max(s.max(0)), body);
+                }
+            } else if let Some(ocr_ms) = clean_inside.strip_prefix("OCR") {
+                if let Ok(ms) = ocr_ms.trim().parse::<i64>() {
+                    return (ms.max(0), (ms + 3000).max(0), body);
+                }
             }
         }
     }
+    (0, 5000, trimmed)
+}
+
+fn strip_inline_hashtags(input: &str) -> String {
+    input
+        .split_whitespace()
+        .filter(|tok| !tok.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn split_concrete_sentences(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut buf = String::new();
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    while i < len {
+        let ch = chars[i];
+        buf.push(ch);
+        if ch == '.' || ch == '!' || ch == '?' {
+            let prev_digit = i > 0 && chars[i - 1].is_ascii_digit();
+            let next_digit = i + 1 < len && chars[i + 1].is_ascii_digit();
+            if !(ch == '.' && prev_digit && next_digit) {
+                let cleaned = strip_inline_hashtags(buf.trim());
+                if !cleaned.is_empty() {
+                    out.push(cleaned);
+                }
+                buf.clear();
+            }
+        }
+        i += 1;
+    }
+    let tail = strip_inline_hashtags(buf.trim());
+    if !tail.is_empty() {
+        out.push(tail);
+    }
+    out
+}
+
+fn score_concrete_factual_sentence(sentence: &str) -> Option<(f64, &'static str)> {
+    let trimmed = sentence.trim();
+    if trimmed.ends_with('?') || trimmed.contains('?') {
+        return None;
+    }
+    let word_count = trimmed
+        .split_whitespace()
+        .filter(|w| w.chars().any(|c| c.is_alphabetic()))
+        .count();
+    if word_count < 5 || trimmed.chars().count() < 24 {
+        return None;
+    }
+    let cyr_chars = trimmed
+        .chars()
+        .filter(|c| ('\u{0400}'..='\u{04FF}').contains(c))
+        .count();
+    if cyr_chars < 12 {
+        return None;
+    }
+    let low = trimmed.to_lowercase();
+    let promo_markers = [
+        "последвай",
+        "сподели",
+        "абонирай",
+        "следете ",
+        "коментирай",
+        "линк в био",
+    ];
+    if promo_markers.iter().any(|p| low.contains(p)) {
+        return None;
+    }
+
+    let has_digits = trimmed.chars().any(|c| c.is_ascii_digit());
+    let quant_markers = [
+        "милион", "милиард", "млн", "млрд", "хиляд", "процент", "%", "евро", "лева", "лв",
+        "години", "година", "месец", "седмиц",
+    ];
+    let attr_markers = [
+        "заяви", "обяви", "съобщи", "твърди", "каза", "посочи", "по данни на", "според",
+        "определи", "потвърди", "опроверга",
+    ];
+    let action_or_inst_markers = [
+        "реши", "прие", "отмени", "гласува", "внесе", "подписа", "назначи", "освободи",
+        "оставка", "арестув", "задържа", "обвини", "разследв", "проверк", "одит", "санкц",
+        "глоба", "съд", "вас", "вкс", "сес", "прокуратур", "кпконпи", "сметна палата",
+        "министерств", "правителств", "парламент", "народното събрание", "президент",
+        "премиер", "министър", "кмет", "общин", "полици", "бнб", "апи", "днск", "кзк",
+        "бюджет", "договор", "поръчк", "инфлац", "данъц", "цени", "протест", "сблъсъц",
+        "безредиц", "пожар", "магистрал", "строителств", "болниц", "училищ",
+    ];
+
+    let has_quant = has_digits || quant_markers.iter().any(|m| low.contains(m));
+    let has_attr = attr_markers.iter().any(|m| low.contains(m));
+    let inst_hits = action_or_inst_markers
+        .iter()
+        .filter(|m| low.contains(**m))
+        .count();
+
+    if !has_quant && !has_attr && inst_hits == 0 {
+        return None;
+    }
+
+    let mut score: f64 = 0.55;
+    if has_digits {
+        score += 0.16;
+    }
+    if has_quant {
+        score += 0.08;
+    }
+    if has_attr {
+        score += 0.08;
+    }
+    score += (inst_hits.min(3) as f64) * 0.06;
+
+    let ctype = if has_quant {
+        "statistical"
+    } else if has_attr {
+        "attribution"
+    } else {
+        "factual"
+    };
+
+    Some((score.min(0.95), ctype))
+}
+
+fn heuristic_extract_claims_json(user_prompt: &str) -> Value {
+    #[derive(Clone)]
+    struct Candidate {
+        text: String,
+        claim_type: &'static str,
+        start_ms: i64,
+        end_ms: i64,
+        score: f64,
+    }
+
+    let mut section = "";
+    let mut candidates: Vec<Candidate> = Vec::new();
+
+    for raw_line in user_prompt.lines() {
+        let trimmed = raw_line.trim();
+        if trimmed.is_empty() || trimmed == "(none)" {
+            continue;
+        }
+        if trimmed.starts_with("VIDEO_METADATA:") {
+            section = "meta";
+            continue;
+        }
+        if trimmed.starts_with("EDITED_TRANSCRIPT") {
+            section = "edited_transcript";
+            continue;
+        }
+        if trimmed.starts_with("TRANSCRIPT_SEGMENTS:") {
+            section = "segments";
+            continue;
+        }
+        if trimmed.starts_with("TRANSCRIPT ") || trimmed == "TRANSCRIPT:" {
+            section = "transcript";
+            continue;
+        }
+        if trimmed.starts_with("OCR_LINES:") {
+            section = "ocr";
+            continue;
+        }
+        if trimmed.starts_with("LEXICON_NOTES:") {
+            section = "lexicon";
+            continue;
+        }
+
+        match section {
+            "meta" => {
+                if let Some(cap) = trimmed.strip_prefix("- caption:") {
+                    for sent in split_concrete_sentences(cap.trim()) {
+                        if let Some((score, ctype)) = score_concrete_factual_sentence(&sent) {
+                            candidates.push(Candidate {
+                                text: sent,
+                                claim_type: ctype,
+                                start_ms: 0,
+                                end_ms: 5000,
+                                score: score - 0.04,
+                            });
+                        }
+                    }
+                }
+            }
+            "segments" | "ocr" => {
+                let (s_ms, e_ms, body) = parse_bracket_timestamps_ms(trimmed);
+                for sent in split_concrete_sentences(body) {
+                    if let Some((score, ctype)) = score_concrete_factual_sentence(&sent) {
+                        candidates.push(Candidate {
+                            text: sent,
+                            claim_type: ctype,
+                            start_ms: s_ms,
+                            end_ms: e_ms,
+                            score: if section == "segments" { score + 0.03 } else { score },
+                        });
+                    }
+                }
+            }
+            "edited_transcript" | "transcript" => {
+                for sent in split_concrete_sentences(trimmed) {
+                    if let Some((score, ctype)) = score_concrete_factual_sentence(&sent) {
+                        candidates.push(Candidate {
+                            text: sent,
+                            claim_type: ctype,
+                            start_ms: 0,
+                            end_ms: 5000,
+                            score,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    candidates.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut selected: Vec<Candidate> = Vec::new();
+    for cand in candidates {
+        let low = cand.text.to_lowercase();
+        let duplicate = selected.iter().any(|existing| {
+            let ex_low = existing.text.to_lowercase();
+            ex_low == low || ex_low.contains(&low) || low.contains(&ex_low)
+        });
+        if !duplicate {
+            selected.push(cand);
+            if selected.len() >= 5 {
+                break;
+            }
+        }
+    }
+
+    selected.sort_by_key(|c| c.start_ms);
+
+    let claims: Vec<Value> = selected
+        .into_iter()
+        .map(|c| {
+            json!({
+                "text_bg": c.text,
+                "claim_type": c.claim_type,
+                "speaker": null,
+                "attribution": [],
+                "start_ms": c.start_ms,
+                "end_ms": c.end_ms,
+                "checkworthiness": (c.score * 100.0).round() / 100.0
+            })
+        })
+        .collect();
+
     json!({
         "claims": claims,
         "people": []
@@ -1316,4 +1597,39 @@ fn truncate_chars(s: &str, max_chars: usize) -> String {
         out.push(ch);
     }
     out
+}
+
+#[cfg(test)]
+mod heuristic_fact_tests {
+    use super::*;
+
+    #[test]
+    fn heuristic_claim_extractor_skips_metadata_and_extracts_concrete_facts() {
+        let prompt = "VIDEO_METADATA:\n\
+- id: 7697938534824430870\n\
+- creator: @blitzbg (blitz)\n\
+- posted_at: 2026-10-18T09:33:10+00:00\n\
+- duration_s: 64.0\n\
+- caption: Протести във Франция #Франция #Новини\n\n\
+TRANSCRIPT (lang=bg, source=generated, quality=0.95):\n\
+Франция е разтърсена от масови протести с 1200 арестувани и 150 ранени полицаи. Върховният административен съд отмени решението на министерството за обществената поръчка. Ще успеят ли властите да овладеят ситуацията? Следете Блиц за повече подробности!\n\n\
+TRANSCRIPT_SEGMENTS:\n\
+[0-12000 ms] Франция е разтърсена от масови протести с 1200 арестувани и 150 ранени полицаи.\n\
+[12000-24000 ms] Върховният административен съд отмени решението на министерството за обществената поръчка.\n\
+[24000-30000 ms] Ще успеят ли властите да овладеят ситуацията?\n\n\
+OCR_LINES:\n\
+(none)\n";
+
+        let val = heuristic_extract_claims_json(prompt);
+        let arr = val.get("claims").and_then(|v| v.as_array()).expect("claims array");
+        assert_eq!(arr.len(), 2, "Expected 2 concrete claims, got: {:?}", arr);
+        let first_text = arr[0].get("text_bg").and_then(|v| v.as_str()).unwrap_or("");
+        let second_text = arr[1].get("text_bg").and_then(|v| v.as_str()).unwrap_or("");
+        assert!(!first_text.contains("7697938534824430870"));
+        assert!(first_text.contains("1200 арестувани"));
+        assert_eq!(arr[0].get("start_ms").and_then(|v| v.as_i64()), Some(0));
+        assert_eq!(arr[0].get("end_ms").and_then(|v| v.as_i64()), Some(12000));
+        assert!(second_text.contains("Върховният административен съд"));
+        assert_eq!(arr[1].get("start_ms").and_then(|v| v.as_i64()), Some(12000));
+    }
 }

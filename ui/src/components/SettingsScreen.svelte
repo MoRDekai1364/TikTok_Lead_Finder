@@ -12,6 +12,7 @@
   import type { Language } from '../lib/i18n';
   import { translations } from '../lib/i18n';
   import type { GeminiStatus } from '../lib/types';
+  import { DISPLAY_PRESETS, widescreen } from '../lib/widescreen.svelte';
 
   let {
     currentLang,
@@ -130,7 +131,7 @@
         <h3>✨ {currentLang === 'bg' ? 'Google AI (Gemini Studio)' : 'Google AI (Gemini Studio)'}</h3>
         {#if onOpenGoogleAiWizard}
           <button type="button" class="btn-wizard-trigger" onclick={onOpenGoogleAiWizard}>
-            🪄 {currentLang === 'bg' ? 'Отвори магьосника' : 'Setup Wizard'}
+            🔑 {currentLang === 'bg' ? 'Настройка на ключ' : 'API Key Setup'}
           </button>
         {/if}
       </div>
@@ -138,8 +139,8 @@
       <div class="ai-status-row">
         <span class="status-badge" class:badge-active={geminiStatus?.configured}>
           {geminiStatus?.configured
-            ? (currentLang === 'bg' ? '🟢 Свързан (98% точност)' : '🟢 Connected (98% accuracy)')
-            : (currentLang === 'bg' ? '⚪ Не е конфигуриран (Whisper)' : '⚪ Not configured (Whisper)')}
+            ? (currentLang === 'bg' ? '🟢 Свързан' : '🟢 Connected')
+            : (currentLang === 'bg' ? '⚪ Не е настроен (локален Whisper)' : '⚪ Not configured (Whisper)')}
         </span>
         {#if geminiStatus?.masked_key}
           <span class="masked-key-pill">{geminiStatus.masked_key}</span>
@@ -148,8 +149,8 @@
 
       <p class="ai-desc">
         {currentLang === 'bg'
-          ? 'Google AI осигурява над 95% точност при транскрибиране на български говор от TikTok и детайлно факт-чекинг досие. Безплатен план с до 1500 заявки дневно.'
-          : 'Google AI enables >95% speech-to-text accuracy in Bulgarian and automated fact dossiers. Free tier with up to 1,500 requests per day.'}
+          ? 'Google AI осигурява висока точност при разпознаване на българска реч и изготвяне на аналитични справки. Безплатният план включва до 1500 заявки на ден.'
+          : 'Google AI enables high speech-to-text accuracy in Bulgarian and detailed analytical reports. Free tier with up to 1,500 requests per day.'}
       </p>
     </div>
 
@@ -168,6 +169,45 @@
           <input type="radio" name="exit_behavior" value="terminate" bind:group={exitBehavior} />
           <span>{currentLang === 'bg' ? 'Прекрати напълно и спри всички фонови процеси веднага' : 'Terminate all processes immediately (nothing stays running)'}</span>
         </label>
+      </div>
+    </div>
+
+    <div class="section-card display-preset-card">
+      <div class="display-card-head">
+        <h3>
+          {currentLang === 'bg'
+            ? '🖥️ Профил на дисплея и разположение (13" – 18")'
+            : '🖥️ Display Profile & Screen Presets (13" – 18")'}
+        </h3>
+        <span class="hw-detected-pill">{widescreen.resolutionSummary}</span>
+      </div>
+      <p class="ai-desc">
+        {currentLang === 'bg'
+          ? 'Калибрирани профили за мащаб на шрифта, брой колони, височина на видеото и пропорции на страничния панел спрямо диагонала и резолюцията на екрана.'
+          : 'Calibrated presets for typography scale, column density, video stage height, and docked workspace proportions by screen diagonal and resolution.'}
+      </p>
+      <div class="preset-cards-grid">
+        {#each DISPLAY_PRESETS as preset (preset.id)}
+          <button
+            type="button"
+            class="preset-option-btn"
+            class:selected={widescreen.preset === preset.id}
+            class:featured-18={preset.featured}
+            onclick={() => widescreen.setPreset(preset.id)}
+          >
+            <div class="preset-opt-top">
+              <span class="preset-diag-badge" class:badge-18={preset.featured}>
+                {preset.diagonalBadge}{preset.featured ? ' ★' : ''}
+              </span>
+              <span class="preset-opt-title">
+                {currentLang === 'bg' ? preset.titleBg : preset.titleEn}
+              </span>
+            </div>
+            <span class="preset-opt-desc">
+              {currentLang === 'bg' ? preset.descBg : preset.descEn}
+            </span>
+          </button>
+        {/each}
       </div>
     </div>
   </div>
@@ -353,6 +393,111 @@
     margin: 0;
     font-size: 0.8rem;
     line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  .display-preset-card {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .display-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .display-card-head h3 {
+    margin: 0;
+  }
+
+  .hw-detected-pill {
+    font-size: 0.75rem;
+    font-family: monospace;
+    padding: 0.22rem 0.55rem;
+    border-radius: 6px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+  }
+
+  .preset-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.2rem;
+  }
+
+  .preset-option-btn {
+    text-align: left;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: var(--text-main);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  }
+
+  .preset-option-btn:hover {
+    border-color: var(--primary-accent);
+  }
+
+  .preset-option-btn.featured-18 {
+    border-color: rgba(245, 158, 11, 0.42);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(59, 130, 246, 0.06));
+  }
+
+  .preset-option-btn.selected {
+    border-color: var(--primary-accent);
+    background: rgba(59, 130, 246, 0.12);
+    box-shadow: 0 0 0 1px var(--primary-accent);
+  }
+
+  .preset-option-btn.featured-18.selected {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(59, 130, 246, 0.12));
+    box-shadow: 0 0 0 1px #f59e0b;
+  }
+
+  .preset-opt-top {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .preset-diag-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.12rem 0.42rem;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    white-space: nowrap;
+  }
+
+  .preset-diag-badge.badge-18 {
+    background: rgba(245, 158, 11, 0.22);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+  }
+
+  .preset-opt-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  .preset-opt-desc {
+    font-size: 0.75rem;
+    line-height: 1.38;
     color: var(--text-muted);
   }
 </style>

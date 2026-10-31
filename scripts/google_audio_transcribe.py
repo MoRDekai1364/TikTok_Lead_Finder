@@ -202,7 +202,73 @@ def parse_gemini_timestamped_sentences(gemini_raw_text):
     full_dialogue = '\n'.join(dialogue_lines)
     return segments, full_dialogue
 
-def transcribe_with_gemini(wav_path, api_keys_input):
+def transcribe_with_gemini(wav_path, api_keys_input, hf_token: str | None = None):
+    """Transcribe audio with Gemini and optionally attach speaker diarization.
+
+    * ``api_keys_input`` – Gemini API keys (comma‑separated).
+    * ``hf_token`` – HuggingFace token for the ``pyannote`` diarization model. If ``None`` diarization is skipped.
+    """
+    if not api_keys_input:
+        return None
+    keys = [k.strip() for k in str(api_keys_input).replace('\\n', ',').replace(';', ',').split(',') if k.strip()]
+    if not keys:
+        return None
+
+    try:
+        import urllib.request
+        import urllib.error
+        import base64
+        with open(wav_path, 'rb') as f:
+            audio_bytes = f.read()
+        b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+    except Exception:
+        return None
+
+    prompt_inst = (
+        "You are an expert Bulgarian speech transcriber. Transcribe this audio recording verbatim with maximum fidelity.\n\n"
+        "CRITICAL SENTENCE DIVISION & PUNCTUATION RULES:\n"
+        "1. You MUST divide the speech into natural, complete, grammatical sentences.\n"
+        "2. Punctuate every sentence accurately: capitalize the first word, insert commas, and end with a period (.), question mark (?), or exclamation mark (!).\n"
+        "3. Output each sentence on its own separate line preceded by its time interval in format:\n"
+        "   [MM:SS - MM:SS] Текст на цялото изречение.\n"
+        "4. NEVER combine multiple sentences into a single continuous wall of text or long unbroken paragraph.\n"
+        "5. Return only the timestamped Bulgarian lines."
+    )
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt_inst},
+                {"inlineData": {"mimeType": "audio/wav", "data": b64_audio}}
+            ]
+        }],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192}
+    }
+    body_data = json.dumps(payload).encode('utf-8')
+
+    for api_key in keys:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            req = urllib.request.Request(url, data=body_data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        text = parts[0].get("text", "").strip()
+                        if text:
+                            if hf_token:
+                                from .diarization_helper import _attach_speakers_to_segments
+                                segments, full_dialogue = _attach_speakers_to_segments(wav_path, text, hf_token)
+                                return segments, full_dialogue
+                            return text
+        except urllib.error.HTTPError as he:
+            if he.code in (429, 403):
+                continue
+        except Exception:
+            pass
+    return None
     if not api_keys_input:
         return None
     keys = [k.strip() for k in str(api_keys_input).replace('\n', ',').replace(';', ',').split(',') if k.strip()]

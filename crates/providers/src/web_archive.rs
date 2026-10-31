@@ -283,6 +283,10 @@ impl WebArchiveEngine {
             domains_to_probe.push("president.bg".to_string());
         } else if name_low.contains("министерски") || name_low.contains("премиер") {
             domains_to_probe.push("gov.bg".to_string());
+        } else if entity_type == "infrastructure" && !domains_to_probe.iter().any(|d| d.contains("api.bg")) {
+            domains_to_probe.push("api.bg".to_string());
+        } else if entity_type == "building" && !domains_to_probe.iter().any(|d| d.contains("mrrb.bg")) {
+            domains_to_probe.push("mrrb.bg".to_string());
         }
 
         for domain in domains_to_probe.iter().take(3) {
@@ -303,29 +307,29 @@ impl WebArchiveEngine {
         let newest = snapshots.last().map(|s| s.timestamp.clone());
 
         let mut provenance_notes = Vec::new();
-        let mut scrubbed_or_altered_risk = "Ниска вероятност за заличаване (стабилен времеви отпечатък)".to_string();
+        let mut scrubbed_or_altered_risk = "Нисък (наличието на архивни копия е последователно)".to_string();
 
         if let Some(ref w) = wiki_res {
-            provenance_notes.push(format!("Енциклопедичен запис в Уикипедия [{}] с обем от {} символа.", w.language, w.extract.chars().count()));
+            provenance_notes.push(format!("Налична е статия в Уикипедия [{}] с обем {} символа.", w.language, w.extract.chars().count()));
             if !w.revisions.is_empty() {
-                provenance_notes.push(format!("Последна редакция на статията: {} от потребител '{}' (Коментар: '{}').", w.revisions[0].timestamp, w.revisions[0].user, w.revisions[0].comment));
+                provenance_notes.push(format!("Последна редакция: {} от потребител '{}' (Бележка: '{}').", w.revisions[0].timestamp, w.revisions[0].user, w.revisions[0].comment));
             }
         } else {
-            provenance_notes.push("Липсва потвърдена статия в Уикипедия - субектът няма самостоятелен енциклопедичен отпечатък.".to_string());
+            provenance_notes.push("Няма самостоятелна статия в Уикипедия за този субект.".to_string());
         }
 
         if !snapshots.is_empty() {
-            provenance_notes.push(format!("Wayback Machine регистрира най-ранен архив: {} и най-нов архив: {}.", oldest.as_deref().unwrap_or("неизвестен"), newest.as_deref().unwrap_or("неизвестен")));
+            provenance_notes.push(format!("Wayback Machine съхранява архивни копия от {} до {}.", oldest.as_deref().unwrap_or("неизвестна дата"), newest.as_deref().unwrap_or("неизвестна дата")));
         } else {
-            provenance_notes.push("Няма открити директни Wayback Machine архиви за асоциираните уеб адреси.".to_string());
+            provenance_notes.push("Няма открити архивни копия в Wayback Machine за свързаните адреси.".to_string());
         }
 
         if !ia_docs.is_empty() {
-            provenance_notes.push(format!("Internet Archive открива {} архивирани медийни записа, документи или радиопредавания.", ia_docs.len()));
+            provenance_notes.push(format!("В Internet Archive са намерени {} документа или медийни записа.", ia_docs.len()));
         }
 
-        if snapshots.is_empty() && wiki_res.is_none() && (entity_type == "person" || entity_type == "institution") {
-            scrubbed_or_altered_risk = "Умерена към висока: липсват дългосрочни дигитални архиви преди появата в социалните мрежи.".to_string();
+        if snapshots.is_empty() && wiki_res.is_none() && (entity_type == "person" || entity_type == "institution" || entity_type == "infrastructure" || entity_type == "building") {
+            scrubbed_or_altered_risk = "Ограничена архивна следа: липсват по-стари публични архиви.".to_string();
         }
 
         AegisTemporalAudit {

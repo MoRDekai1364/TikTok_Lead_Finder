@@ -47,10 +47,10 @@ export function getPlaybackState() {
 export function registerPlaybackElement(
   el: HTMLVideoElement,
   meta?: {
-    videoId?: string;
-    creatorHandle?: string;
-    caption?: string;
-    thumbnailUrl?: string;
+    videoId?: string | null;
+    creatorHandle?: string | null;
+    caption?: string | null;
+    thumbnailUrl?: string | null;
   }
 ) {
   activeElement = el;

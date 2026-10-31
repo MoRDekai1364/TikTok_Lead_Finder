@@ -60,7 +60,7 @@ export const translations = {
     stanceContradicts: 'Опровергава',
     stanceSupports: 'Потвърждава',
     stanceNeutral: 'Контекст',
-    peopleHeading: 'Споменати лица и организации',
+    peopleHeading: 'Споменати лица и обекти',
     publicFigure: 'Публична личност',
     creatorHeading: 'Автор',
     creatorWatchlist: 'Под наблюдение',

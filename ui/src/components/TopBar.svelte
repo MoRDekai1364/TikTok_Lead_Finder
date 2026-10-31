@@ -5,6 +5,8 @@
   import { translations } from '../lib/i18n';
   import type { BenchmarkProgress, PowerInfo, QueueCounts, ScaleStatus, Screen } from '../lib/types';
   import { getCapacityTierInfo } from '../lib/types';
+  import { DISPLAY_PRESETS, widescreen, type DisplayPresetId } from '../lib/widescreen.svelte';
+  import { getActiveAiJobs } from '../lib/aiTasks.svelte';
   import NotificationCenterModal from './NotificationCenterModal.svelte';
 
   let {
@@ -26,6 +28,7 @@
     onToggleTheme,
     onToggleLang,
     onRefreshPeople,
+    onOpenSubject,
   }: {
     activeScreen: Screen;
     currentLang: Language;
@@ -45,13 +48,19 @@
     onToggleTheme: () => void;
     onToggleLang: () => void;
     onRefreshPeople?: () => void;
+    onOpenSubject?: (subjectId: number) => void;
   } = $props();
 
   let geminiConfigured = $state(false);
   let isNotificationsOpen = $state(false);
+  let isDisplayMenuOpen = $state(false);
+  let displayMenuWrapEl = $state<HTMLDivElement | null>(null);
   let unreadNotificationsCount = $state(0);
   let questionsCount = $state(0);
+  let ongoingServerCount = $state(0);
   let notifTimer: ReturnType<typeof setInterval> | null = null;
+  const activeClientJobs = $derived(getActiveAiJobs());
+  const totalOngoingCount = $derived(Math.max(ongoingServerCount, activeClientJobs.length));
 
   let pasteText = $state('');
   let isPasting = $state(false);
@@ -102,8 +111,15 @@
     }).catch(() => {});
     checkNotifications();
     notifTimer = setInterval(checkNotifications, 15000);
+    const handleOutsideDisplayClick = (ev: MouseEvent) => {
+      if (isDisplayMenuOpen && displayMenuWrapEl && !displayMenuWrapEl.contains(ev.target as Node)) {
+        isDisplayMenuOpen = false;
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideDisplayClick);
     return () => {
       stopPolling();
+      document.removeEventListener('mousedown', handleOutsideDisplayClick);
       if (notifTimer !== null) {
         clearInterval(notifTimer);
         notifTimer = null;
@@ -111,12 +127,25 @@
     };
   });
 
+  function selectDisplayPreset(id: DisplayPresetId) {
+    widescreen.setPreset(id);
+    isDisplayMenuOpen = false;
+  }
+
   function checkNotifications() {
     fetchNotifications().then((res) => {
       unreadNotificationsCount = res.unread_count || 0;
       questionsCount = res.questions_count || 0;
+      ongoingServerCount = res.ongoing_count || 0;
     }).catch(() => {});
   }
+
+  $effect(() => {
+    if (activeClientJobs.length > 0 || ongoingServerCount > 0) {
+      const fast = setInterval(checkNotifications, 2500);
+      return () => clearInterval(fast);
+    }
+  });
 
   function stopPolling() {
     if (pollTimer !== null) {
@@ -315,9 +344,9 @@
           type="button"
           class="btn scan-trigger-btn"
           onclick={onOpenScanModal}
-          title={currentLang === 'bg' ? 'Фин скенер на TikTok профили и теми' : 'Fine-tuned TikTok scanner'}
+          title={currentLang === 'bg' ? 'Търсене на TikTok профили, теми и видеа' : 'Search TikTok profiles and topics'}
         >
-          🎯 {currentLang === 'bg' ? 'Фин скенер' : 'Fine Scanner'}
+          🎯 {currentLang === 'bg' ? 'Търсене в TikTok' : 'TikTok Search'}
         </button>
       {/if}
       {#if toastMessage}
@@ -398,17 +427,103 @@
         </button>
       {/if}
 
+      <div class="display-preset-wrap" bind:this={displayMenuWrapEl}>
+        <button
+          type="button"
+          class="indicator-pill widescreen-pill clickable"
+          class:ws-on={widescreen.isActive}
+          class:ws-eighteen={widescreen.isEighteenInch}
+          onclick={() => (isDisplayMenuOpen = !isDisplayMenuOpen)}
+          title={currentLang === 'bg'
+            ? `Профил на дисплея: ${widescreen.activeBadgeLabel('bg')} • ${widescreen.resolutionSummary}`
+            : `Display preset: ${widescreen.activeBadgeLabel('en')} • ${widescreen.resolutionSummary}`}
+        >
+          <span class="dot" class:green={widescreen.isActive} class:amber={!widescreen.isActive}></span>
+          <span>🖥️ {widescreen.activeBadgeLabel(currentLang)}</span>
+          <span class="preset-caret">{isDisplayMenuOpen ? '▴' : '▾'}</span>
+        </button>
+
+        {#if isDisplayMenuOpen}
+          <div class="display-preset-popover" role="dialog" aria-label={currentLang === 'bg' ? 'Избор на профил за дисплея' : 'Select display preset'}>
+            <div class="dp-popover-head">
+              <div class="dp-head-title">
+                {currentLang === 'bg' ? 'Оптимизация по размер на дисплея' : 'Display Size Preset'}
+              </div>
+              <div class="dp-head-hw">
+                {widescreen.resolutionSummary}
+              </div>
+            </div>
+
+            <div class="dp-quick-strip">
+              {#each ['auto', '13', '14', '15', '16', '17', '18', 'desktop'] as pid}
+                {@const pmeta = DISPLAY_PRESETS.find((x) => x.id === pid)}
+                {#if pmeta}
+                  <button
+                    type="button"
+                    class="dp-chip"
+                    class:active={widescreen.preset === pmeta.id}
+                    class:matched-auto={widescreen.preset === 'auto' && widescreen.resolvedProfile === pmeta.id}
+                    class:featured-18={pmeta.id === '18'}
+                    onclick={() => selectDisplayPreset(pmeta.id)}
+                  >
+                    {currentLang === 'bg' ? pmeta.shortLabelBg : pmeta.shortLabelEn}
+                  </button>
+                {/if}
+              {/each}
+            </div>
+
+            <div class="dp-list">
+              {#each DISPLAY_PRESETS as item}
+                <button
+                  type="button"
+                  class="dp-row"
+                  class:selected={widescreen.preset === item.id}
+                  class:featured={item.featured}
+                  onclick={() => selectDisplayPreset(item.id)}
+                >
+                  <span class="dp-badge" class:badge-18={item.id === '18'}>{item.diagonalBadge}</span>
+                  <div class="dp-row-body">
+                    <div class="dp-row-title-line">
+                      <span class="dp-row-title">{currentLang === 'bg' ? item.titleBg : item.titleEn}</span>
+                      {#if item.id === 'auto'}
+                        <span class="dp-auto-match-tag">
+                          → {widescreen.hardwareDetectedProfile === 'desktop' ? '24"+' : `${widescreen.hardwareDetectedProfile}"`}
+                        </span>
+                      {/if}
+                      {#if item.id === '18'}
+                        <span class="dp-special-tag">{currentLang === 'bg' ? 'Препоръчан 16:10' : '16:10 Tuned'}</span>
+                      {/if}
+                    </div>
+                    <span class="dp-row-desc">{currentLang === 'bg' ? item.descBg : item.descEn}</span>
+                  </div>
+                  {#if widescreen.preset === item.id}
+                    <span class="dp-check">✓</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+
       <button
         type="button"
         class="indicator-pill notification-pill"
         class:has-questions={questionsCount > 0}
+        class:has-ongoing={totalOngoingCount > 0}
         onclick={() => (isNotificationsOpen = !isNotificationsOpen)}
-        title={currentLang === 'bg' ? 'Център за известия & Медия контроли' : 'Notification Center & Media Controls'}
+        title={totalOngoingCount > 0
+          ? (currentLang === 'bg' ? `Проучвания в ход (${totalOngoingCount}) — натиснете за детайли` : `Ongoing research (${totalOngoingCount})`)
+          : (currentLang === 'bg' ? 'Известия, проучвания и възпроизвеждане' : 'Notifications, research & playback')}
       >
-        <span class="bell-icon">🔔</span>
-        {#if questionsCount > 0 || unreadNotificationsCount > 0}
-          <span class="notification-badge" class:has-questions={questionsCount > 0}>
-            {questionsCount > 0 ? questionsCount : unreadNotificationsCount}
+        <span class="bell-icon">{totalOngoingCount > 0 ? '⏳' : '🔔'}</span>
+        {#if totalOngoingCount > 0 || questionsCount > 0 || unreadNotificationsCount > 0}
+          <span
+            class="notification-badge"
+            class:has-questions={questionsCount > 0 && totalOngoingCount === 0}
+            class:has-ongoing={totalOngoingCount > 0}
+          >
+            {totalOngoingCount > 0 ? totalOngoingCount : (questionsCount > 0 ? questionsCount : unreadNotificationsCount)}
           </span>
         {/if}
       </button>
@@ -467,6 +582,8 @@
         onRefreshPeople();
       }
     }}
+    onOpenSubject={onOpenSubject}
+    onJumpToVideo={onJumpToVideo}
   />
 
   {#if lastPasted}
@@ -576,8 +693,34 @@
   .topbar {
     background-color: var(--surface-bg);
     border-bottom: 1px solid var(--border-color);
-    padding: 0.5rem 1.25rem 0 1.25rem;
+    padding: var(--topbar-pad-y, 0.5rem) 1.15rem 0 1.15rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  :global([data-display-profile='13']) .topbar,
+  :global([data-display-profile='14']) .topbar {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+
+  :global([data-display-profile='13']) .top-row,
+  :global([data-display-profile='15']) .top-row,
+  :global([data-display-profile='18']) .top-row {
+    min-height: 42px;
+    gap: 0.4rem 0.65rem;
+  }
+
+  :global([data-display-profile='13']) .indicators {
+    gap: 0.32rem;
+  }
+
+  :global([data-display-profile='13']) .indicator-pill {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.74rem;
+  }
+
+  :global([data-display-profile='18']) .paste-bar {
+    max-width: 780px;
   }
 
   .top-row {
@@ -738,6 +881,12 @@
     background: rgba(245, 158, 11, 0.14);
   }
 
+  .notification-pill.has-ongoing {
+    border-color: #06b6d4;
+    background: rgba(6, 182, 212, 0.16);
+    box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.25);
+  }
+
   .bell-icon {
     font-size: 0.92rem;
   }
@@ -755,6 +904,11 @@
   .notification-badge.has-questions {
     background: #f59e0b;
     color: #1f2937;
+  }
+
+  .notification-badge.has-ongoing {
+    background: #06b6d4;
+    color: #082f49;
   }
 
   .benchmark-pulsing-pill {
@@ -1034,5 +1188,227 @@
 
   .preview-dismiss:hover {
     color: var(--text-heading);
+  }
+
+  .display-preset-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .widescreen-pill.clickable {
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .widescreen-pill.ws-on {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--text-heading);
+  }
+
+  .widescreen-pill.ws-eighteen {
+    border-color: rgba(16, 185, 129, 0.62);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(37, 99, 235, 0.16));
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.18);
+  }
+
+  .preset-caret {
+    font-size: 0.68rem;
+    opacity: 0.75;
+  }
+
+  .display-preset-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 390px;
+    max-width: 92vw;
+    max-height: 82vh;
+    overflow-y: auto;
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
+    z-index: 2500;
+    padding: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .dp-popover-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .dp-head-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .dp-head-hw {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dp-quick-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.32rem;
+  }
+
+  .dp-chip {
+    padding: 0.3rem 0.35rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-body);
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+
+  .dp-chip:hover {
+    border-color: var(--primary-accent);
+    color: var(--text-heading);
+  }
+
+  .dp-chip.featured-18 {
+    border-color: rgba(16, 185, 129, 0.45);
+  }
+
+  .dp-chip.matched-auto {
+    border-style: dashed;
+    border-color: #10b981;
+  }
+
+  .dp-chip.active {
+    background: var(--primary-accent);
+    border-color: var(--primary-accent);
+    color: #ffffff;
+  }
+
+  .dp-chip.active.featured-18 {
+    background: #059669;
+    border-color: #10b981;
+  }
+
+  .dp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .dp-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    text-align: left;
+    padding: 0.48rem 0.55rem;
+    border-radius: 7px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-body);
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+
+  .dp-row:hover {
+    background: var(--hover-bg);
+    border-color: var(--primary-accent);
+  }
+
+  .dp-row.featured {
+    border-color: rgba(16, 185, 129, 0.42);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(37, 99, 235, 0.06));
+  }
+
+  .dp-row.selected {
+    border-color: var(--primary-accent);
+    box-shadow: inset 0 0 0 1px var(--primary-accent);
+  }
+
+  .dp-row.selected.featured {
+    border-color: #10b981;
+    box-shadow: inset 0 0 0 1px #10b981;
+  }
+
+  .dp-badge {
+    min-width: 42px;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: var(--pill-bg);
+    color: var(--text-heading);
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .dp-badge.badge-18 {
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.45);
+  }
+
+  .dp-row-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .dp-row-title-line {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .dp-row-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-heading);
+  }
+
+  .dp-auto-match-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--primary-accent);
+    background: var(--primary-accent-alpha);
+    padding: 0 5px;
+    border-radius: 4px;
+  }
+
+  .dp-special-tag {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.32);
+    padding: 0 5px;
+    border-radius: 4px;
+  }
+
+  .dp-row-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.32;
+  }
+
+  .dp-check {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #10b981;
+    flex-shrink: 0;
   }
 </style>
