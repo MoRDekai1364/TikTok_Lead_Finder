@@ -1,0 +1,41 @@
+!(function () { window.googletag = window.googletag || {}; window.vmpbjs = window.vmpbjs || {}; window.vpb = window.vpb || {}; vpb.cmd = vpb.cmd || []; vpb.st=Date.now();  vpb.fastLoad = true; googletag.cmd = googletag.cmd || []; vmpbjs.cmd = vmpbjs.cmd || []; var cmds = []; try{ cmds = googletag.cmd.slice(0); googletag.cmd.length = 0; }catch(e){} var ready = false; function exec(cb) { return cb.call(googletag); } var overriden = false; googletag.cmd.push(function () { overriden = true; googletag.cmd.unshift = function (cb) { if (ready) { return exec(cb); } cmds.unshift(cb); if (cb._startgpt) { ready = true; for (var k = 0; k < cmds.length; k++) { exec(cmds[k]); } } }; googletag.cmd.push = function (cb) { if (ready) { return exec(cb); } cmds.push(cb); }; }); if(!overriden){ googletag.cmd.push = function (cb) { cmds.push(cb); }; googletag.cmd.unshift = function (cb) { cmds.unshift(cb); if (cb._startgpt) { ready = true; if (googletag.apiReady) { cmds.forEach(function (cb) { googletag.cmd.push(cb); }); } else { googletag.cmd = cmds; } } }; } var dayMs = 36e5, cb = parseInt(Date.now() / dayMs), vpbSrc = '//player.hbmp.ops.co/prebidlink/' + cb + '/wrapper_hb_779253_23204.js', pbSrc = vpbSrc.replace('wrapper_hb', 'hb'), gptSrc = '//securepubads.g.doubleclick.net/tag/js/gpt.js', c = document.head || document.body || document.documentElement; function loadScript(src, cb) { var s = document.createElement('script'); s.src = src; s.defer=false; c.appendChild(s); s.onload = cb; s.onerror = function(){ var fn = function(){}; fn._startgpt = true; googletag.cmd.unshift(fn); }; return s; } loadScript(pbSrc); loadScript(gptSrc); loadScript(vpbSrc); })()
+  window.googletag = window.googletag || {cmd: []};
+  googletag.cmd.push(function() {
+    const sizeMapping = googletag.sizeMapping()
+        .addSize([1440, 0], [
+            [970,90],
+            [970,250],
+            [728,90],
+        ])
+        .addSize([1024, 0], [
+            [728,90],
+            [320,100],
+        ])
+        .addSize([768, 0], [
+            [320, 50],
+            [300, 50],
+        ])
+        .addSize([0, 0], [
+            [320, 50],
+			[300, 50],
+        ])
+        .build();
+    googletag.defineSlot('/25722649/Politifact/BottomLeaderboard_Adhesion', [[300,50],[320,50],[728,90]], 'BottomLeaderboard_Adhesion')
+      .defineSizeMapping(sizeMapping) 
+      .addService(googletag.pubads());
+    googletag.defineSlot('/25722649/Politifact/Politifact_BottomLeaderboard', [[320,50],[728,90]], 'BottomLeaderboard')
+      .defineSizeMapping(sizeMapping)          
+      .addService(googletag.pubads());
+    googletag.defineSlot('/25722649/Politifact/Politifact_MiddleRectangle', [[300,250]], 'MiddleRectangle')
+             .addService(googletag.pubads());
+    googletag.defineSlot('/25722649/Politifact/Politifact_TopLeaderboard', [[320,50],[728,90]], 'TopLeaderboard')
+      .defineSizeMapping(sizeMapping)        
+      .addService(googletag.pubads());
+    googletag.defineSlot('/25722649/Politifact/Politifact_TopMedRect', [[300,250],[300,600]], 'TopMedRect')
+             .addService(googletag.pubads());
+    googletag.defineSlot('/25722649/Politifact/SmartNewsFeed', [[300,250]], 'SmartNewsFeed')
+             .addService(googletag.pubads());
+
+    googletag.pubads().enableSingleRequest();
+    googletag.enableServices();
+  });

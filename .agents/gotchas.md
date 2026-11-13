@@ -93,3 +93,47 @@
 - Svelte allows one style block per file; insert CSS before the existing closing style tag in DetailDrawer.svelte.
 - Pair -webkit-line-clamp with standard line-clamp to avoid svelte-check warnings.
 - Claim redaction: POST /api/claims/:id/redact -> update_claim_text (clears verdict) -> feedback rating 'edited' -> verify_claim_with_retrieval injects latest_claim_notes as REVIEWER_NOTES (guidance, not evidence).
+
+## Workbench Database Loading Stalemate (`lane = 'all'` Zero-Row SQLite Mismatch)
+- **Symptom**: Workbench screen is permanently stuck on "Зареждане на видеа от базата данни..." ("Loading videos from database...") on initial startup, even when the SQLite database contains hundreds of processed videos.
+- **Root Cause**: `fetchVideos('all', 2000)` passed query parameter `lane=all`. In `crates/core/src/db.rs`, the SQL `WHERE` clause checked `(?1 IS NULL OR (?1 = 'pasted' AND ...) OR (?1 = 'leads' AND ...))`. Because video rows in `leadfinder.db` are partitioned across specific lanes (`leads`, `pasted`, `kept`, etc.) and no video has `lane = 'all'`, passing `?1 = 'all'` matched exactly 0 rows, returning `cards: []`. The UI's loading check `if (!cards || cards.length === 0)` therefore remained permanently true.
+- **Resolution**:
+  1. Updated `crates/core/src/db.rs` line 353 to `WHERE (?1 IS NULL OR ?1 = 'all' ...)`.
+  2. Normalized query parameters in `crates/pipeline/src/server.rs` (`handle_list_videos`) by mapping `Some("all")` and `Some("")` to `None`.
+  3. In `ui/src/lib/api.ts` (`fetchVideos`), omitted `&lane=` when `lane === 'all'` or `!lane`.
+  4. Updated `WorkbenchScreen.svelte` to feature the complete capabilities of the main UI: interactive triage (`Keep`, `Discard`, `Research More`, `Delete`), inline claim redaction & reverification, RLHF feedback (`correct`, `wrong_verdict`, `unrelated`), AEGIS deepfake scanning & score badges, and interactive OSINT subject dossiers (`onOpenSubject`).
+  5. Defaulted UI language to English (`currentLang = 'en'`) across the application lifecycle.
+
+## Windows PowerShell 5.1 `&&` Operator Incompatibility
+- **Symptom**: Commands chaining directory changes and build steps (e.g. `cd "path" && cargo build`) fail immediately with:
+  `ParserError: The token '&&' is not a valid statement separator in this version.`
+- **Root Cause**: `&&` was introduced in PowerShell 7 Core. Standard Windows PowerShell 5.1 does not recognize `&&` as a statement separator.
+- **Resolution**: Use `;` (semicolon) or `Set-Location -Path "..."` followed by the command on a separate line or semicolon-delimited: `Set-Location -Path "path"; cargo build ...`.
+
+## PowerShell `Select-String` Output Pipe Zero-Hit Exit Code
+- **Symptom**: Filtered commands such as `cargo check 2>&1 | Select-String -Pattern "error"` exit with PowerShell exit code 1 even when the build succeeded with zero errors.
+- **Root Cause**: PowerShell `Select-String` sets `$LASTEXITCODE = 1` whenever zero matching lines are found in the stream.
+- **Resolution**: Never infer failure solely from exit code 1 when piping to `Select-String`. Always pair the filter with a success pattern (e.g., `Select-String -Pattern "Finished|error:"` or `Select-String -Pattern "test result:|FAILED"`) and evaluate the matched text lines.
+
+## Dual-Format Knowledge JSON Deserialization (Object vs Array)
+- **Symptom**: Knowledge ingestion scripts report or insert 0 records into SQLite because the deserializer expects `Vec<T>` at the root, while the knowledge corpus wraps items in an object with metadata (`{"total": 877, "factchecks": [...]}`).
+- **Root Cause**: Generation scripts output dictionary manifests with metadata, whereas consumer endpoints expect bare JSON lists.
+- **Resolution**: In Rust/Python deserializers, parse `serde_json::Value` dynamically: check `parsed.as_array()` first; if None, inspect `parsed.get("factchecks").and_then(|v| v.as_array())`. Always log explicit `tracing::info!` row counts and `tracing::warn!` on errors instead of discarding with `let _ = ...;`.
+
+## Windows Active Process File Locking During Release Builds (`os error 5`)
+- **Symptom**: `cargo build --release -p leadfinder-cli` or `cargo build --release in ui/src-tauri` fails during linking with: `error: failed to remove file ... Caused by: Access is denied. (os error 5)`.
+- **Root Cause**: On Windows, running executables are locked by the operating system kernel and cannot be deleted or overwritten by the linker. If `leadfinder.exe` or `leadfinder-desktop.exe` is running in the background, `rustc`/`ld` cannot write the output binary.
+- **Resolution**: Check for active processes (`Get-Process leadfinder*`) and terminate them (`Stop-Process -Id <pid> -Force`) before running `cargo build --release`, then re-launch via `Start_TikTok_Lead_Finder.ps1`.
+
+## OSINT Dossier Garbage Output — Nav Menus, Ad Banners, City Lists in "Corporate & Financial Records"
+- **Symptom**: OSINT subject dossier sections (especially "Corporate & Financial Records") contained complete website navigation menus ("София Пловдив Варна..."), Mail.bg ad banners (mailbox size promotions), celebrity gossip tickers (Justin Bieber cocaine, Siara pregnant), and Bulgarian tax document instructions (ЗДДФЛ) — all sourced from scraped pages like kik-info.com, mail.bg, fakti.bg.
+- **Root Causes** (3 layers):
+  1. `passages.rs` `scrape_text_from_html()` body-fallback joined all lines with space, making nav/footer/ad sections into one giant "sentence". Structural HTML tags (`<nav>`, `<header>`, `<footer>`, `<aside>`, `<menu>`, `<form>`) were not stripped.
+  2. `server.rs` `extract_matching_factual_passages()` matched any sentence containing a generic financial keyword (`доход`, `ЕАД`) with **zero subject co-occurrence** requirement — so a mail.bg banner with "ЕАД" in the copyright passed as a "financial fact".
+  3. `ensure_concrete_facts_preserved_block1/2` forcibly injected raw `fin_extracted` sentences into LLM prose even when garbage (no subject co-occurrence gate).
+- **Resolution**:
+  1. `passages.rs`: Strip `<nav>/<header>/<footer>/<aside>/<menu>/<form>/<dialog>/<canvas>` in regex; join lines with `\n` not space; added `is_category_or_city_list()` + `clean_extracted_text()` with 50+ Bulgarian ad/nav noise patterns.
+  2. `server.rs`: Added `is_sentence_noise_or_boilerplate()` (35–340 char gate, 40+ noise patterns, verb presence check, category-cloud detection); `extract_matching_factual_passages()` now requires subject name co-occurrence in every accepted sentence (or doc title mentions target as bypass for infra/building entities); all 7 call sites updated to pass `target_name`.
+  3. `ensure_concrete_facts_preserved_block1/2`: Added `is_sentence_noise_or_boilerplate()` gate before appending preserved facts; reduced injected fact limits (8→4 fin, 5→3 net, 8→4 legal).
+  4. Pivot relevance gate: `pivot_relevant` check verifies scraped pivot-company page actually mentions the company name (stripped of legal suffixes: оод, еоод, ад, еад, дззд, холдинг, консорциум) before ingesting it.
+- **Tests**: `leadfinder-providers` 33 passed; `leadfinder-pipeline` 36 passed after adding `title_mentions_target` bypass for infra/building entity types.

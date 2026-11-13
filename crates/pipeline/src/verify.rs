@@ -525,6 +525,26 @@ impl PipelineContext {
         let actor = claim.speaker.as_deref().or_else(|| claim.attribution.first().map(|a| a.actor.as_str()));
         let distilled_q = distill_claim_keywords(&claim.text_bg, actor, &context_terms);
 
+        if let Ok(ls_hits) = self.db.search_lead_stories_factchecks(&distilled_q, 5).await {
+            for ls in &ls_hits {
+                let sources: Vec<String> = serde_json::from_str(&ls.sources_json).unwrap_or_default();
+                let first_url = sources.first().cloned().unwrap_or_default();
+                if !first_url.is_empty() {
+                    let snippet = if ls.notes.is_empty() { ls.claim_text_en.chars().take(300).collect() } else { ls.notes.chars().take(300).collect() };
+                    let hit = SearchHit {
+                        url: first_url,
+                        title: ls.claim_text_en.chars().take(120).collect(),
+                        snippet,
+                        source_name: Some("Lead Stories".to_string()),
+                        source_kind: "factcheck".to_string(),
+                        published_at: ls.created_year.map(|y| format!("{}-01-01T00:00:00Z", y)),
+                    };
+                    let body = format!("Verdict: {} | Label: {} | {}", ls.verdict, ls.label, ls.notes);
+                    candidate_hits.push((hit, body));
+                }
+            }
+        }
+
         if let Ok(fc_matches) = archive.find_fact_checks(&distilled_q).await {
             for m in fc_matches {
                 let hit = SearchHit {

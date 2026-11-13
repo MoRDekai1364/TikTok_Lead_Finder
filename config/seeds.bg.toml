@@ -197,3 +197,3209 @@ topic = 'viral_claims'
 kind = 'hashtag'
 value = 'енергетика'
 topic = 'energy'
+
+
+[[seeds]]
+kind = 'creator'
+value = '.truthinplainsight'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '10_17sg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '5rovbulgaria1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '69____atanaso7w____69'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '_.palmaraex._'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '_251824'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'a3kmet'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'adam.sali.sali'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'akselmariyanov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alayaayaaor'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'aleksandaraleks17'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alexandaralexand66'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alextrifonov26'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alian.936'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alion.693'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alion.963'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alion.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alion.kuty'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'aljazeeraenglish'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alleyesonme9405'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'amore.2024'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'angel.zhekov.georgiev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'angelnikolov08'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'animalistic171'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'anjelafunhouse'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'antonadov7'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'asen_ivanov_2121'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'asenmanev2001'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'atanasstefanof'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ayhaninfire'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'azraltar'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'backwords_internationale'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'baharstoqnovailieva44'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'balgarsko_vazrazhdane'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'batival'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bavno.bogat'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bg33355'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bg_politics'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bgn_channel'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bgnpn'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bgxit.org'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bilqnaftgabi'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'blbosakov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bloomingtonbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bntnews.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bobi10bestbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bogari.media'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bogomilkolchakov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'borha_82'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'borisvasilev0'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bsp_official01'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bukvarrbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgaria2024.now'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgaria_sof'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgarian_orthodoxy'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgarianfen_681'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgarianlion7'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'byulent_myumyunov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'cveti.77'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dazzlehistory'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'deqnaivanova1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dimitrovkraev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'diversant.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dr.dimata'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dy1oomrh4p4v'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dy7fl31xqtxe'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dzakgreen'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'eligeorgieva763'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'elvis.bogdanov3'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'emildimov36'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'emiliyanparvanov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'esoterika8'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'evelina_1968_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'evelinayanakieva1968'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'factcheck.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'farmingvideoedits'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fazza63838'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fenshata'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fidanovapeta'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fidanovapetya'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fidpeta'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fix191919'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'flagmanbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'flatearthbulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'flatearthbulgariq'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'folkystan'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'fowolme'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'g_klasa'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gabrielakniajevska'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gargamelpolihronov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'georgi.saykov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'georgivanov88'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gnstoqnov4'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'golden.bulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'golden.bulgariaa'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'goldenbulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gotiofficial'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gusto.mana'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'h_yavorbogdanov_s'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'hankubrat1988'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'haribda08'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'hasanhyusnyuev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'historyvision'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'hooppy123'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'i.sokolova89'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'iptheboss'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'istanislava'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'istinabg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'istinaizliza555'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'istinatasega'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivan.chenchev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivan.dudulov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivan_lrnatural22'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivankaslavova77'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivanov_asen_2121'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivanovphotography'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivanyovchev77'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivo19811'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'jan.valjan49'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'jorjoffreads'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kalina6666'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'karanpzbfz2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'khan.stan'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kibritq'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kiro_163'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'knowledge_and_wisdom'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kombinatoro'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'korneliyaninova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kostadin7777'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kostov88811'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'krasendikov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kristiyanhr'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kyamran.007'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'leosownbubble'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lightmoon888'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lionheart333r'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lionheart474'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lubomirabubeto'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lyusienakostova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'm.todo19rov_14'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'margo13v.vasileva'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mariapetrovamlm'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'marinemilovasenov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'martin.dimov06'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'maxim_velkov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mihailyankov24'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'milko.atanasov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mimi.shishkova.petrova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mirnabulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mitko_dimitrov0806'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'monarh.936'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'monetiruse'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nadejda_creative_society'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nadezhda.hospital'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nasko_istoriq'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nataliya.dimitrov3'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nellijakmita'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nessieee07'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nev4e82'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'newspoint.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'neyc66'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nickypetrov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nicolay.nicolov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nicolaynicolov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'niki_euro'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'niki_georgiev_ostrieto'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikkolov7'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'niko_nik84'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikola.gyulemetov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikolay_zhekovv'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikolaynikolov257'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikolov.new'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'novinite_dnes'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'orbitinc'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'otecvasilbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'otupor_news'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'otvetnareakciq'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'paco1.9tdi'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'palestin11133'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pavlinasirakova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'persefonakore'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'petergwc12v'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'petrlievk'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'petyagold'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'petylawrence'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pharaohjasmine'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pichaku.picaku'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pietro7307'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'plamezho0fz'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'platononthestate'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ploskatazemq'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'politiktokbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pp_mech_pazardzhik'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pravovistatuschovek'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ra1na333'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rad9rad'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'radostin.vasilev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rahvin96'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'raiandhell'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ralev.krasimir'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'raycholyutakov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'raznibezobrazni'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'riko.riko799'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rnh_856'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ros79628'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rumen.hristov44'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rumengangster777'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ruslana_tarot_88'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 's.d611'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sandexsport'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sarnelav'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sashkopopov7'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sashogatev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'schatz773'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sergei111333'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'serkan...1984'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'si_yanastan4eva'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sisij1122'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'snezhanastoyanovazdrave'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'someonetoldthetruth'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'spasradov69'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'srinahadyrjavata'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stanislavgeorgie66'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stasslakoff'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stefangalev1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stoicho_danchev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stoynov70'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sunnyjordanov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'superpepo69'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'suzihr'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'taisia1136'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tanya_b1973'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tanya_doncheva'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tedy_kanat'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'teodorooo07'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'teodosiy.penev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'the.informant8'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'the_sun_god_ra21'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tidavidish112'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tihomir_ilchev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tihomirilchev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tiktok1ti291'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tiktotoyotov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'todev85'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'todorsapunarov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tretoko'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'truthseeker515191'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tsezarovna'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tynev30'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user1080621381958'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user1617937327281'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user2317542813583'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user2363260298626'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user247626009'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user2860887194811'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user2v8it7ufup'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user3462424379954'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user3568835927740'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user40250402533763'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user7815086231259'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user8119619208204'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user86516985867291'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user9121940703593'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'userdm7b0zes1h'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'userkrasimiryankov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'usero5nkk4l360'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'valentinagoleminova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'valentinivanov945'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'value.mindsetbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vazrazhdane_baza'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'velik_creative_society'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'velislav.ivanov4'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'veni.ap'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'venipetrova77'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsichicagoto'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsislav.angelo4'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsislav.arseno'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsyslavangelov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'veronica_siberian'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'veselinanaydenova1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'veselindimov22'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'victor.yochev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vladislav_iliev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vladyslavyashchenko1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vmm6228p5p'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vuzrajdanepetrich'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'xxtektation'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'zdravkovasilev39'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'zinar087'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'zubenlive'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'keyword'
+value = 'лабораторно месо AND причинява AND турбо рак'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Русия AND гаси AND пожари AND в Гърция'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'евроатлантическаи AND ценности'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'министър на отбраната AND купува AND имение AND 7 милиона евро AND корупция AND украйна'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'телетъбис AND истината AND лалаленд AND български деца'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'телетъбис AND истината AND лалаленд AND български деца'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'протести AND истанбулска AND конвенция AND нито една повече'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'числата AND Грабовой'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'протести AND истанбулска AND конвенция AND нито една повече'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'пожари AND мауи AND DEW'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '15минутни градове AND пълен контрол'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'НАСА AND астронавти AND челинджър AND живи AND нова идентичност'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'ромски деца AND пловидв AND кражба AND органи AND джип'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'флуор AND паста за зъби AND вода AND манипулация AND световен ред'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'човешко месо AND продава се AND великобритания'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'ромски деца AND пловидв AND кражба AND органи AND джип'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'човешко месо AND продава се AND великобритания'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'флуор AND паста за зъби AND вода AND манипулация AND световен ред'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'България AND най-високо ДДС AND хранителни продукти'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'масова ваксинация AND СЗО AND изменение на климата'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '217 научни институции AND потвърждават AND СОVID-19 AND не съществува'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'България AND най-високо ДДС AND хранителни продукти'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'числата AND Грабовой'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'кредитни, карти AND американски AND компании AND виза AND мастъркард AND маестро AND приндлежат AND '
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Кока Кола AND киселина AND промишлен AND ръждопреобразувател AND унищожава AND зъбите AND изгаря AND'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'евродепутата AND Мишел AND Ривази AND инициира AND разследване AND фон, дер, Лайен AND Pfizer'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Луната AND извънземна AND база AND контрол AND човечеството'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'евродепутата AND Мишел AND Ривази AND инициира AND разследване AND фон, дер, Лайен AND Pfizer'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'прекъсване AND електрозахранване AND 2024 AND целия AND свят AND Оливър AND Даудън AND Швеция AND пр'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Киевският AND режим AND изпраща AND деца AND фронта'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'полша AND унгария AND излизат AND ЕС'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Чешкият AND премиер AND каза AND Няма AND приемаме AND еврото AND народ AND глад AND България'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Киевският AND режим AND изпраща AND деца AND фронта'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'САЩ AND заповяда AND демонтирането AND паметник AND Съветската AND армия'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'бесарабски AND българи AND съпротива AND мобилизация AND украинска AND армия'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'САЩ AND заповяда AND демонтирането AND паметник AND Съветската AND армия'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'френски AND журналист AND Жул AND Венсан AND изнесе AND информация AND украинско AND министерство AN'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '7-ми AND блок AND технология AND AP1000 AND България AND миниатомна AND бомба AND най-опасният AND р'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '7-ми AND блок AND технология AND AP1000 AND България AND миниатомна AND бомба AND най-опасният AND р'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Кирил AND Петков AND Васил AND Левски AND комунист AND руски AND терорист'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'план AND сливане AND САЩ AND Съвeтски,съюз AND 1910 AND 1933 AND комунизъм AND плниран AND колективи'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Чърчил AND София AND изравнена AND картофена нива AND бомбадировки AND втора AND световна AND война'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'хората AND нямат AND нужда AND храна AND 80%  AND енергия AND слънце AND въздуха AND вода'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'ароматизирана AND свещ AND парафин AND нефт AND алкани AND алкини AND фталати'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'компасите AND работят AND само AND плоска AND земя'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'България AND произвежда AND снаряди AND обеден AND уран AND Украйна'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'статуя AND София AND столица AND България AND шумерско AND божество AND демон AND Лилит'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Ейвис AND Боулън AND посланик AND САЩ AND България AND Боровец AND българско AND население AND 4 AND'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'министерство AND икономиката AND регистрирано AND Търговски AND регистър AND САЩ AND България AND ня'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'убиец AND уби AND невинни AND университет AND Прага AND Давид AND Козак AND евреин'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'майка AND Леонардо AND Да,Винчи AND българка'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'майка AND Леонардо AND Да,Винчи AND българка'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'министерство AND икономиката AND регистрирано AND Търговски AND регистър AND САЩ AND България AND ня'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'aтентат AND Чернобил AND aмериканци AND  вербуват AND инженер AND Кълвачев AND атомна AND централа A'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'касов AND бон AND украйна AND призовка'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'реч AND нова AND година AND президент AND руски'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'соросоиди AND заря AND роби AND маски'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Огюст AND Пикар AND учен AND физик AND изобретател AND казал AND земята AND плосък AND диск AND обър'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'българия AND забрани AND самолета AND Лавров AND прелети AND над, страната'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '110, хилядна, армия AND България AND 20 хиляди AND резерв AND 44 AND хеликоптера AND 220 изтребителя'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'creator'
+value = '.269626'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '369_520'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '3gh13klssd5uy780akjrt6t'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '4ushka'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '6945smogar33'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '88888.ana'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '8stanlee8'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '__evelina68'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = '_evelina1968_'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'aladdin9069'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'albena66775'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'aleks777.a777'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alexandertodorov65'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alion.news'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alion_global'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alleks.hristov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'allisaa1994'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'alphatronbg2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'andonaleksandarov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'angel.djambazki'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'anketnikut'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'anons.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'arsenal1974'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'asen.tomov8'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'asen_ivanov2121'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'atanas.chaushev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'atanasova.nea'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ayhan.semra7'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'babycreama'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bdude.nvm'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bezcenzurabg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bezgranici.s.nevena'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bg.patriot'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bg953484'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bg_lev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bg_suprotivata'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bgsisobg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bgtechknowogy'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bit.moremoney'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'black.bunny.media'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'blaivison.song.fe'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bobi.stoianov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bogomil1975'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bonboni030'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'borrie_'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'boryana63'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'break.news70'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'budna_bulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'budnavarna.com'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgaria606'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgaria_520'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgaria_edits00'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgarian537'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'bulgarionlion8'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'che.guevara0246'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'classical_cubyr'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'darik_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dariknews.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'deanfraiser'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'denis.raime'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'desiskpdpdp'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'didi.rusevaa'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dimatarlazarov65'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dimisimeonov0'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dimitrovmilen'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'djthebiggestdan_oficial'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dnevnikbg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dobrinka.moskova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'donkar.tiktok'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'dr.paskov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'edit28_2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'emil.angelov8'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'emil001_1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'emisalvera0'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'epicbulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'eurocomtv'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'evening2505'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'f1novini'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'g.a.yo777'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'galerieartedeesse'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gavril.gruev.hlat'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gavrilgruevhlatev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'georgemarkov739'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'georgi.dimov284'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'georgie93'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'glndrk'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gluhakotka'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'goatnewzzz'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gord.bulgarin1893'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gostenin'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'goveroywhtv'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'gps.bulgaria'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'grantantonyan69'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'grow.shop30'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'hehaec.com'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'hristo88georgiev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ilenahussein'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'iliya361'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'imotgovori'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'inspire.stories_facts'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'intrigata.com'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'intrigi_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'iordan.genchev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'istinskazemya'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'itspetaaar'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivan33242'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ivolvar822'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'jenq.petrova59'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'karlovo_velichie'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kiril.veselinski'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kontrapunkt.1'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'korneliyaninovafan'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'korypciqstop'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kostadin.t.kostadinov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'krasen1974'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kserx.1976'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'kurnazayse50'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lachezarpetrov932'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lia.g.asparuhova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'limonse09'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'liubomir.nikolov5'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lozanoff87'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'luchanoofficial'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lunayordanova2026'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lyubchoelmazov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'lyubo0878'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'm.tik.tok.new'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mafia.ru0'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'maha14657'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mandja111'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'marianmss5'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mariavelichkovazemke'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'marin.iliev46'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mariqnadecheva'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'marsiano_fly'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'martin.dimitrov1977'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'martinnikolov820904'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'martyn.ivanov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'medi.trans4'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'metachovek_podcast'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mi_lena95stanislavova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'milchomilchev7'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mileto1509'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mirem.raklba'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mishomoi'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mitkopetrov83'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mladezhizavazrazhdane'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mlk9188'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mmm6228p5p'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'morskepdow6'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mrb0bby'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'mrnobody34_'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nadlleya37'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nakata_bg07'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'namaznachenie0'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nasha.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'naskotodorovd5'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'neoskywallker'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikolay.nikolov166'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nikolay.nikolov2407'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ninanikolova369'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'nov__chovek'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'orhanorhan0178'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'otgovornaveka'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'otporut_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'outlet.europe'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'panayot93'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'paollo1969'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'paradise1313_'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pdyonov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'petar.petrov.sofia'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'petevzjbxus'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'plamen.ivanovv'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'plamen0345'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'plik_news'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ppcentar'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'pribarmanabe'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'prigojin.jenq'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'qsnivubezh'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'qwertjleixv'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'qzo1914'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rada.laykova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'radimavrudieva'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'radoslav.trifonov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'retvbgnews'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'retvhd'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'revel_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'richarddominel1441'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'rizokkob2gl'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ross_mino'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'russeva6'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 's.d1135'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sasheva367'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'securitymarian2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'seydekuscu2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'seydekuscu6'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'siderovvolen'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'silna_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'silvinaivi2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'simeon.stavrev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'simeon_petrovv'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sinabojii'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'siromahckovekjivdqvol'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'sokolgotsev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stefanovbf'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stelio.9969'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stiliqn.jos.de.ol'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stormchieff'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'stranjer.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'suprotivata_bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'svettok13'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 't_s_e_t_s_i'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tasev74'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tatiana.sultanova4'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tesysss'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tihomir.dimitrov17'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'todor_mollov03'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'toto1234687'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'traykudza'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'truck_griver_kolev_new'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'truefacts.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ts.ganev'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tsvety7610'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'tyanko.todorov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'unknown0.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user1201493005044'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user1258502971306'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user1883588295588banito3'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user273189064'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user3153156909045'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user32336859247900'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user355992229'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user4676248976935'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user4697595380183'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user50002371425103'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user51209682372415'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user5155595399915'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user5401962568005'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user7429814130688'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user7754476888715'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user7810219559321'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user8071187529293'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'user9938206980733'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'valentinangelov274'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vazrazhdane.bg'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsi.angelov.ch'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsiangelavchicagoto'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsislav.angelo06'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'ventsislav.angelov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'veskovelikov3'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'veverdita'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'vladislavmakedons0'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'watsoon2'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'world6426'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'y.nikiforov'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'yeshua_ha_mashiah13'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'znaisvoiteprava'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'creator'
+value = 'zvezdelina_karavelova'
+topic = 'flagged_creator'
+
+[[seeds]]
+kind = 'keyword'
+value = '1992 AND Economist AND променим AND ДНК AND mанипулираха AND човешката AND ДНК AND биологичните AND '
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'учени AND откриха AND гробница AND чингис AND хан'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'учен AND химик AND шейн AND елиът AND твърди AND лекарства AND контрол AND население The TikTok vide'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'секретни AND операции AND 1947 AND нло AND ню,мексико'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '80 AND процента AND световното AND население AND подкрепя AND Русия AND руската AND икономика AND пр'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '11 AND хиляди AND политици AND олигарси AND Нова AND Зеландия AND получили AND освобождаване AND вак'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '8. Verifiably False? Y'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#невилиомръзнадавиправятнамаймунки #оставкаизатвор #петъревтимов'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#оставкаизатвор #невилиомръзнадавиправятнамаймунки #петъревтимов'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#новини #русия #путин #война #2023 #вагнер #политика #news #breakingnews #russia #wagner #politics #'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#оставкаизатвор #петъревтимов'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '21# българия# хора# живот# свят# природа# професор# климат# земетресения# промени# тв# бтв# тикток# '
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#сащсапрестъпници #възражданепроектнасащ #невилиомръзнадавиправятнамаймунки #петъревтимов'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#сзо #новини #деца #училище #българия #европа #ес #внимание #малкидеца #детскаградина #обучение #new'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#невилиомръзнадавиправятнамаймунки #петъревтимов'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#смях #viral #забавно #хаха #българия #мозък #мисъл #ум #майка'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#злато #златодобив #българи #пари #богатство #бедност #грабеж #на #века #злато #българия #челопеч'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#наука #лаборатория #билгейтс #експерименти #човешкиправа #болести #ваксина #2023 #колумбия #меделин'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#tiktok #bulgaria #interesting #bg #celebrity #music #horror #lyrics #scary #bgtiktok c'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#европа #europe #war #matrix #escape'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#европа #europe #war #matrix #ум #душа #матрица'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#новини #българия #свят #доклад #оон #хора #прираст #данни #обезлюдяване #факты #европа #африка #ази'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#украйнаслугинасащ #сащсапрестъпници #възражданепроектнасащ #невилиомръзнадавиправятнамаймунки #петъ'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#лев #българия🇧🇬 #goldenbulgaria #bulgaria #euro #валутенборд #златнабългария #еврозона #евро #иконо'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'fyp #fy #fyfyyyy #CapCut #В Н И М А Н И Е Бъдете нащрек ПЛАНДЕМИЧНОТО споразумение на СЗ ще бъде нал'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'fyp #fy #fyfyyyy #CapCut #В Н И М А Н И Е  Бъдете нащрек  ПЛАНДЕМИЧНОТО споразумение на СЗ ще бъде н'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#кемтрейлс #време #контрол #въздух #програма #wakeup #learn #goodtoknow #chemtrails #weather #weathe'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#scary #tiktok #bulgaria #fyp #bg #eat #foryoupage #foru #foryou #bgtiktok #scared'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = '#россия #rusia #miketyson #майктайсон'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'Хърватия AND забранява AND Кока AND кола AND отровни AND съставки'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'директор AND болница AND германия AND скача AND сграда AND признава AND ваксини AND измама'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'премиерът AND Нигер AND даде AND България AND като AND катастрофален AND пример'
+topic = 'disinformation_trend'
+
+[[seeds]]
+kind = 'keyword'
+value = 'безжични AND слушалки AND причиняват AND рак'
+topic = 'disinformation_trend'

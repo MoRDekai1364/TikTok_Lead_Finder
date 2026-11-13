@@ -8,9 +8,9 @@ use sqlx::{Row, SqlitePool};
 use crate::config::SeedEntry;
 use crate::models::{
     AegisDeepfakeResult, AttributionAct, Claim, ClaimWithEvidence, Creator, Decision,
-    EntityIntelEvent, Evidence, HardwareProfile, Job, LeadCardSummary, OcrText, Person,
-    ProviderUsageSummary, SanctionsMatch, Seed, Stage, Transcript, TranscriptSegment, Video,
-    VideoDetail, VideoRef, VideoState,
+    EntityIntelEvent, Evidence, HardwareProfile, Job, LeadCardSummary, LeadStoriesFactCheck,
+    OcrText, Person, ProviderUsageSummary, SanctionsMatch, Seed, Stage, Transcript,
+    TranscriptSegment, Video, VideoDetail, VideoRef, VideoState,
 };
 use crate::politeness::compute_backoff_delay;
 
@@ -68,6 +68,8 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS entity_sanctions_cache (person_id INTEGER PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE, payload_json TEXT NOT NULL, checked_at TEXT NOT NULL)",
             "ALTER TABLE people ADD COLUMN last_monitored_at TEXT",
             "CREATE TABLE IF NOT EXISTS claim_verification_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, claim_id INTEGER NOT NULL, video_id TEXT NOT NULL, rating TEXT NOT NULL, suggested_verdict TEXT, notes TEXT, created_at TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS lead_stories_factchecks (id TEXT PRIMARY KEY, claim_text_en TEXT NOT NULL, claim_text_bg TEXT NOT NULL DEFAULT '', verdict TEXT NOT NULL, label TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'other', notes TEXT NOT NULL DEFAULT '', sources_json TEXT NOT NULL DEFAULT '[]', tiktok_urls_json TEXT NOT NULL DEFAULT '[]', boolean_queries TEXT NOT NULL DEFAULT '', doc_type TEXT NOT NULL DEFAULT 'unknown', source_file TEXT NOT NULL DEFAULT '', created_year INTEGER)",
+            "CREATE VIRTUAL TABLE IF NOT EXISTS lead_stories_fts USING fts5(id UNINDEXED, claim_text_en, claim_text_bg, notes, content=lead_stories_factchecks, content_rowid=rowid)",
         ];
         for mig in migrations {
             let _ = sqlx::raw_sql(mig).execute(&pool).await;
@@ -350,7 +352,7 @@ impl Database {
             "SELECT v.*, c.handle AS creator_handle, c.display_name AS creator_display_name
              FROM videos v
              LEFT JOIN creators c ON c.id = v.creator_id
-             WHERE (?1 IS NULL
+             WHERE (?1 IS NULL OR ?1 = 'all'
                     OR (?1 = 'pasted' AND v.lane = 'pasted')
                     OR (?1 = 'leads' AND (v.lane = 'leads' OR (v.lane IS NULL AND v.state IN ('VERIFIED', 'READY'))))
                     OR (?1 = 'already_checked' AND (v.lane = 'already_checked' OR EXISTS (SELECT 1 FROM claims cl WHERE cl.video_id = v.id AND (cl.verdict = 'ALREADY_CHECKED' OR cl.verdict = 'already_checked'))))
@@ -2708,5 +2710,142 @@ impl Database {
             }
         }
         Ok(map)
+    }
+
+    pub async fn seed_lead_stories_knowledge(&self, path: &Path) -> Result<usize> {
+        let raw = std::fs::read_to_string(path)?;
+        let parsed: serde_json::Value = serde_json::from_str(&raw)?;
+        let empty_vec = Vec::new();
+        let entries = if let Some(arr) = parsed.as_array() {
+            arr
+        } else if let Some(arr) = parsed.get("factchecks").and_then(|v| v.as_array()) {
+            arr
+        } else {
+            &empty_vec
+        };
+        let mut inserted = 0usize;
+        for entry in entries {
+            let id = entry.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            if id.is_empty() { continue; }
+            let claim_text_en = entry.get("claim_text_en").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let claim_text_bg = entry.get("claim_text_bg").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let verdict = entry.get("verdict").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let label = entry.get("label").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+            let category = entry.get("category").and_then(|v| v.as_str()).unwrap_or("other").to_string();
+            let notes = entry.get("notes").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let sources_json = entry.get("sources").map(|v| v.to_string()).unwrap_or_else(|| "[]".to_string());
+            let tiktok_urls_json = entry.get("tiktok_urls").map(|v| v.to_string()).unwrap_or_else(|| "[]".to_string());
+            let boolean_queries = entry.get("boolean_queries").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let doc_type = entry.get("doc_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+            let source_file = entry.get("source_file").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let created_year: Option<i64> = entry.get("created_year").and_then(|v| v.as_i64());
+            let res = sqlx::query(
+                "INSERT OR IGNORE INTO lead_stories_factchecks (id, claim_text_en, claim_text_bg, verdict, label, category, notes, sources_json, tiktok_urls_json, boolean_queries, doc_type, source_file, created_year) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)"
+            )
+            .bind(&id)
+            .bind(&claim_text_en)
+            .bind(&claim_text_bg)
+            .bind(&verdict)
+            .bind(&label)
+            .bind(&category)
+            .bind(&notes)
+            .bind(&sources_json)
+            .bind(&tiktok_urls_json)
+            .bind(&boolean_queries)
+            .bind(&doc_type)
+            .bind(&source_file)
+            .bind(created_year)
+            .execute(&self.pool)
+            .await?;
+            if res.rows_affected() > 0 {
+                inserted += 1;
+            }
+        }
+        Ok(inserted)
+    }
+
+    pub async fn search_lead_stories_factchecks(&self, query: &str, limit: i64) -> Result<Vec<LeadStoriesFactCheck>> {
+        let tokens: Vec<&str> = query
+            .split_whitespace()
+            .filter(|w| w.chars().count() >= 3)
+            .take(6)
+            .collect();
+
+        let mut out = Vec::new();
+        let mut seen_ids = std::collections::HashSet::new();
+
+        if !tokens.is_empty() {
+            let mut sql = String::from("SELECT id, claim_text_en, claim_text_bg, verdict, label, category, notes, sources_json, tiktok_urls_json, boolean_queries, doc_type, source_file, created_year FROM lead_stories_factchecks WHERE ");
+            let clauses: Vec<String> = tokens.iter().enumerate().map(|(i, _)| {
+                format!("(claim_text_en LIKE ?{} OR claim_text_bg LIKE ?{} OR notes LIKE ?{} OR boolean_queries LIKE ?{})", i * 4 + 1, i * 4 + 2, i * 4 + 3, i * 4 + 4)
+            }).collect();
+            sql.push_str(&clauses.join(" AND "));
+            sql.push_str(&format!(" ORDER BY length(claim_text_en) ASC LIMIT ?{}", tokens.len() * 4 + 1));
+
+            let mut q_builder = sqlx::query(&sql);
+            for tok in &tokens {
+                let p = format!("%{}%", tok);
+                q_builder = q_builder.bind(p.clone()).bind(p.clone()).bind(p.clone()).bind(p);
+            }
+            q_builder = q_builder.bind(limit);
+
+            if let Ok(rows) = q_builder.fetch_all(&self.pool).await {
+                for r in rows {
+                    let id: String = r.get("id");
+                    if seen_ids.insert(id.clone()) {
+                        out.push(LeadStoriesFactCheck {
+                            id,
+                            claim_text_en: r.get("claim_text_en"),
+                            claim_text_bg: r.get("claim_text_bg"),
+                            verdict: r.get("verdict"),
+                            label: r.get("label"),
+                            category: r.get("category"),
+                            notes: r.get("notes"),
+                            sources_json: r.get("sources_json"),
+                            tiktok_urls_json: r.get("tiktok_urls_json"),
+                            boolean_queries: r.get("boolean_queries"),
+                            doc_type: r.get("doc_type"),
+                            source_file: r.get("source_file"),
+                            created_year: r.get("created_year"),
+                        });
+                    }
+                }
+            }
+        }
+
+        if out.len() < limit as usize {
+            let remaining = limit - out.len() as i64;
+            let like_q = format!("%{}%", query.chars().take(80).collect::<String>());
+            let fallback_rows = sqlx::query(
+                "SELECT id, claim_text_en, claim_text_bg, verdict, label, category, notes, sources_json, tiktok_urls_json, boolean_queries, doc_type, source_file, created_year FROM lead_stories_factchecks WHERE claim_text_en LIKE ?1 OR claim_text_bg LIKE ?1 OR notes LIKE ?1 OR boolean_queries LIKE ?1 ORDER BY length(claim_text_en) ASC LIMIT ?2"
+            )
+            .bind(&like_q)
+            .bind(remaining)
+            .fetch_all(&self.pool)
+            .await?;
+
+            for r in fallback_rows {
+                let id: String = r.get("id");
+                if seen_ids.insert(id.clone()) {
+                    out.push(LeadStoriesFactCheck {
+                        id,
+                        claim_text_en: r.get("claim_text_en"),
+                        claim_text_bg: r.get("claim_text_bg"),
+                        verdict: r.get("verdict"),
+                        label: r.get("label"),
+                        category: r.get("category"),
+                        notes: r.get("notes"),
+                        sources_json: r.get("sources_json"),
+                        tiktok_urls_json: r.get("tiktok_urls_json"),
+                        boolean_queries: r.get("boolean_queries"),
+                        doc_type: r.get("doc_type"),
+                        source_file: r.get("source_file"),
+                        created_year: r.get("created_year"),
+                    });
+                }
+            }
+        }
+
+        Ok(out)
     }
 }

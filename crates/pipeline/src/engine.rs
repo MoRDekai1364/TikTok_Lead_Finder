@@ -72,6 +72,22 @@ impl PipelineContext {
         let _ = db.seed_defaults(&seeds).await?;
         let _ = db.recover_running_jobs().await?;
 
+        {
+            let knowledge_path = if paths.data_dir.join("lead_stories_knowledge.json").exists() {
+                Some(paths.data_dir.join("lead_stories_knowledge.json"))
+            } else if paths.static_root.join("data").join("lead_stories_knowledge.json").exists() {
+                Some(paths.static_root.join("data").join("lead_stories_knowledge.json"))
+            } else {
+                None
+            };
+            if let Some(kp) = knowledge_path {
+                match db.seed_lead_stories_knowledge(&kp).await {
+                    Ok(n) => tracing::info!("Seeded {} Lead Stories factchecks from {:?}", n, kp),
+                    Err(e) => tracing::warn!("Failed seeding Lead Stories factchecks: {:?}", e),
+                }
+            }
+        }
+
         let api_token = resolve_or_create_api_token(&paths.data_dir)?;
 
         let policy = PolitenessPolicy {
@@ -658,9 +674,9 @@ impl PipelineContext {
 
         let ytdlp_source = YtDlpDiscoverySource::new(self.ytdlp.clone());
         let mut target_handles: Vec<String> = Vec::new();
-        let is_keyword_mode = (cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" || cfg.target_mode == "general") && !cfg.allow_no_keywords;
+        let is_keyword_mode = (cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" || cfg.target_mode == "general" || cfg.target_mode == "trends") && !cfg.allow_no_keywords;
 
-        if cfg.target_mode == "watchlist" || cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" {
+        if cfg.target_mode == "watchlist" || cfg.target_mode == "keywords" || cfg.target_mode == "hashtags" || cfg.target_mode == "trends" {
             let creators = self.db.list_creators().await.unwrap_or_default();
             let mut wl: Vec<String> = creators
                 .into_iter()
@@ -734,18 +750,37 @@ impl PipelineContext {
 
         let max_v = cfg.max_per_target.max(1).min(30);
 
+        let mut all_queries: Vec<DiscoveryQuery> = Vec::new();
+        if (cfg.target_mode == "trends" || cfg.target_mode == "keywords" || cfg.target_mode == "hashtags") && !search_terms.is_empty() {
+            for term in search_terms.iter().take(8) {
+                let first_word = term.split_whitespace().next().unwrap_or(term).trim_start_matches('#');
+                if !first_word.is_empty() {
+                    all_queries.push(DiscoveryQuery::Keyword {
+                        keyword: first_word.to_string(),
+                        max_results: max_v,
+                    });
+                }
+            }
+        }
         for handle in target_handles {
-            result.targets_scanned += 1;
-            let query = DiscoveryQuery::Creator {
-                handle: handle.clone(),
+            all_queries.push(DiscoveryQuery::Creator {
+                handle,
                 max_results: max_v,
                 expansion_depth: 0,
-            };
+            });
+        }
 
+        for query in all_queries {
+            result.targets_scanned += 1;
             let refs = match ytdlp_source.discover(&query).await {
                 Ok(r) => r,
                 Err(e) => {
-                    result.errors.push(format!("@{handle}: {e}"));
+                    let desc = match &query {
+                        DiscoveryQuery::Creator { handle, .. } => format!("@{handle}"),
+                        DiscoveryQuery::Keyword { keyword, .. } => format!("#{keyword}"),
+                        _ => "query".to_string(),
+                    };
+                    result.errors.push(format!("{desc}: {e}"));
                     continue;
                 }
             };

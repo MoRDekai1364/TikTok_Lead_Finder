@@ -1,0 +1,28 @@
+(function ($) {
+    window.PF = window.PF || {};
+    function setEqualCardHeights(selector) {
+        const $el = $(selector);
+        let maxHeight = 0;
+        $el.each(function() {
+            maxHeight = Math.max(maxHeight, $(this).outerHeight());
+        });
+        if (window.matchMedia('(max-width: 767px').matches) {
+            $el.css({height: 'auto'});
+        } else {
+            $el.css({height: maxHeight});
+            
+        }
+    }
+    window.PF.setEqualCardHeights = function () {
+        setEqualCardHeights('[data-same-height]');
+    };
+    $(document).ready(function() {
+        setEqualCardHeights('[data-same-height]');
+    });
+    $(window).on('resize orientationchange', function() {
+        setEqualCardHeights('[data-same-height]');
+    });
+
+
+})(jQuery)
+

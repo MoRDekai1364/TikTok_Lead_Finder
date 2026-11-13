@@ -1,0 +1,1 @@
+{"nodes": [{"id": "prompts_verify_v1_verify_prompt", "label": "Verification V1 Prompt", "file_type": "concept", "source_file": "prompts/verify_v1.txt", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Strict JSON schema prompt for factual verification and per-statement checks"}], "edges": [], "hyperedges": []}

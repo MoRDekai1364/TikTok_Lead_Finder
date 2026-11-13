@@ -77,3 +77,73 @@ category = 'institution'
 name = 'Национален осигурителен институт'
 domain = 'noi.bg'
 category = 'institution'
+
+[[sources]]
+name = 'EUR-Lex - Право на Европейския съюз'
+domain = 'eur-lex.europa.eu'
+category = 'eu_law'
+
+[[sources]]
+name = 'Европейска комисия'
+domain = 'ec.europa.eu'
+category = 'eu_institution'
+
+[[sources]]
+name = 'Европейски орган за безопасност на храните (EFSA)'
+domain = 'efsa.europa.eu'
+category = 'regulatory_agency'
+
+[[sources]]
+name = 'Европейска централна банка (ECB)'
+domain = 'ecb.europa.eu'
+category = 'central_bank'
+
+[[sources]]
+name = 'НАТО - Официален портал'
+domain = 'nato.int'
+category = 'international_organization'
+
+[[sources]]
+name = 'Световна здравна организация (СЗО / WHO)'
+domain = 'who.int'
+category = 'health_authority'
+
+[[sources]]
+name = 'Национална медицинска библиотека на САЩ (PubMed)'
+domain = 'pubmed.ncbi.nlm.nih.gov'
+category = 'scientific_database'
+
+[[sources]]
+name = 'Associated Press (AP News)'
+domain = 'apnews.com'
+category = 'international_news_agency'
+
+[[sources]]
+name = 'Reuters News & Fact Check'
+domain = 'reuters.com'
+category = 'international_news_agency'
+
+[[sources]]
+name = 'Factcheck.bg'
+domain = 'factcheck.bg'
+category = 'factcheck_org'
+
+[[sources]]
+name = 'AFP Провери (Agence France-Presse)'
+domain = 'proveri.afp.com'
+category = 'factcheck_org'
+
+[[sources]]
+name = 'Lead Stories'
+domain = 'leadstories.com'
+category = 'factcheck_org'
+
+[[sources]]
+name = 'Българско национално радио (БНР)'
+domain = 'bnr.bg'
+category = 'public_broadcaster'
+
+[[sources]]
+name = 'Българска национална телевизия (БНТ)'
+domain = 'bntnews.bg'
+category = 'public_broadcaster'

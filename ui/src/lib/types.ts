@@ -1,6 +1,6 @@
 export type Lane = 'leads' | 'already_checked' | 'low_quality' | 'failed' | 'screened_out' | 'pasted';
 
-export type Screen = 'inbox' | 'creators' | 'people' | 'seeds' | 'calibration' | 'models' | 'settings' | 'export' | 'help';
+export type Screen = 'inbox' | 'creators' | 'people' | 'seeds' | 'calibration' | 'models' | 'settings' | 'export' | 'help' | 'workbench';
 
 export interface LeadCard {
   id: string;
@@ -386,7 +386,7 @@ export interface ScaleStatus {
   open_breakers: number;
 }
 
-export function formatVerdictDisplay(verdict: string | null | undefined, label: string | null | undefined, lang: string = 'bg'): string {
+export function formatVerdictDisplay(verdict: string | null | undefined, label: string | null | undefined, lang: string = 'en'): string {
   const normLabel = (label || '').trim().toLowerCase();
   const normVerdict = (verdict || '').trim().toUpperCase();
 
@@ -462,7 +462,7 @@ export function formatVerdictDisplay(verdict: string | null | undefined, label: 
 }
 
 export interface CustomScanConfig {
-  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags' | 'all' | 'no_keywords' | 'general';
+  target_mode: 'watchlist' | 'creators' | 'keywords' | 'hashtags' | 'all' | 'no_keywords' | 'general' | 'trends';
   targets?: string[];
   allow_no_keywords?: boolean;
   max_per_target?: number;
@@ -574,7 +574,7 @@ export interface CapacityTierInfo {
   secondsPerVideo: number;
 }
 
-export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'bg'): CapacityTierInfo {
+export function getCapacityTierInfo(cap: number, lang: 'bg' | 'en' = 'en'): CapacityTierInfo {
   const roundCap = Math.max(0, Math.round(cap || 0));
   const percentOfTarget = Math.round((roundCap / 300) * 100);
   const equivHoursPerDay = Math.max(1, Math.round((roundCap * 45) / 3600));

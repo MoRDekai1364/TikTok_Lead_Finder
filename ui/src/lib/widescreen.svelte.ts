@@ -479,7 +479,7 @@ class WidescreenStore {
 
   inboxRowHeight = $derived(this.geometry.rowHeight);
 
-  activeBadgeLabel(lang: 'bg' | 'en'): string {
+  activeBadgeLabel(lang: 'bg' | 'en' = 'en'): string {
     const prof = this.resolvedProfile;
     if (this.preset === 'auto') {
       if (prof === 'desktop') return lang === 'bg' ? 'Авто • 24"+' : 'Auto • 24"+';

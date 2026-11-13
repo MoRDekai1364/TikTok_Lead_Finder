@@ -833,3 +833,21 @@ pub struct ModelTestResponse {
     pub parsed_json: Option<serde_json::Value>,
     pub error: Option<String>,
 }
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LeadStoriesFactCheck {
+    pub id: String,
+    pub claim_text_en: String,
+    pub claim_text_bg: String,
+    pub verdict: String,
+    pub label: String,
+    pub category: String,
+    pub notes: String,
+    pub sources_json: String,
+    pub tiktok_urls_json: String,
+    pub boolean_queries: String,
+    pub doc_type: String,
+    pub source_file: String,
+    pub created_year: Option<i64>,
+}

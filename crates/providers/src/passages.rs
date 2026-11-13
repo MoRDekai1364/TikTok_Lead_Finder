@@ -95,7 +95,7 @@ impl PassageExtractorAndRanker {
 
     pub fn extract_main_text(&self, html: &str) -> String {
         static SCRIPT_STYLE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-            regex::Regex::new(r"(?is)<script\b[^>]*>[\s\S]*?</script>|<style\b[^>]*>[\s\S]*?</style>|<iframe\b[^>]*>[\s\S]*?</iframe>|<noscript\b[^>]*>[\s\S]*?</noscript>|<svg\b[^>]*>[\s\S]*?</svg>|<iframe\b[^>]*>").unwrap()
+            regex::Regex::new(r"(?is)<script\b[^>]*>[\s\S]*?</script>|<style\b[^>]*>[\s\S]*?</style>|<iframe\b[^>]*>[\s\S]*?</iframe>|<noscript\b[^>]*>[\s\S]*?</noscript>|<svg\b[^>]*>[\s\S]*?</svg>|<canvas\b[^>]*>[\s\S]*?</canvas>|<nav\b[^>]*>[\s\S]*?</nav>|<header\b[^>]*>[\s\S]*?</header>|<footer\b[^>]*>[\s\S]*?</footer>|<aside\b[^>]*>[\s\S]*?</aside>|<menu\b[^>]*>[\s\S]*?</menu>|<form\b[^>]*>[\s\S]*?</form>|<dialog\b[^>]*>[\s\S]*?</dialog>").unwrap()
         });
         let sanitized = SCRIPT_STYLE_RE.replace_all(html, " ");
         let doc = Html::parse_document(&sanitized);
@@ -128,7 +128,7 @@ impl PassageExtractorAndRanker {
 
         if let Ok(body_sel) = Selector::parse("body") {
             if let Some(body) = doc.select(&body_sel).next() {
-                return clean_extracted_text(&body.text().collect::<Vec<_>>().join(" "));
+                return clean_extracted_text(&body.text().collect::<Vec<_>>().join("\n"));
             }
         }
         String::new()
@@ -326,11 +326,29 @@ pub fn decode_html_bytes(bytes: &[u8], content_type: Option<&str>) -> String {
     fallback.into_owned()
 }
 
+fn is_category_or_city_list(trimmed: &str) -> bool {
+    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    if words.len() >= 5 {
+        let title_cased = words.iter().filter(|w| w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)).count();
+        let connectors = [
+            "и", "в", "на", "за", "с", "от", "по", "до", "че", "как", "е", "са", "се", "си", "беше", "при", "към", "във", "със"
+        ];
+        let has_connector = words.iter().any(|w| connectors.contains(&w.to_lowercase().as_str()));
+        if !has_connector && (title_cased as f64 / words.len() as f64) >= 0.65 {
+            return true;
+        }
+    }
+    false
+}
+
 fn clean_extracted_text(raw: &str) -> String {
     let mut lines = Vec::new();
     for l in raw.lines() {
         let trimmed = l.trim();
         if trimmed.is_empty() {
+            continue;
+        }
+        if is_category_or_city_list(trimmed) {
             continue;
         }
         let low = trimmed.to_lowercase();
@@ -339,6 +357,38 @@ fn clean_extracted_text(raw: &str) -> String {
             || low.contains("all rights reserved")
             || low.contains("политика за бисквитки")
             || low.contains("абонирайте се")
+            || low.contains("абонирай се")
+            || low.contains("пощенска кутия")
+            || low.contains("поща на твой домейн")
+            || low.contains("спам защита")
+            || low.contains("антиспам")
+            || low.contains("анти вирус")
+            || low.contains("виртуална клавиатура")
+            || low.contains("виртуална бдс")
+            || low.contains("шорткъти")
+            || low.contains("дневен хороскоп")
+            || low.contains("седмичен хороскоп")
+            || low.contains("любовен хороскоп")
+            || low.contains("за зодиите")
+            || low.contains("астрология")
+            || low.contains("куизове")
+            || low.contains("вицове")
+            || low.contains("всички градове")
+            || low.contains("всички държави")
+            || low.contains("бг футбол")
+            || low.contains("световен футбол")
+            || low.contains("общи условия")
+            || low.contains("за реклама")
+            || low.contains("реклама")
+            || low.contains("последна редакция:")
+            || low.contains("сподели във")
+            || low.contains("сподели в")
+            || low.contains("размерът има значение")
+            || low.contains("продължи откажи")
+            || low.contains("достъп отвсякъде")
+            || low.contains("мобилна версия")
+            || low.contains("смс известяване")
+            || low.contains("бърз достъп")
             || low.contains("var ")
             || low.contains("let ")
             || low.contains("const ")
@@ -378,7 +428,7 @@ fn clean_extracted_text(raw: &str) -> String {
         }
         lines.push(trimmed);
     }
-    lines.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")
+    lines.join("\n")
 }
 
 fn extract_lemmas(lexicon: &LexiconNormalizer, text: &str) -> Vec<String> {
@@ -440,6 +490,18 @@ mod tests {
         assert!(!clean.contains("oamSetHiddenInput"));
         assert!(!clean.contains("shopify-section"));
         assert!(!clean.contains("videaPlayerContainer"));
+    }
+
+    #[test]
+    fn category_clouds_and_ad_banners_are_filtered_from_clean_text() {
+        let raw = "Действителен новинарски абзац за финансово дружество с вписан капитал.\nРазмерът има значение 20 GB пощенска кутия Ново 20 MB приложения\nБългария Свят Мнения Разследвания Бизнес Имоти Авто Технологии Крими Спорт\nСофия Пловдив Варна Бургас Русе Добрич Враца Стара Загора\nСАЩ Великобритания Германия Италия Русия Франция Испания Гърция";
+        let clean = clean_extracted_text(raw);
+        assert!(clean.contains("Действителен новинарски абзац"));
+        assert!(!clean.contains("20 GB"));
+        assert!(!clean.contains("пощенска кутия"));
+        assert!(!clean.contains("Разследвания"));
+        assert!(!clean.contains("Пловдив"));
+        assert!(!clean.contains("Великобритания"));
     }
 
     #[test]

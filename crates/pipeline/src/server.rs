@@ -518,8 +518,12 @@ async fn handle_list_videos(
     State(ctx): State<Arc<PipelineContext>>,
     Query(q): Query<VideoListQuery>,
 ) -> Response {
+    let lane = match q.lane.as_deref() {
+        Some("all") | Some("") => None,
+        other => other.map(|s| s.to_string()),
+    };
     let filter = VideoFilter {
-        lane: q.lane,
+        lane,
         state: q.state,
         verdict: q.verdict,
         label: q.label,
@@ -1966,7 +1970,7 @@ async fn handle_research_person(
                 let combined_low = format!("{} {}", hit.title.to_lowercase(), body_text.to_lowercase());
                 let relevant = if name_tokens.len() >= 2 {
                     combined_low.contains(&name_low)
-                        || name_tokens.iter().filter(|t| combined_low.contains(t.as_str())).count() >= 1
+                        || name_tokens.iter().all(|t| combined_low.contains(t.as_str()))
                 } else {
                     combined_low.contains(&name_low)
                 };
@@ -2045,6 +2049,26 @@ async fn handle_research_person(
                 } else {
                     format!("{} {}", hit.title.trim(), hit.snippet.trim())
                 };
+                let pivot_combined_low = format!("{} {}", hit.title.to_lowercase(), body_text.to_lowercase());
+                let pivot_core = pivot.entity_name
+                    .to_lowercase()
+                    .replace("оод", "")
+                    .replace("еоод", "")
+                    .replace("ад", "")
+                    .replace("еад", "")
+                    .replace("дззд", "")
+                    .replace("холдинг", "")
+                    .replace("консорциум", "")
+                    .trim()
+                    .to_string();
+                let pivot_relevant = if pivot_core.chars().count() >= 3 {
+                    pivot_combined_low.contains(&pivot_core) || pivot_combined_low.contains(&pivot.entity_name.to_lowercase())
+                } else {
+                    pivot_combined_low.contains(&pivot.entity_name.to_lowercase())
+                };
+                if !pivot_relevant {
+                    continue;
+                }
                 if body_text.trim().chars().count() >= 25 {
                     scraped_docs.push(ScrapedOsintDoc {
                         bucket: "pivot".to_string(),
@@ -2125,6 +2149,7 @@ async fn handle_research_person(
         &scraped_docs,
         &["fin", "pivot"],
         wiki_full_text,
+        &name,
         &[
             "еик", "булстат", "оод", "еоод", "ад", "еад", "дззд", "търговски регистър",
             "управител", "съдружник", "дял", "капитал", "собственост", "имот", "декларац",
@@ -2139,6 +2164,7 @@ async fn handle_research_person(
         &scraped_docs,
         &["net", "pivot"],
         wiki_full_text,
+        &name,
         &[
             "съдружник", "партньор", "свързан", "кръг", "коалиция", "партия", "управителен",
             "съвет", "директор", "основател", "назнач", "предложен", "екип", "консорциум",
@@ -2150,6 +2176,7 @@ async fn handle_research_person(
         &scraped_docs,
         &["legal", "gov"],
         wiki_full_text,
+        &name,
         &[
             "съд", "вас", "вкс", "сес", "дело", "решение", "присъд", "осъден", "оправдан",
             "обвинен", "импийчмънт", "иск", "оспор", "кпконпи", "кпк", "несъвместимост",
@@ -2754,7 +2781,7 @@ fn ensure_concrete_facts_preserved_block1(
         ));
     }
 
-    for piv in entity_pivots.iter().take(12) {
+    for piv in entity_pivots.iter().take(8) {
         if !low.contains(&piv.entity_name.to_lowercase()) {
             let status_note = piv
                 .registry_status
@@ -2767,16 +2794,20 @@ fn ensure_concrete_facts_preserved_block1(
         }
     }
 
-    for fact in fin_extracted.iter().take(8) {
+    for fact in fin_extracted.iter().take(4) {
         let probe: String = fact.chars().take(42).collect::<String>().to_lowercase();
-        if !probe.is_empty() && !low.contains(&probe) {
+        if !probe.is_empty() && !low.contains(&probe) && !is_sentence_noise_or_boilerplate(fact) {
             missing_lines.push(format!("- {}", fact));
         }
     }
 
-    for fact in net_extracted.iter().take(5) {
+    for fact in net_extracted.iter().take(3) {
         let probe: String = fact.chars().take(42).collect::<String>().to_lowercase();
-        if !probe.is_empty() && !low.contains(&probe) && !missing_lines.iter().any(|l| l.to_lowercase().contains(&probe)) {
+        if !probe.is_empty()
+            && !low.contains(&probe)
+            && !missing_lines.iter().any(|l| l.to_lowercase().contains(&probe))
+            && !is_sentence_noise_or_boilerplate(fact)
+        {
             missing_lines.push(format!("- {}", fact));
         }
     }
@@ -2811,9 +2842,9 @@ fn ensure_concrete_facts_preserved_block2(
         }
     }
 
-    for fact in legal_extracted.iter().take(8) {
+    for fact in legal_extracted.iter().take(4) {
         let probe: String = fact.chars().take(42).collect::<String>().to_lowercase();
-        if !probe.is_empty() && !low.contains(&probe) {
+        if !probe.is_empty() && !low.contains(&probe) && !is_sentence_noise_or_boilerplate(fact) {
             missing_lines.push(format!("- {}", fact));
         }
     }
@@ -2913,6 +2944,66 @@ fn chapter_headings_for_type(entity_type: &str) -> [&'static str; 9] {
     }
 }
 
+fn is_sentence_noise_or_boilerplate(sent: &str) -> bool {
+    let trimmed = sent.trim();
+    let char_count = trimmed.chars().count();
+    if char_count < 35 || char_count > 340 {
+        return true;
+    }
+    let low = trimmed.to_lowercase();
+    let noise_patterns = [
+        "бисквитки", "cookies", "права запазени", "all rights reserved", "абонирайте се", "абонирай се",
+        "пощенска кутия", "поща на твой домейн", "спам защита", "антиспам", "анти вирус", "виртуална клавиатура",
+        "виртуална бдс", "шорткъти", "дневен хороскоп", "седмичен хороскоп", "любовен хороскоп", "за зодиите",
+        "астрология", "куизове", "вицове", "всички градове", "всички държави", "бг футбол", "световен футбол",
+        "общи условия", "за реклама", "реклама", "последна редакция:", "сподели във", "сподели в",
+        "джъстин бийбър", "сиара", "зеедорф", "porsche 911", "мкс получиха", "размерът има значение",
+        "продължи откажи", "достъп отвсякъде", "мобилна версия", "смс известяване", "бърз достъп",
+        "приложения (атачмънти)", "файл до всяка поща", "изключителна сигурност", "най-добрата спам защита",
+        "вписан в антиспам", "снимки (аватари)", "безплатна поща", "безплатни smtp", "по-малко кликове",
+        "стачна готовност", "повече ползи", "назначи зеедорф", "се връща към корените", "коледните си подаръци",
+        "еко-парк с многослоен", "откриха кокаин", "е бременна", "контактна форма", "карта на сайта",
+    ];
+    if noise_patterns.iter().any(|p| low.contains(p)) {
+        return true;
+    }
+
+    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    if words.len() < 5 {
+        return true;
+    }
+
+    let title_cased = words.iter().filter(|w| w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)).count();
+    let connectors = [
+        "и", "в", "на", "за", "с", "от", "по", "до", "че", "как", "е", "са", "се", "си",
+        "беше", "бяха", "при", "към", "като", "през", "след", "между", "срещу", "чрез",
+        "във", "със", "но", "а", "или", "който", "която", "които", "което",
+    ];
+    let connector_count = words.iter().filter(|w| connectors.contains(&w.to_lowercase().as_str())).count();
+
+    if connector_count == 0 && (title_cased as f64 / words.len() as f64) >= 0.55 {
+        return true;
+    }
+
+    let verb_stems = [
+        "е", "са", "бе", "беше", "бяха", "бил", "била", "били", "има", "няма",
+        "става", "стана", "прави", "направи", "казва", "каза", "съобщи", "обяви",
+        "подаде", "вписа", "избран", "назначен", "освободен", "управлява", "притежава",
+        "участва", "сключи", "плати", "получи", "образува", "разглежда", "постанови",
+        "отхвърли", "потвърди", "осъди", "глоби", "провери", "разследва", "договори",
+        "изгради", "завърши", "откри", "работи", "живее", "роден", "завършва",
+    ];
+    let has_verb = words.iter().any(|w| {
+        let lw = w.to_lowercase();
+        verb_stems.iter().any(|vs| lw == *vs || lw.starts_with(vs))
+    });
+    if !has_verb && connector_count < 2 {
+        return true;
+    }
+
+    false
+}
+
 fn split_factual_sentences(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     for para in text.lines() {
@@ -2939,13 +3030,15 @@ fn split_factual_sentences(text: &str) -> Vec<String> {
                     "г" | "гр" | "с" | "ул" | "бул" | "ал" | "чл" | "т" | "параграф"
                         | "проф" | "доц" | "д-р" | "инж" | "адв" | "ген" | "млн" | "млрд" | "хил" | "лв"
                 );
-                if !abbrev && cur.chars().count() >= 40 {
+                if !abbrev && cur.chars().count() >= 40 && cur.chars().count() <= 340 {
                     out.push(cur.trim().to_string());
                     cur.clear();
                 }
+            } else if cur.chars().count() > 340 {
+                cur.clear();
             }
         }
-        if cur.trim().chars().count() >= 40 {
+        if cur.trim().chars().count() >= 40 && cur.trim().chars().count() <= 340 {
             out.push(cur.trim().to_string());
         }
     }
@@ -2956,11 +3049,19 @@ fn extract_matching_factual_passages(
     docs: &[ScrapedOsintDoc],
     preferred_buckets: &[&str],
     wiki_text: &str,
+    target_name: &str,
     keywords: &[&str],
     max_items: usize,
 ) -> Vec<String> {
     let mut scored: Vec<(usize, String)> = Vec::new();
     let mut seen_prefixes: Vec<String> = Vec::new();
+
+    let target_low = target_name.to_lowercase();
+    let target_tokens: Vec<String> = target_low
+        .split_whitespace()
+        .filter(|w| w.chars().count() >= 3)
+        .map(|w| w.to_string())
+        .collect();
 
     let mut ordered_docs: Vec<&ScrapedOsintDoc> = docs
         .iter()
@@ -2975,14 +3076,68 @@ fn extract_matching_factual_passages(
     for doc in ordered_docs {
         let bucket_bonus = if preferred_buckets.contains(&doc.bucket.as_str()) { 3 } else { 0 };
         for sent in split_factual_sentences(&doc.text) {
-            let low = sent.to_lowercase();
-            if low.contains("бисквитки") || low.contains("cookies") || low.contains("всички права запазени") || low.contains("абонирайте се") {
+            if is_sentence_noise_or_boilerplate(&sent) {
                 continue;
             }
+            let low = sent.to_lowercase();
             let kw_hits = keywords.iter().filter(|kw| low.contains(**kw)).count();
             if kw_hits == 0 {
                 continue;
             }
+
+            let doc_title_low = doc.title.to_lowercase();
+            let title_mentions_target = doc_title_low.contains(&target_low)
+                || (target_tokens.len() >= 2
+                    && (target_tokens.iter().all(|t| doc_title_low.contains(t.as_str()))
+                        || target_tokens.iter().any(|t| t.chars().count() >= 4 && doc_title_low.contains(t.as_str()))));
+
+            let mentions_target = if title_mentions_target {
+                true
+            } else if target_tokens.len() >= 2 {
+                low.contains(&target_low)
+                    || target_tokens.iter().all(|t| low.contains(t.as_str()))
+                    || (target_tokens.last().map(|surname| low.contains(surname)).unwrap_or(false)
+                        && (low.contains("г-н")
+                            || low.contains("министър")
+                            || low.contains("депутат")
+                            || low.contains("президент")
+                            || low.contains("кмет")
+                            || low.contains("управител")
+                            || low.contains("съдружник")
+                            || low.contains("директор")))
+            } else {
+                low.contains(&target_low)
+            };
+
+            let mentions_pivot = if doc.bucket == "pivot" {
+                if let Some(bracket_end) = doc_title_low.find(']') {
+                    let pivot_entity = &doc_title_low[1..bracket_end];
+                    let pivot_stem = pivot_entity
+                        .replace("оод", "")
+                        .replace("еоод", "")
+                        .replace("ад", "")
+                        .replace("еад", "")
+                        .replace("дззд", "")
+                        .replace("холдинг", "")
+                        .replace("консорциум", "")
+                        .trim()
+                        .to_string();
+                    if pivot_stem.chars().count() >= 3 {
+                        low.contains(&pivot_stem) || low.contains(pivot_entity)
+                    } else {
+                        low.contains(pivot_entity)
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if !mentions_target && !mentions_pivot {
+                continue;
+            }
+
             let has_digit = sent.chars().any(|c| c.is_ascii_digit());
             let has_quote = sent.contains('„') || sent.contains('"');
             let score = kw_hits * 2 + bucket_bonus + if has_digit { 2 } else { 0 } + if has_quote { 1 } else { 0 };
@@ -3003,6 +3158,9 @@ fn extract_matching_factual_passages(
 
     if scored.len() < max_items && !wiki_text.is_empty() {
         for sent in split_factual_sentences(wiki_text) {
+            if is_sentence_noise_or_boilerplate(&sent) {
+                continue;
+            }
             let low = sent.to_lowercase();
             let kw_hits = keywords.iter().filter(|kw| low.contains(**kw)).count();
             if kw_hits == 0 {
@@ -3057,6 +3215,7 @@ fn generate_fallback_block1(
             docs,
             &["bio", "gov"],
             wiki_full,
+            name,
             &["роден", "завършва", "университет", "образование", "кариера", "директор", "председател", "министър", "кмет", "изграден", "открит", "местоположение", "площ", "км"],
             8,
         );
@@ -3081,7 +3240,7 @@ fn generate_fallback_block1(
     } else {
         &["оод", "еоод", "ад", "еад", "дззд", "еик", "търговски регистър", "дял", "дялове", "капитал", "съдружник", "управител", "собственик", "декларация", "кпконпи", "кпк", "имот", "влог", "лв", "лева", "евро", "долар", "$", "млн", "млрд", "милион", "милиард", "богатств", "актив", "доход", "печалб", "компани", "корпорац", "организейшън", "холдинг", "сделк", "оборот", "поръчка", "договор"]
     };
-    let fin_facts = extract_matching_factual_passages(docs, &["fin", "pivot", "legal"], wiki_full, fin_keywords, 12);
+    let fin_facts = extract_matching_factual_passages(docs, &["fin", "pivot", "legal"], wiki_full, name, fin_keywords, 12);
 
     if !entity_pivots.is_empty() || !eik_numbers.is_empty() {
         out.push_str("### 2.1. Идентифицирани юридически лица, консорциуми и регистрови идентификатори\n");
@@ -3118,7 +3277,7 @@ fn generate_fallback_block1(
     } else {
         &["съдружник", "партньор", "сдружение", "фондация", "управителен съвет", "съвет на директорите", "директор", "основател", "коалиция", "партия", "екип", "заместник", "вицепрезидент", "назначен", "предложен", "семейств", "близък", "свързан"]
     };
-    let net_facts = extract_matching_factual_passages(docs, &["net", "pivot", "fin", "gov"], wiki_full, net_keywords, 10);
+    let net_facts = extract_matching_factual_passages(docs, &["net", "pivot", "fin", "gov"], wiki_full, name, net_keywords, 10);
 
     out.push_str("### 3.1. Установени свързани лица, организации и партньорства\n");
     if !net_facts.is_empty() {
@@ -3158,7 +3317,7 @@ fn generate_fallback_block2(
     } else {
         &["мандат", "правителство", "кабинет", "министър", "парламент", "народно събрание", "депутат", "бнб", "подуправител", "председател", "комисия", "кмет", "президент", "указ", "бюджет", "решение"]
     };
-    let gov_facts = extract_matching_factual_passages(docs, &["gov", "bio"], wiki_full, gov_keywords, 10);
+    let gov_facts = extract_matching_factual_passages(docs, &["gov", "bio"], wiki_full, name, gov_keywords, 10);
     if !gov_facts.is_empty() {
         out.push_str("### 4.1. Данни за публични правомощия, управленски решения и етапи\n");
         for f in &gov_facts {
@@ -3187,7 +3346,7 @@ fn generate_fallback_block2(
         "несъвместимост", "конфликт на интереси", "отстраняване", "отстранен", "кзк", "сметна палата",
         "нарушение", "глоба", "санкция", "санкции", "магнитски", "ofac", "проверка", "акт",
     ];
-    let legal_facts = extract_matching_factual_passages(docs, &["legal", "fin", "media"], wiki_full, legal_keywords, 12);
+    let legal_facts = extract_matching_factual_passages(docs, &["legal", "fin", "media"], wiki_full, name, legal_keywords, 12);
 
     out.push_str("### 5.1. Съдебни дела, производства пред регулаторни органи и проверки\n");
     if !legal_facts.is_empty() {
@@ -3223,6 +3382,7 @@ fn generate_fallback_block2(
         docs,
         &["media", "news", "legal"],
         wiki_full,
+        name,
         &["разследване", "публикация", "позиция", "заяви", "коментира", "критика", "спор", "скандал", "казус", "интервю", "инцидент", "протест"],
         10,
     );
@@ -5853,6 +6013,41 @@ mod tests {
         assert!(b1.contains("Тръмп Организейшън"), "Expected eponymous company in Chapter 2: {}", b1);
         assert!(b1.contains("32 милиона долара") || b1.contains("$3,7 милиарда"), "Expected USD financial figures in Chapter 2: {}", b1);
         assert!(b2.contains("импийчмънт"), "Expected impeachment ruling in Chapter 5: {}", b2);
+    }
+
+    #[test]
+    fn test_noise_and_unrelated_documents_are_strictly_rejected_from_osint_facts() {
+        assert!(is_sentence_noise_or_boilerplate("Размерът има значение 20 GB пощенска кутия Ново 20 MB приложения"));
+        assert!(is_sentence_noise_or_boilerplate("България Свят Мнения Разследвания Бизнес Имоти Авто Технологии Крими Спорт"));
+        assert!(is_sentence_noise_or_boilerplate("София Пловдив Варна Бургас Русе Добрич Враца Стара Загора Хасково"));
+        assert!(is_sentence_noise_or_boilerplate("Откриха кокаин в къщата на Джъстин Бийбър Сиара е бременна"));
+        assert!(is_sentence_noise_or_boilerplate("Официално: Милан назначи Зеедорф за треньор"));
+
+        let garbage_docs = vec![
+            ScrapedOsintDoc {
+                bucket: "fin".to_string(),
+                title: "Публикувани са нови документи".to_string(),
+                url: "https://kik-info.com/novini/nap/".to_string(),
+                text: "Автобусните превозвачи са в стачна готовност. Шведско изследване: Българските и румънските имигранти носят повече ползи. Официално: Милан назначи Зеедорф за треньор. Откриха кокаин в къщата на Джъстин Бийбър. Сиара е бременна.".to_string(),
+            },
+            ScrapedOsintDoc {
+                bucket: "pivot".to_string(),
+                title: "[Ипон-1 ООД] Mail.bg".to_string(),
+                url: "http://corp.mail.bg/banners/athomead/thewall/".to_string(),
+                text: "Размерът има значение. 20 GB пощенска кутия. Ново 20 MB приложения (атачмънти). Най-добрата СПАМ защита в България. Вграден анти ВИРУС. МЕЙЛ БГ ЕАД (ЕИК: 175219991).".to_string(),
+            },
+        ];
+
+        let facts = extract_matching_factual_passages(
+            &garbage_docs,
+            &["fin", "pivot"],
+            "",
+            "Бойко Борисов",
+            &["еик", "оод", "еад", "доход", "зддфл"],
+            10,
+        );
+
+        assert!(facts.is_empty(), "Expected zero facts extracted from unrelated and noisy docs: {:?}", facts);
     }
 }
 

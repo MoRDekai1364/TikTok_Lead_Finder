@@ -1,0 +1,52 @@
+.wb { font: 13px system-ui, sans-serif; color: #dde1ea; }
+.wb h3 { margin: 0 0 4px; font-size: 15px; }
+.wb h4 { margin: 14px 0 6px; font-size: 13px; }
+.wb button { background: #262b3a; color: inherit; border: 1px solid #353b50; padding: 4px 9px; border-radius: 6px; cursor: pointer; font: inherit; }
+.wb button.on { background: #3b4fa0; }
+.wb button.primary { background: #3b6fe0; border-color: #3b6fe0; }
+.wb button.ghost { background: transparent; }
+.wb button.danger { color: #ff8a93; }
+.wb input, .wb select, .wb textarea { background: #0e1016; color: inherit; border: 1px solid #353b50; border-radius: 6px; padding: 5px; font: inherit; }
+.wb textarea { width: 100%; box-sizing: border-box; min-height: 90px; resize: vertical; }
+.wb .panel { background: #161922; border: 1px solid #2b3040; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+.wb .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+.wb .grow { flex: 1; }
+.wb .hint { color: #8b93a8; font-size: 12px; }
+.wb .tag { background: #262b3a; border-radius: 4px; padding: 1px 6px; margin-right: 4px; font-size: 11px; display: inline-block; }
+.wb .chip { padding: 1px 8px; border-radius: 10px; font-size: 11px; }
+.wb .ok { background: #1f5a3a; } .wb .bad { background: #6a2530; } .wb .warn { background: #6a5520; } .wb .info { background: #2b3a66; }
+.wb table { width: 100%; border-collapse: collapse; }
+.wb th, .wb td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #2b3040; vertical-align: top; }
+.wb th { color: #8b93a8; font-weight: 500; font-size: 12px; cursor: default; }
+.wb a { color: #7fa6ff; word-break: break-all; }
+.wb .grid { display: grid; gap: 10px; }
+.wb .g3 { grid-template-columns: repeat(3, 1fr); }
+.wb .g2 { grid-template-columns: 1fr 1fr; }
+.wb .card { background: #1c2030; border: 1px solid #2b3040; border-radius: 8px; padding: 10px; }
+.wb .big { font-size: 28px; font-weight: 700; }
+.wb .bar { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.wb .bar span { width: 80px; }
+.wb .bar i { display: block; height: 8px; background: #3b6fe0; border-radius: 4px; }
+.wb .tl { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
+.wb .tl div { flex: 1; background: #3b6fe0; border-radius: 3px 3px 0 0; min-width: 14px; position: relative; }
+.wb .tl small { position: absolute; bottom: -16px; left: 0; font-size: 9px; color: #8b93a8; white-space: nowrap; }
+.wb .sticky { position: sticky; top: 0; z-index: 3; background: #12141a; }
+.wb .claimtabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.wb .block { background: #1c2030; border: 1px solid #2b3040; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.wb .block label { color: #8b93a8; font-size: 11px; display: flex; gap: 6px; align-items: center; }
+.wb .block input.lbl { background: transparent; border: 0; color: #8b93a8; font-size: 11px; padding: 0; width: 220px; }
+.wb .preview { background: #fff; color: #111; border-radius: 8px; padding: 16px; white-space: pre-wrap; font: 13px/1.5 'Calibri', 'Aptos', 'Segoe UI', Arial, sans-serif; min-height: 300px; }
+.wb .preview b { font-family: system-ui, sans-serif; }
+.wb .word-doc-page { background: #ffffff; color: #111111; border-radius: 4px; padding: 36px 40px; font-family: 'Calibri', 'Aptos', 'Segoe UI', Arial, sans-serif; font-size: 14px; line-height: 1.35; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); border: 1px solid #d0d7de; min-height: 480px; word-break: break-word; }
+.wb .word-doc-page a { color: #0563c1; text-decoration: underline; word-break: break-all; }
+.wb .word-doc-page .word-head { font-weight: 700; margin-top: 14px; margin-bottom: 2px; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px; }
+.wb .word-doc-page .word-p { margin-bottom: 10px; white-space: pre-wrap; }
+.wb .word-doc-page .word-meta { margin-bottom: 6px; }
+.wb .word-doc-page .word-rating { font-weight: 600; margin-bottom: 12px; }
+.wb .word-doc-page .word-link-list { display: flex; flex-direction: column; gap: 3px; margin-top: 12px; }
+.wb .word-doc-page .word-field { margin-bottom: 8px; }
+.wb .word-doc-page .word-field-key { font-weight: 700; }
+.wb .word-doc-page .word-sub-list { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+.wb .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.wb .listrow { display: flex; gap: 4px; margin-bottom: 4px; }
+.wb .listrow input { flex: 1; }

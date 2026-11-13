@@ -38,12 +38,13 @@
   import SettingsScreen from './components/SettingsScreen.svelte';
   import TopBar from './components/TopBar.svelte';
   import VirtualInbox from './components/VirtualInbox.svelte';
+  import WorkbenchScreen from './components/WorkbenchScreen.svelte';
   import { widescreen } from './lib/widescreen.svelte';
   import { startAiJob, finishAiJob } from './lib/aiTasks.svelte';
 
-  let activeScreen = $state<Screen>('inbox');
+  let activeScreen = $state<Screen>('workbench');
   let activeLane = $state<Lane>('leads');
-  let currentLang = $state<Language>('bg');
+  let currentLang = $state<Language>('en');
   let theme = $state<'light' | 'dark'>('dark');
   let globalDossierPerson = $state<Person | null>(null);
 
@@ -86,7 +87,11 @@
     document.documentElement.setAttribute('data-theme', theme);
 
     const savedLang = localStorage.getItem('leadfinder_lang') as Language | null;
-    if (savedLang) currentLang = savedLang;
+    if (savedLang) {
+      currentLang = savedLang;
+    } else {
+      currentLang = 'en';
+    }
 
     const savedFeed = localStorage.getItem('leadfinder_video_feed');
     if (savedFeed !== null) {
@@ -596,6 +601,16 @@
         <ExportScreen {currentLang} />
       {:else if activeScreen === 'help'}
         <HelpScreen {currentLang} />
+      {:else if activeScreen === 'workbench'}
+        <WorkbenchScreen
+          {currentLang}
+          initialCards={cards}
+          onOpenSubject={(p) => (globalDossierPerson = p)}
+          onKeep={handleKeep}
+          onDiscard={handleDiscard}
+          onResearchMore={handleResearchMore}
+          onDeleteVideo={handleDeleteVideo}
+        />
       {/if}
     </div>
 

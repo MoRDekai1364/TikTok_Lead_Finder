@@ -18,7 +18,122 @@
     onScanComplete?: () => void;
   } = $props();
 
-  let targetMode = $state<'watchlist' | 'creators' | 'keywords' | 'general'>('watchlist');
+  interface LeadStoriesTrendChip {
+    id: string;
+    icon: string;
+    category: string;
+    title: string;
+    titleEn: string;
+    query: string;
+    verdict: string;
+    debunkSummary: string;
+    debunkSummaryEn: string;
+    sourceUrl: string;
+  }
+
+  const LEAD_STORIES_TRENDS: LeadStoriesTrendChip[] = [
+    {
+      id: 'lab-meat',
+      icon: '🥩',
+      category: 'health',
+      title: 'Лабораторно месо причинява турбо рак',
+      titleEn: "Lab-grown meat causes 'turbo cancer'",
+      query: 'лабораторно месо рак',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'EFSA и онкологичните институти потвърждават, че култивираното месо не съдържа ракови клетки. Термин "турбо рак" не съществува в онкологията.',
+      debunkSummaryEn: 'EFSA and medical consensus confirm lab-grown meat does not contain cancer cells. "Turbo cancer" is not a medical term.',
+      sourceUrl: 'https://efsa.europa.eu'
+    },
+    {
+      id: 'greece-fires',
+      icon: '🔥',
+      category: 'crisis',
+      title: 'Русия гаси пожарите в Гърция вместо НАТО',
+      titleEn: 'Russia, not NATO, is extinguishing Greek wildfires',
+      query: 'пожари Гърция Русия самолети',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'Руското МВнР изрично потвърди, че не е изпращало самолети Be-200. Помощта за Гърция дойде чрез Механизма за гражданска защита на ЕС.',
+      debunkSummaryEn: 'Russian MFA explicitly confirmed no Be-200 planes were sent. Firefighting aircraft were provided via the EU Civil Protection Mechanism.',
+      sourceUrl: 'https://civil-protection-humanitarian-aid.ec.europa.eu'
+    },
+    {
+      id: 'eu-insects',
+      icon: '🪲',
+      category: 'consumer',
+      title: 'ЕС задължава тайни канцерогенни насекоми в храните',
+      titleEn: 'EU mandates secret carcinogenic insects in food',
+      query: 'насекоми брашно рак ЕС',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'Регламентите на ЕС изискват изрично етикетиране на съставките от насекоми на опаковките за информиране на потребители и алергични.',
+      debunkSummaryEn: 'EU regulations strictly mandate explicit labeling of insect ingredients on food packages to inform consumers of allergens.',
+      sourceUrl: 'https://eur-lex.europa.eu'
+    },
+    {
+      id: 'reznikov-villa',
+      icon: '💰',
+      category: 'governance',
+      title: 'Дъщерята на Резников купи вила в Кан за 7 млн. евро',
+      titleEn: "Reznikov's daughter bought a €7M mansion in Cannes",
+      query: 'министър Резников имение Кан милиона',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'Френският имотен регистър и Le Figaro доказаха, че вилата не е собственост на семейство Резников, а видеото използва чужди снимки от сайт за наеми.',
+      debunkSummaryEn: 'French land registries and Le Figaro verified the property was never owned by Reznikov, using scraped luxury rental photos.',
+      sourceUrl: 'https://properties.lefigaro.com'
+    },
+    {
+      id: '15-min-cities',
+      icon: '🏙️',
+      category: 'conspiracy',
+      title: '15-минутните градове са концлагери с дигитален контрол',
+      titleEn: '15-minute cities are digital open-air prisons',
+      query: '15минутни градове затвор контрол',
+      verdict: 'CONTRADICTED',
+      debunkSummary: '15-минутният град е урбанистична концепция за пешеходен достъп до основни услуги без никакво ограничение на придвижването.',
+      debunkSummaryEn: '15-minute cities are an urban planning framework ensuring daily necessities are within walking distance, with zero travel restrictions.',
+      sourceUrl: 'https://factcheck.bg'
+    },
+    {
+      id: 'elections-rigged',
+      icon: '🏛️',
+      category: 'elections',
+      title: 'Машините за гласуване подменят вота в чужбина',
+      titleEn: 'Voting machines falsified ballots abroad',
+      query: 'машини избори подмяна протоколи',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'ЦИК и наблюдателите верифицират хартиените контролни разписки от всяка машина, съвпадащи на 100% с протоколите от секциите.',
+      debunkSummaryEn: 'The Central Election Commission and independent monitors verify paper control receipts matching precinct tally sheets.',
+      sourceUrl: 'https://cik.bg'
+    },
+    {
+      id: 'organ-theft',
+      icon: '👶',
+      category: 'crisis',
+      title: 'Черен джип отвлича деца в Пловдив за органи',
+      titleEn: 'Black SUV abducting children for organ trafficking',
+      query: 'кражба органи деца джип Пловдив',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'МВР и ОДМВР-Пловдив официално опровергаха циркулиращата паника: няма нито един подаден сигнал за отвлечено дете или трафик на органи.',
+      debunkSummaryEn: 'Ministry of Interior officially refuted the rumors: zero reports of child abduction or organ trafficking were filed.',
+      sourceUrl: 'https://mvr.bg'
+    },
+    {
+      id: 'fluoride-mind',
+      icon: '🧪',
+      category: 'health',
+      title: 'Флуорът в пастата за зъби калцира епифизата за контрол',
+      titleEn: 'Fluoride in toothpaste calcifies pineal gland for control',
+      query: 'флуор паста за зъби манипулация световен ред',
+      verdict: 'CONTRADICTED',
+      debunkSummary: 'СЗО и стоматологичните асоциации потвърждават, че флуоридът предпазва от зъбен кариес и е безопасен при нормална хигиена.',
+      debunkSummaryEn: 'WHO and dental associations confirm fluoride prevents dental caries and is safe under standard oral hygiene.',
+      sourceUrl: 'https://who.int'
+    }
+  ];
+
+  let targetMode = $state<'watchlist' | 'creators' | 'keywords' | 'general' | 'trends'>('trends');
+  let selectedTrendId = $state<string>('lab-meat');
+  let trendQuery = $state<string>('лабораторно месо рак');
+  let activeTrend = $derived(LEAD_STORIES_TRENDS.find((t) => t.id === selectedTrendId) ?? null);
   let customTargetsText = $state('');
   let keywordQuery = $state('');
   let generalQuery = $state('');
@@ -98,6 +213,16 @@
       recencyDays = 7;
       maxTargetsChoice = 0;
       autoProcess = true;
+    } else if (name === 'lead_stories') {
+      targetMode = 'trends';
+      selectedTrendId = 'lab-meat';
+      trendQuery = 'лабораторно месо рак';
+      allowNoKeywords = false;
+      maxPerTarget = 5;
+      minViewsChoice = 1000;
+      recencyDays = 14;
+      maxTargetsChoice = 0;
+      autoProcess = true;
     }
   }
 
@@ -110,7 +235,10 @@
 
     try {
       let targets: string[] = [];
-      if (targetMode === 'creators') {
+      if (targetMode === 'trends') {
+        const selected = LEAD_STORIES_TRENDS.find((t) => t.id === selectedTrendId);
+        targets = selected ? [selected.query] : (trendQuery.trim().length > 0 ? [trendQuery.trim()] : ['лабораторно месо рак']);
+      } else if (targetMode === 'creators') {
         targets = customTargetsText
           .split(/[\n,; ]+/)
           .map((s) => s.trim())
@@ -220,6 +348,9 @@
       <div class="modal-body">
         <div class="presets-bar">
           <span class="presets-label">⚡ {currentLang === 'bg' ? 'Готови настройки:' : 'Quick Presets:'}</span>
+          <button class="preset-btn preset-leadstories" onclick={() => applyPreset('lead_stories')}>
+            📰 {currentLang === 'bg' ? 'Lead Stories Трендове' : 'Lead Stories Trends'}
+          </button>
           <button class="preset-btn" onclick={() => applyPreset('fast')}>
             ⚡ {currentLang === 'bg' ? 'Бърза проверка (5 канала, 3 видеа)' : 'Quick Test (5 channels, 3 vids)'}
           </button>
@@ -240,6 +371,24 @@
               1. {currentLang === 'bg' ? 'Цел на сканирането' : 'Scan Target'}
             </h4>
             <div class="target-mode-selector">
+              <label class="mode-card highlight-leadstories" class:active={targetMode === 'trends'}>
+                <input
+                  type="radio"
+                  name="target_mode"
+                  value="trends"
+                  checked={targetMode === 'trends'}
+                  onchange={() => (targetMode = 'trends')}
+                />
+                <div class="mode-info">
+                  <span class="mode-name">📰 {currentLang === 'bg' ? 'Lead Stories Трендове' : 'Lead Stories Fact-Check Trends'}</span>
+                  <span class="mode-desc">
+                    {currentLang === 'bg'
+                      ? 'Търсене по проверени дезинформационни наративи, булеви заявки и разследвани теми'
+                      : 'Scan TikTok for verified misinformation narratives, boolean queries, and monitored themes'}
+                  </span>
+                </div>
+              </label>
+
               <label class="mode-card" class:active={targetMode === 'general'}>
                 <input
                   type="radio"
@@ -312,6 +461,82 @@
                 </div>
               </label>
             </div>
+
+            {#if targetMode === 'trends'}
+              <div class="input-subgroup trends-subgroup">
+                <div class="field-label-row">
+                  <span class="field-label">
+                    📰 {currentLang === 'bg' ? 'Изберете разследван тренд от Lead Stories:' : 'Select Lead Stories Misinformation Narrative:'}
+                  </span>
+                  <span class="trend-count-badge">8 {currentLang === 'bg' ? 'проверени теми' : 'verified narratives'}</span>
+                </div>
+
+                <div class="trends-grid">
+                  {#each LEAD_STORIES_TRENDS as trend}
+                    <button
+                      type="button"
+                      class="trend-card"
+                      class:active={selectedTrendId === trend.id}
+                      onclick={() => {
+                        selectedTrendId = trend.id;
+                        trendQuery = trend.query;
+                      }}
+                    >
+                      <div class="trend-card-top">
+                        <span class="trend-icon">{trend.icon}</span>
+                        <span class="trend-category-tag">{trend.category}</span>
+                        <span class="trend-status-pill">{trend.verdict}</span>
+                      </div>
+                      <div class="trend-card-title">
+                        {currentLang === 'bg' ? trend.title : trend.titleEn}
+                      </div>
+                      <div class="trend-card-query">
+                        <code>{trend.query}</code>
+                      </div>
+                    </button>
+                  {/each}
+                </div>
+
+                {#if activeTrend}
+                  <div class="active-trend-dossier">
+                    <div class="dossier-header">
+                      <span class="dossier-icon">🛡️</span>
+                      <span class="dossier-title">
+                        {currentLang === 'bg' ? 'Фактчек досие на Lead Stories:' : 'Lead Stories Fact-Check Dossier:'}
+                      </span>
+                      <span class="dossier-rating-tag">{activeTrend.verdict}</span>
+                    </div>
+                    <p class="dossier-body">
+                      {currentLang === 'bg' ? activeTrend.debunkSummary : activeTrend.debunkSummaryEn}
+                    </p>
+                    <div class="dossier-footer">
+                      <span class="dossier-src-label">{currentLang === 'bg' ? 'Първичен източник:' : 'Primary Source:'}</span>
+                      <a href={activeTrend.sourceUrl} target="_blank" rel="noreferrer" class="dossier-src-link">
+                        {activeTrend.sourceUrl} ↗
+                      </a>
+                    </div>
+                  </div>
+                {/if}
+
+                <div class="custom-trend-query-row">
+                  <label for="trend-query-input" class="field-label">
+                    🔍 {currentLang === 'bg' ? 'Заявка за търсене в TikTok за този наратив:' : 'TikTok search query for this narrative:'}
+                  </label>
+                  <input
+                    id="trend-query-input"
+                    type="text"
+                    class="custom-input"
+                    bind:value={trendQuery}
+                    placeholder={currentLang === 'bg' ? 'Въведете ключови думи или булева заявка...' : 'Enter keywords or boolean query...'}
+                  />
+                  <span class="field-hint">
+                    {currentLang === 'bg'
+                      ? '✓ Скенерът ще търси в TikTok за видеа, съдържащи тези думи в заглавието, описанията и хаштаговете.'
+                      : '✓ Scanner will query TikTok for videos containing these keywords in titles, captions, and hashtags.'}
+                  </span>
+                </div>
+              </div>
+            {/if}
 
             {#if targetMode === 'general'}
               <div class="input-subgroup">
@@ -806,6 +1031,208 @@
     background: var(--hover-bg);
     border-color: var(--primary-accent);
     color: var(--primary-accent);
+  }
+
+  .preset-leadstories {
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(99, 102, 241, 0.08);
+    font-weight: 700;
+  }
+
+  .preset-leadstories:hover {
+    border-color: var(--primary-accent);
+    background: rgba(99, 102, 241, 0.16);
+  }
+
+  .mode-card.highlight-leadstories {
+    border-color: rgba(99, 102, 241, 0.45);
+    background: rgba(99, 102, 241, 0.05);
+  }
+
+  .mode-card.highlight-leadstories.active {
+    border-color: var(--primary-accent);
+    background: rgba(99, 102, 241, 0.15);
+  }
+
+  .trends-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: 0.35rem;
+  }
+
+  .trend-count-badge {
+    font-size: 0.72rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary-accent);
+    font-weight: 700;
+  }
+
+  .trends-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.6rem;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 0.15rem;
+  }
+
+  .trend-card {
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+
+  .trend-card:hover {
+    border-color: var(--primary-accent);
+    background: var(--hover-bg);
+    transform: translateY(-1px);
+  }
+
+  .trend-card.active {
+    border-color: var(--primary-accent);
+    background: rgba(99, 102, 241, 0.12);
+    box-shadow: 0 0 0 1px var(--primary-accent);
+  }
+
+  .trend-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .trend-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .trend-category-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex: 1;
+    margin-left: 0.25rem;
+  }
+
+  .trend-status-pill {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .trend-card-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    line-height: 1.3;
+  }
+
+  .trend-card-query {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .trend-card-query code {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.68rem;
+  }
+
+  .active-trend-dossier {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .dossier-header {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .dossier-icon {
+    font-size: 1rem;
+  }
+
+  .dossier-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    flex: 1;
+  }
+
+  .dossier-rating-tag {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+  }
+
+  .dossier-body {
+    margin: 0;
+    font-size: 0.76rem;
+    line-height: 1.45;
+    color: var(--text-body);
+  }
+
+  .dossier-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.7rem;
+    flex-wrap: wrap;
+    padding-top: 0.35rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .dossier-src-label {
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .dossier-src-link {
+    color: var(--primary-accent);
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .dossier-src-link:hover {
+    text-decoration: underline;
+  }
+
+  .custom-trend-query-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
   }
 
   .scan-sections {

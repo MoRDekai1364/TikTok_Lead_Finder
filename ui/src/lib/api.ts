@@ -175,7 +175,8 @@ export async function fetchProfile(): Promise<HardwareProfile | null> {
 }
 
 export async function fetchVideos(lane: string = 'leads', limit: number = 2000): Promise<LeadCard[]> {
-  const res = await fetchJson<any>(`/api/videos?lane=${encodeURIComponent(lane)}&limit=${limit}`);
+  const laneQuery = (!lane || lane === 'all') ? '' : `&lane=${encodeURIComponent(lane)}`;
+  const res = await fetchJson<any>(`/api/videos?limit=${limit}${laneQuery}`);
   const list = Array.isArray(res) ? res : Array.isArray(res?.cards) ? res.cards : [];
   return list.map(mapSummaryToCard);
 }

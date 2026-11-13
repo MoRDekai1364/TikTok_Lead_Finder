@@ -1,0 +1,365 @@
+/*== Base Styles ==*/
+.ff-no-claims {
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    text-align: center;
+    color: #6c757d;
+}
+
+/*== Grid Container ==*/
+.ff-claims-container,
+.ff-layout-grid {
+    display: grid;
+    gap: 1.7rem;
+    width: 100%;
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+
+/*== Claim Card ==*/
+.ff-claim-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ff-card-bg, #ffffff);
+    border: 1px solid var(--ff-border, #eeeeee);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.ff-claim-card:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+/*== Author Wrapper ==*/
+.ff-claim-author-wrapper {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    background-color: #f6f6f6;
+    padding: 7px 10px 5px 14px;
+    border-bottom: 1px solid #e3e3e3;
+    border-radius: 6px 6px 0 0;
+    gap: 0.5rem;
+    min-height: 52px;
+}
+
+/*== Author Content ==*/
+.ff-claim-author {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem;
+    align-items: center;
+    line-height: 1.1rem;
+    min-height: 50px;
+}
+
+.ff-claim-author a.ff-author-name:only-child {
+    align-self: center;
+    padding-left: 6px;
+}
+
+/*== Author Image ==*/
+.ff-author-img {
+    flex-shrink: 0;
+    width: var(--ff-author-size, 36px);
+    height: var(--ff-author-size, 36px);
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 0 !important;
+}
+
+/*== Author Name ==*/
+.ff-author-name {
+    display: inline-block;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--ff-author-color, #555);
+    text-decoration: none;
+    transition: color 0.2s ease;
+    white-space: normal;
+    word-break: break-word;
+    margin: 0;
+    padding: 0;
+    max-width: 100%;
+}
+
+.ff-author-name:hover {
+    color: var(--ff-red, #a80808);
+    text-decoration: underline;
+}
+
+/*== Date ==*/
+.ff-claim-date {
+    font-size: 0.8rem;
+    color: var(--ff-date-color, #888);
+    margin-left: auto;
+    white-space: nowrap;
+    align-self: center;
+}
+
+/*== Card Body ==*/
+.ff-claim-body {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+/*== Title ==*/
+.ff-claim-title {
+    margin: 0 0 0.25rem;
+    font-size: var(--ff-title-size, 1.25rem);
+    line-height: 1.3;
+    font-weight: 700;
+    font-family: var(--ff-font-family, inherit);
+    color: var(--ff-title-color, #333);
+    padding-left: 0.19rem;
+}
+
+.ff-claim-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.ff-claim-title a:hover {
+    color: var(--ff-red, #a80808);
+    text-decoration: underline;
+}
+
+/*== Rating Badge ==*/
+.ff-rating {
+    margin-top: 0.22rem;
+    display: inline-block;
+    background: var(--ff-rating-bg, #ffeeee);
+    color: var(--ff-red, #a80808);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.18rem 0.55rem;
+    border-radius: 4px;
+    align-self: flex-start;
+}
+
+.ff-rating:hover {
+    color: var(--ff-red, #a80808);
+}
+
+/*== Image ==*/
+.ff-claim-img-link {
+    display: block;
+    overflow: hidden;
+    position: relative;
+    padding-top: 56.25%;
+}
+
+.ff-claim-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.ff-claim-card:hover .ff-claim-img {
+    transform: scale(1.05);
+}
+
+/*== Load More ==*/
+.ff-load-more-wrapper {
+    text-align: center;
+    margin: 2rem 0;
+    clear: both;
+}
+
+.ff-load-more {
+    padding: 0.5rem 1.5rem;
+    background: #f0f0f0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 0.5rem;
+}
+
+.ff-load-more:hover {
+    background: #e0e0f0;
+}
+
+.ff-load-more:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.ff-remaining-claims {
+    color: #666;
+    font-size: 0.9em;
+}
+
+/*== Responsive ==*/
+@media (max-width: 767px) {
+    .ff-layout-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ff-claim-body {
+        padding: 1rem;
+    }
+
+    .ff-claim-author-wrapper {
+        flex-direction: row;
+        align-items: center;
+        padding: 0.75rem 1rem;
+	    min-height: 45px;
+    }
+}
+
+
+/*== Author Wrapper ==*/
+.ff-claim-author-wrapper {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    background-color: #f6f6f6;
+    padding: 7px 10px 5px 14px;
+    border-bottom: 1px solid #e3e3e3;
+    border-radius: 6px 6px 0 0;
+    gap: 0.5rem;
+    min-height: 52px;
+}
+
+
+/* Search Form Styles */
+.factcheck-search-container {
+    max-width: 800px;
+    margin: 0 auto 2rem;
+}
+
+#factcheck-search-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#factcheck-search-form input[type="text"] {
+    flex-grow: 1;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 17px;
+	min-height: 36px;
+}
+
+#factcheck-search-form button {
+    padding: 5px 14px;
+    background-color: #000;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+	min-width: 100px;
+	margin-top: auto;
+	margin-bottom: auto;
+	max-height: 36px;
+}
+
+#factcheck-search-form button:hover {
+    background-color: #a80808;
+}
+
+/* Search Results Styles */
+.factcheck-search-results {
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+.factcheck-search-results h3 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.factcheck-search-results ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.factcheck-search-results li {
+    padding: 10px 0;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.factcheck-search-results li:last-child {
+    border-bottom: none;
+}
+
+.factcheck-search-results a {
+    color: #2271b1;
+    text-decoration: none;
+}
+
+.factcheck-search-results a:hover {
+    text-decoration: underline;
+}
+
+.factcheck-rating {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.factcheck-author {
+    display: block;
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+}
+
+.factcheck-author-count {
+    margin-left: 5px;
+    color: #999;
+    font-size: 0.9em;
+}
+
+.factcheck-search-loading,
+.factcheck-search-error {
+    padding: 20px;
+    text-align: center;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.factcheck-search-error {
+    color: #dc3232;
+}
+
+/* News Search - Drop-down */
+
+.claim-authors-search {
+    max-width: 300px;
+    margin: 20px 0;
+}
+
+.claim-authors-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+}

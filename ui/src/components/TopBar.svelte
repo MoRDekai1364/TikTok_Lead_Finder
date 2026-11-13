@@ -659,6 +659,9 @@
   {/if}
 
   <nav class="nav-tabs" aria-label="Основна навигация">
+    <button class="nav-tab nav-tab-workbench" class:active={activeScreen === 'workbench'} onclick={() => onNavigate('workbench')}>
+      {t.tabWorkbench}
+    </button>
     <button class="nav-tab" class:active={activeScreen === 'inbox'} onclick={() => onNavigate('inbox')}>
       {t.tabInbox}
     </button>
@@ -1018,6 +1021,27 @@
   .nav-tab.active {
     color: var(--primary-accent);
     border-bottom-color: var(--primary-accent);
+  }
+
+  .nav-tab-workbench {
+    margin-left: auto;
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 6px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .nav-tab-workbench:hover {
+    background: rgba(96, 165, 250, 0.1);
+    color: #93c5fd;
+  }
+
+  .nav-tab-workbench.active {
+    background: rgba(96, 165, 250, 0.15);
+    border-color: rgba(96, 165, 250, 0.7);
+    border-bottom-color: rgba(96, 165, 250, 0.7);
+    color: #93c5fd;
   }
 
   .pasted-preview-card {

@@ -1,0 +1,61 @@
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(e) {
+        if (!e.target.classList.contains('ff-load-more')) return;
+
+        e.preventDefault();
+        const button = e.target;
+        const wrapper = button.closest('.ff-load-more-wrapper');
+        const container = document.querySelector('.ff-claims-container');
+
+        if (!container) return;
+
+        const data = new FormData();
+        data.append('action', 'load_more_claims');
+        data.append('security', button.dataset.nonce);
+        data.append('limit', button.dataset.limit);
+        data.append('offset', button.dataset.offset);
+        data.append('author', button.dataset.author);
+        data.append('show_image', button.dataset.showImage);
+        data.append('show_rating', button.dataset.showRating);
+        data.append('show_date', button.dataset.showDate);
+        data.append('show_author_image', button.dataset.showAuthorImage);
+        data.append('pagination', button.dataset.pagination);
+
+        button.textContent = factCheckAjax.loadingText;
+        button.disabled = true;
+
+        fetch(factCheckAjax.ajaxurl, {
+            method: 'POST',
+            body: data
+        })
+        .then(res => res.json())
+        .then(response => {
+            if (response.success) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = response.data.html;
+
+                const newContent = tempDiv.querySelector('.ff-claims-container');
+                const newButtonWrapper = tempDiv.querySelector('.ff-load-more-wrapper');
+
+                if (newContent) {
+                    // Добавяме новите claims към съществуващите
+                    container.innerHTML += newContent.innerHTML;
+                }
+
+                if (newButtonWrapper) {
+                    wrapper.replaceWith(newButtonWrapper);
+                } else {
+                    wrapper.remove();
+                }
+            } else {
+                button.textContent = factCheckAjax.errorText;
+            }
+        })
+        .catch(() => {
+            button.textContent = 'Error - Click to Retry';
+        })
+        .finally(() => {
+            button.disabled = false;
+        });
+    });
+});
